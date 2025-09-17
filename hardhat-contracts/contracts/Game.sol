@@ -39,6 +39,8 @@ contract Game is Ownable {
     }
 
     function claimTokens(uint256 _amount, bytes memory _signature) external {
+        
+        require(_amount > 0, "Game: Amount must be greater than zero");
         uint256 currentNonce = userNonces[msg.sender];
         bytes32 messageHash = _buildMessageHash(_amount, currentNonce);
         
@@ -49,6 +51,10 @@ contract Game is Ownable {
 
         require(recoveredSigner == serverSignerAddress, "Game: Invalid signature");
         
+          if (!isRegistered[msg.sender]) {
+            _registerUser(msg.sender);
+        }
+
         userNonces[msg.sender]++;
         totalClaimedAmount[msg.sender] += _amount;
 
@@ -60,14 +66,9 @@ contract Game is Ownable {
         emit TokensClaimed(msg.sender, _amount, currentNonce);
     }
 
-    function register() external {
+     function register() external {
         require(!isRegistered[msg.sender], "User is already registered");
-        
-        isRegistered[msg.sender] = true;
-        users.push(msg.sender);
-        registrationDate[msg.sender] = block.timestamp;
-        
-        emit UserRegistered(msg.sender, block.timestamp);
+        _registerUser(msg.sender);
     }
 
     function getUserProfile(address _account) external view returns (UserProfile memory) {
@@ -98,5 +99,12 @@ contract Game is Ownable {
     }
     function isUserRegistered(address _account) external view returns (bool) {
         return isRegistered[_account];
+    }
+    function _registerUser(address _account) internal {
+        isRegistered[_account] = true;
+        users.push(_account);
+        registrationDate[_account] = block.timestamp;
+        
+        emit UserRegistered(_account, block.timestamp);
     }
 }
