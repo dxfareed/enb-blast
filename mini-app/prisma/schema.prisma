@@ -1,8 +1,10 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../app/generated/prisma" // This output path is good for the App Router
+  output   = "../app/generated/prisma"
+}
+
+generator scripts {
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -10,35 +12,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Model to store your users' profiles and game data
 model User {
   id            String    @id @default(cuid())
-  walletAddress String    @unique // The user's primary on-chain identifier
-  
-  // Optional fields for Farcaster integration
+  walletAddress String    @unique
   fid           Int?      @unique 
   username      String?   @unique
   pfpUrl        String?
-  
-  // Data for the "Me" page from your UI mockup
   streak        Int       @default(0)
   level         Int       @default(1)
-  totalClaimed  Decimal   @default(0) // For the leaderboard feature
-
+  totalClaimed  Decimal   @default(0)
   createdAt     DateTime  @default(now())
-
-  // This creates a relationship: one user can have many claims
   claims        Claim[]
 }
 
-// Model to store the on-chain claim history for each user
 model Claim {
   id        String   @id @default(cuid())
-  txHash    String   @unique // The unique transaction hash from the blockchain
-  amount    Decimal  // Use Decimal for precision with token amounts
+  txHash    String   @unique
+  amount    Decimal
   timestamp DateTime @default(now())
-  
-  // This links the claim back to a specific user
   user      User     @relation(fields: [userId], references: [id])
   userId    String
 }
