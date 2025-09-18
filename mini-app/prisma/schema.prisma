@@ -15,7 +15,7 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   walletAddress String    @unique
-  fid           Int?      @unique 
+  fid           BigInt      @unique 
   username      String?   @unique
   pfpUrl        String?
   streak        Int       @default(0)

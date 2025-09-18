@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const topUsers = await prisma.user.findMany({
-        //highest first
+      //highest first
       orderBy: {
         totalClaimed: 'desc',
       },
@@ -19,10 +19,17 @@ export async function GET() {
         pfpUrl: true,
         totalClaimed: true,
         level: true,
+        walletAddress:true,
       },
     });
 
-    return NextResponse.json(topUsers, { status: 200 });
+    //@ts-ignore
+    const serializableUsers = topUsers.map(user => ({
+      ...user,
+      totalClaimed: user.totalClaimed.toString(),
+    }));
+
+    return NextResponse.json(serializableUsers, { status: 200 });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
     return NextResponse.json({ message: 'Error fetching leaderboard' }, { status: 500 });
