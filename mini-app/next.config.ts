@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },
+
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/onboarding/welcome', 
+        permanent: true,
+      },
+    ]
+  },
 };
 
 export default nextConfig;
