@@ -1,8 +1,13 @@
 "use client";
 import Image from "next/image";
 import { Wallet } from "@coinbase/onchainkit/wallet";
-// import { useQuickAuth } from "@coinbase/onchainkit/minikit";
 import styles from "./page.module.css";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  useMiniKit,
+  useAddFrame,
+  useOpenUrl,
+} from "@coinbase/onchainkit/minikit";
 
 export default function Home() {
   // If you need to verify the user's identity, you can use the useQuickAuth hook.
@@ -10,9 +15,15 @@ export default function Home() {
   // this to meet your needs. See the /app/api/auth/route.ts file for more details.
   // Note: If you don't need to verify the user's identity, you can get their FID and other user data
   // via `useMiniKit().context?.user`.
-  // const { data, isLoading, error } = useQuickAuth<{
-  //   userFid: string;
-  // }>("/api/auth");
+
+  const { setFrameReady, isFrameReady, context } = useMiniKit();
+
+
+  useEffect(() => {
+    if (!isFrameReady) {
+      setFrameReady();
+    }
+  }, [setFrameReady, isFrameReady]);
 
   return (
     <div className={styles.container}>
@@ -20,7 +31,7 @@ export default function Home() {
         <Wallet />
       </header>
 
-      <div className={styles.content}>
+    { isFrameReady && <div className={styles.content}>
         <Image
           priority
           src="/sphere.svg"
@@ -29,9 +40,8 @@ export default function Home() {
           height={200}
         />
         <h1 className={styles.title}>MiniKit</h1>
-
         <p>
-          Get started by editing <code>app/page.tsx</code>
+          Get started by editing <code>app/page.tsx 11</code>
         </p>
 
         <h2 className={styles.componentsTitle}>Explore Components</h2>
@@ -66,7 +76,7 @@ export default function Home() {
             </li>
           ))}
         </ul>
-      </div>
+      </div>}
     </div>
   );
 }
