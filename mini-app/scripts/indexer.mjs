@@ -85,12 +85,10 @@ async function main() {
   const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
 
   if (!contractAddress) { throw new Error("Contract address not found."); }
-
+  
   const contract = new ethers.Contract(contractAddress, GAME_CONTRACT_ABI, provider);
 
-  console.log(`👂 Listening for TokensClaimed events on contract: ${contractAddress}`);
 
-  // The main listener just calls our new, robust processing function
   contract.on("TokensClaimed", (user, amount, nonce, event) => {
     processEvent(user, amount, nonce, event);
   });

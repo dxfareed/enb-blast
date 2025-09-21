@@ -4,6 +4,7 @@ import { SafeArea } from "@coinbase/onchainkit/minikit";
 import { minikitConfig } from "@/minikit.config";
 import { RootProvider } from "./rootProvider";
 import "./globals.css";
+import { Space_Mono } from 'next/font/google';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -35,14 +36,21 @@ const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
 });
 
+const spaceMono = Space_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+});
+
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <RootProvider>
-      <html lang="en">
+      <html lang="en" className={spaceMono.className}>
         <body className={`${inter.variable} ${sourceCodePro.variable}`}>
           <SafeArea>{children}</SafeArea>
         </body>

@@ -1,35 +1,50 @@
-import Image from 'next/image';
-import Link from 'next/link';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMiniKit } from '@coinbase/onchainkit/minikit';
+import animationStyles from '../../animations.module.css';
+import welcomeStyles from './welcome.module.css';
 
 export default function WelcomePage() {
+  const { context } = useMiniKit();
+  const router = useRouter();
+
+  async function checkUserRegistration(fid: number | string) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+      const response = await fetch(`/api/user/profile?fid=${fid}`);
+      if (response.ok) {
+        console.log('User is registered, go to game');
+        router.push('/game');
+      } else {
+        console.log("user is not registered, go to register");
+        router.push('/onboarding/register');
+      }
+    } catch (error){
+      console.log('Failed to check user registration:', error);
+      router.push('/onboarding/register');
+    }
+  }
+
+  useEffect(() => {
+    const fid = context?.user?.fid;
+    if (fid) {
+      checkUserRegistration(fid);
+    }
+  }, [context?.user?.fid]);
+
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      
-      <div className="flex flex-col items-center justify-around w-full max-w-sm h-[80vh] bg-white rounded-3xl shadow-lg p-8">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-48 h-48 rounded-full border-4 border-gray-800 flex items-center justify-center overflow-hidden mb-4">
-            <Image 
-              src="/splash.png"
-              alt="Splash Image" 
-              width={192} 
-              height={192}
-              className="object-cover"
-              priority
-            />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800">Pop Game</h1>
-          <p className="text-gray-500 mt-2">Catch the falling token to win!</p>
-        </div>
-
-        <div className="w-full">
-          <Link 
-            href="/game"
-            className="block w-full text-center bg-blue-600 text-white font-bold py-4 px-6 rounded-full text-xl shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-transform transform hover:scale-105"
-          >
-            Start Playing
-          </Link>
-        </div>
-
+    <main className={welcomeStyles.container}>
+      <div className={`w-48 h-48 rounded-full flex items-center justify-center overflow-hidden ${animationStyles.heartbeat}`}>
+        <img 
+          src="/Enb_000.png"
+          alt="Pop Game" 
+          className="object-cover w-full h-full"
+          width={120}
+          height={120}
+        />
       </div>
     </main>
   );
