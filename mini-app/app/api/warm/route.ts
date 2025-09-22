@@ -1,5 +1,3 @@
-// warm up the database connection, running a serverless database
-
 import prisma from '../../../lib/prisma';
 import { NextResponse } from 'next/server';
 

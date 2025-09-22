@@ -3,10 +3,14 @@ import { Inter, Source_Code_Pro } from "next/font/google";
 import { SafeArea } from "@coinbase/onchainkit/minikit";
 import { minikitConfig } from "@/minikit.config";
 import { RootProvider } from "./rootProvider";
+
 import "./globals.css";
 import { Space_Mono } from 'next/font/google';
 
+
+
 export async function generateMetadata(): Promise<Metadata> {
+  
   return {
     title: minikitConfig.frame.name,
     description: minikitConfig.frame.description,

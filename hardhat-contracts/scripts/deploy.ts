@@ -1,16 +1,21 @@
 import hre from "hardhat";
-import { getAddress } from "viem";
 
 async function main() {
   console.log("Preparing to deploy the Game contract to Base Sepolia...");
 
-  const tokenAddress = "0x0a0E0FccC2c799845214E8E5583E44479EC02a23";
-  const initialOwner = "0x70ca4a44A227645BB4815AE4d68098eA68aB926F";
+  const tokenAddress = "0xf73978b3a7d1d4974abae11f696c1b4408c027a0";
+  const initialOwner = "0xE59DF381684a7cf4D3E1177e68569b5D13F9585a";
   const signerAddress = "0x52c043C7120d7DA35fFdDF6C5c2359d503ceE5F8";
   const constructorArgs = [tokenAddress, initialOwner, signerAddress];
 
   const [deployer] = await hre.viem.getWalletClients();
   console.log(`Deploying contract with account: ${deployer.account.address}`);
+
+  console.log("Constructor arguments:", {
+    tokenAddress,
+    initialOwner,
+    signerAddress
+  });
 
   console.log("Deploying contract...");
 
@@ -18,7 +23,7 @@ async function main() {
 
   const deployTxHash = await deployer.deployContract({
     abi: contractArtifact.abi,
-    bytecode: contractArtifact.bytecode as `0x${string}`, // cast to the expected type
+    bytecode: contractArtifact.bytecode as `0x${string}`,
     args: constructorArgs,
   });
 
@@ -47,7 +52,7 @@ async function main() {
       address: contractAddress,
       constructorArguments: constructorArgs,
     });
-    console.log("✅ Contract verified successfully on Basescan!");
+    console.log("Contract verified successfully on Basescan!");
   } catch (error) {
     console.error("Verification failed.", error);
   }

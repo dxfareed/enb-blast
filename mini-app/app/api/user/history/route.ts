@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([], { status: 200 });
     }
 
-    //@ts-ignore
     const serializableClaims = userWithClaims.claims.map(claim => ({
       ...claim,
       amount: claim.amount.toString(),

@@ -1,5 +1,3 @@
-// one pool connection
-
 import { PrismaClient } from '@prisma/client';
 
 declare global {

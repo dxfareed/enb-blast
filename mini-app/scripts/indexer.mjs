@@ -14,6 +14,7 @@ const GAME_CONTRACT_ABI = [
 
 const MAX_RETRIES = 3; // We will retry a failed DB operation up to 3 times
 const RETRY_DELAY = 5000; // Wait 5 seconds between retries
+const POLLING_INTERVAL = 2000; // Poll every 2 seconds
 
 async function processEvent(user, amount, nonce, event, retryCount = 0) {
   console.log(`✅ Event received! Processing Nonce: ${nonce}...`);

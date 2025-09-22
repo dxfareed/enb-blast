@@ -1,10 +1,13 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
 import "dotenv/config";
+import "./scripts/check-user";
+import "./scripts/delete-user";
 
 const BASE_SEPOLIA_RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || "";
+const BASE_MAINNET_RPC_URL = process.env.BASE_MAINNET_RPC_URL || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000"; // Default for safety
-const BASESCAN_API_KEY = process.env.BASESCAN_API_KEY || "";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || ""; // Using standard Etherscan API key for V2
 
 const config: HardhatUserConfig = {
   solidity: "0.8.20",
@@ -15,19 +18,22 @@ const config: HardhatUserConfig = {
       url: BASE_SEPOLIA_RPC_URL,
       accounts: [PRIVATE_KEY],
     },
+    base: {
+      url: BASE_MAINNET_RPC_URL,
+      accounts: [PRIVATE_KEY],
+      chainId: 8453,
+    },
   },
 
   etherscan: {
-    apiKey: {
-      baseSepolia: BASESCAN_API_KEY,
-    },
+    apiKey: ETHERSCAN_API_KEY,
     customChains: [
       {
-        network: "baseSepolia",
-        chainId: 84532,
+        network: "base",
+        chainId: 8453,
         urls: {
-          apiURL: "https://api-sepolia.basescan.org/api",
-          browserURL: "https://sepolia.basescan.org",
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://basescan.org",
         },
       },
     ],
