@@ -1,8 +1,7 @@
 'use client';
-import { useState } from 'react';
-import { useAccount, useWriteContract, useTransaction } from 'wagmi';
-import { ConnectWallet } from '@coinbase/onchainkit/wallet';
-import { useMiniKit } from '@coinbase/onchainkit/minikit';
+import { useState, useEffect } from 'react';
+import { useAccount, useWriteContract, useTransaction, useConnect } from 'wagmi';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { useRouter } from 'next/navigation';
 import ParticleBackground from './particles';
 import styles from './register.module.css';
@@ -19,119 +18,158 @@ const GAME_ABI = [{
 const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`;
 
 export default function RegisterPage() {
+  console.log('RegisterPage mounted');
   const [isPopping, setIsPopping] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const { address, isConnected } = useAccount();
-  const { context } = useMiniKit();
+  const [user_fid, setUserFid] = useState<number | null>(null);
   const router = useRouter();
-  const user_fid = context?.user.fid;
-  const { writeContract, data: hash } = useWriteContract();
+  const { writeContract, data: hash, error: writeContractError } = useWriteContract();
+  const { connect, connectors } = useConnect();
 
-  const { isLoading: isWaitingForTransaction, isSuccess } = useTransaction({
+  useEffect(() => {
+    console.log('Attempting to get Farcaster user context...');
+    async function getFarcasterUser() {
+      try {
+        const { user } = await sdk.context;
+        if (user) {
+          console.log('Farcaster user found:', user);
+          setUserFid(user.fid);
+        } else {
+          console.log('No Farcaster user found in context.');
+        }
+      } catch (err) {
+        console.error('Error getting Farcaster user:', err);
+      }
+    }
+    getFarcasterUser();
+  }, []);
+
+  const { isLoading: isWaitingForTransaction, isSuccess, error: transactionError } = useTransaction({
     hash,
+    query: {
+      enabled: !!hash,
+    },
   });
 
-  if (!user_fid) {
-    console.log('No FID found');
-    return;
-  }
   const [hasRegistered, setHasRegistered] = useState(false);
 
-  if (isSuccess && hash && !hasRegistered) {
-    setHasRegistered(true);
-    setIsVerifying(false); // Stop verifying state
-    setIsCreatingProfile(true); // Start creating profile state
-    
-    console.log('Transaction successful, hash:', hash);
-    console.log('FID:', user_fid);
-    console.log('Connected wallet address:', address);
+  useEffect(() => {
+    if (isSuccess && hash && !hasRegistered && user_fid) {
+      setHasRegistered(true);
+      setIsVerifying(false);
+      setIsCreatingProfile(true);
+      
+      console.log('[PROFILE CREATION] Starting...');
+      console.log('[PROFILE CREATION] Transaction successful, hash:', hash);
+      console.log('[PROFILE CREATION] FID:', user_fid);
+      console.log('[PROFILE CREATION] Connected wallet address:', address);
 
-    console.log('Attempting to create user profile with:', {
-      fid: user_fid,
-      hash,
-      walletAddress: address,
-      contractAddress: GAME_CONTRACT_ADDRESS
-    });
-
-    fetch('/api/user/profile', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+      const profileData = {
         fid: user_fid,
         hash,
         walletAddress: address,
-      }),
-    })
-      .then(async response => {
-        const responseText = await response.text();
-        console.log('Raw API Response:', responseText);
+      };
 
-        let data;
-        try {
-          data = JSON.parse(responseText);
-          console.log('Parsed API Response:', data);
-        } catch (e) {
-          console.error('Failed to parse API response:', e);
-          throw new Error('Invalid API response format');
-        }
+      console.log('[PROFILE CREATION] Attempting to create user profile with:', profileData);
 
-        if (!response.ok) {
-          throw new Error(`Failed to create user profile: ${data.message || response.statusText}`);
-        }
-        return data;
+      fetch('/api/user/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
       })
-      .then((data) => {
-        console.log('Registration complete! User data:', data);
-        setIsCreatingProfile(false); // Stop creating profile state
-        router.push('/dashboard/game');
-      })
-      .catch(error => {
-        console.error('Error creating user profile:', error);
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack
+        .then(async response => {
+          const responseText = await response.text();
+          console.log('[PROFILE CREATION] Raw API Response:', responseText);
+
+          let data;
+          try {
+            data = JSON.parse(responseText);
+            console.log('[PROFILE CREATION] Parsed API Response:', data);
+          } catch (e) {
+            console.error('[PROFILE CREATION] Failed to parse API response:', e);
+            throw new Error('Invalid API response format');
+          }
+
+          if (!response.ok) {
+            throw new Error(`Failed to create user profile: ${data.message || response.statusText}`);
+          }
+          return data;
+        })
+        .then((data) => {
+          console.log('[PROFILE CREATION] Registration complete! User data:', data);
+          setIsCreatingProfile(false);
+          router.push('/dashboard/game');
+        })
+        .catch(error => {
+          console.error('[PROFILE CREATION] Error creating user profile:', error);
+          alert(`Registration failed: ${error.message}`);
+          setHasRegistered(false);
+          setIsCreatingProfile(false);
         });
-        alert(`Registration failed: ${error.message}`);
-        setHasRegistered(false);
-        setIsCreatingProfile(false); // Stop creating profile state on error
-      });
-  }
+    }
+  }, [isSuccess, hash, hasRegistered, user_fid, address, router]);
+
+  useEffect(() => {
+    if (writeContractError) {
+      console.error('Error from useWriteContract:', writeContractError);
+      alert(`Failed to send transaction: ${writeContractError.message}`);
+      setIsRegistering(false);
+    }
+  }, [writeContractError]);
+
+  useEffect(() => {
+    if (transactionError) {
+      console.error('Error from useTransaction:', transactionError);
+      alert(`Transaction failed: ${transactionError.message}`);
+      setIsRegistering(false);
+    }
+  }, [transactionError]);
 
   async function handleClick() {
     setIsPopping(true);
-    console.log('Starting registration process');
+    setTimeout(() => setIsPopping(false), 500);
+
+    console.log('[REGISTRATION] Button clicked.');
+    console.log('[REGISTRATION] Wallet connected:', isConnected);
+    console.log('[REGISTRATION] Wallet address:', address);
+    console.log('[REGISTRATION] User FID:', user_fid);
 
     if (!isConnected || !address) {
-      console.log('Wallet not connected');
+      console.log('[REGISTRATION] Wallet not connected, aborting.');
+      alert('Please connect your wallet first.');
       return;
-    } else if (!isRegistering) {
-      console.log('Starting contract registration');
-      setIsRegistering(true);
-      try {
-        console.log('Sending contract transaction to:', GAME_CONTRACT_ADDRESS);
-        writeContract({
-          address: GAME_CONTRACT_ADDRESS,
-          abi: GAME_ABI,
-          functionName: 'register',
-        });
-      } catch (error) {
-        console.error('Error in contract registration:', error);
-        alert('Failed to register on contract: ' + (error as Error).message);
-      } finally {
-        setIsRegistering(false);
-      }
+    }
+    if (!user_fid) {
+      console.log('[REGISTRATION] FID not found, aborting.');
+      alert('Farcaster user not found. Please open this in a Farcaster client.');
+      return;
     }
 
-    setTimeout(() => {
-      setIsPopping(false);
-    }, 500);
+    if (!isRegistering) {
+      console.log('[REGISTRATION] Starting contract registration...');
+      setIsRegistering(true);
+      writeContract({
+        address: GAME_CONTRACT_ADDRESS,
+        abi: GAME_ABI,
+        functionName: 'register',
+      });
+    }
   }
 
-  // Determine the current loading state and message
+  const handleConnect = () => {
+    console.log('Connect button clicked.');
+    if (connectors.length > 0) {
+      connect({ connector: connectors[0] });
+    } else {
+      console.error('No wagmi connectors found.');
+    }
+  }
+
   const getLoadingState = () => {
     if (isRegistering) return 'SENDING TRANSACTION...';
     if (isWaitingForTransaction) return 'WAITING FOR CONFIRMATION...';
@@ -147,7 +185,13 @@ export default function RegisterPage() {
       <ParticleBackground />
       <div className={styles.buttonContainer}>
         {!isConnected ? (
-          <ConnectWallet />
+          <button
+            className={styles.button}
+            type="button"
+            onClick={handleConnect}
+          >
+            Connect Wallet
+          </button>
         ) : (
           <button
             className={`${styles.button} ${isPopping ? animationStyles.popAnimation : ''}`}

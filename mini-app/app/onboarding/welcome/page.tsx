@@ -1,14 +1,24 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect,useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMiniKit } from '@coinbase/onchainkit/minikit';
+import { sdk } from '@farcaster/miniapp-sdk';
 import animationStyles from '../../animations.module.css';
 import welcomeStyles from './welcome.module.css';
 
 export default function WelcomePage() {
-  const { context } = useMiniKit();
+  const [fid, setFid] = useState<number | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    async function getFarcasterUser() {
+      const { user } = await sdk.context;
+      if (user) {
+        setFid(user.fid);
+      }
+    }
+    getFarcasterUser();
+  }, []);
 
   async function checkUserRegistration(fid: number | string) {
     try {
@@ -29,11 +39,10 @@ export default function WelcomePage() {
   }
 
   useEffect(() => {
-    const fid = context?.user?.fid;
     if (fid) {
       checkUserRegistration(fid);
     }
-  }, [context?.user?.fid]);
+  }, [fid]);
 
   return (
     <main className={welcomeStyles.container}>

@@ -1,37 +1,31 @@
 "use client";
 import Image from "next/image";
-import { Wallet } from "@coinbase/onchainkit/wallet";
 import styles from "./page.module.css";
-import { useEffect, useMemo, useState, useCallback } from "react";
-import {
-  useMiniKit,
-  useAddFrame,
-  useOpenUrl,
-} from "@coinbase/onchainkit/minikit";
+import { useAccount, useConnect } from 'wagmi'
 
 export default function Home() {
-  // If you need to verify the user's identity, you can use the useQuickAuth hook.
-  // This hook will verify the user's signature and return the user's FID. You can update
-  // this to meet your needs. See the /app/api/auth/route.ts file for more details.
-  // Note: If you don't need to verify the user's identity, you can get their FID and other user data
-  // via `useMiniKit().context?.user`.
+  const { isConnected, address } = useAccount()
+  const { connect, connectors } = useConnect()
 
-  const { setFrameReady, isFrameReady, context } = useMiniKit();
-
-
-  useEffect(() => {
-    if (!isFrameReady) {
-      setFrameReady();
+  const handleConnect = () => {
+    if (connectors.length > 0) {
+      connect({ connector: connectors[0] });
     }
-  }, [setFrameReady, isFrameReady]);
+  }
 
   return (
     <div className={styles.container}>
       <header className={styles.headerWrapper}>
-        <Wallet />
+        {isConnected ? (
+          <div>{address}</div>
+        ) : (
+          <button type="button" onClick={handleConnect}>
+            Connect
+          </button>
+        )}
       </header>
 
-    { isFrameReady && <div className={styles.content}>
+      <div className={styles.content}>
         <Image
           priority
           src="/sphere.svg"
@@ -39,44 +33,11 @@ export default function Home() {
           width={200}
           height={200}
         />
-        <h1 className={styles.title}>MiniKit</h1>
+        <h1 className={styles.title}>ENB Pop</h1>
         <p>
-          Get started by editing <code>app/page.tsx 11</code>
+          A mini-app for ENB Pop
         </p>
-
-        <h2 className={styles.componentsTitle}>Explore Components</h2>
-
-        <ul className={styles.components}>
-          {[
-            {
-              name: "Transaction",
-              url: "https://docs.base.org/onchainkit/transaction/transaction",
-            },
-            {
-              name: "Swap",
-              url: "https://docs.base.org/onchainkit/swap/swap",
-            },
-            {
-              name: "Checkout",
-              url: "https://docs.base.org/onchainkit/checkout/checkout",
-            },
-            {
-              name: "Wallet",
-              url: "https://docs.base.org/onchainkit/wallet/wallet",
-            },
-            {
-              name: "Identity",
-              url: "https://docs.base.org/onchainkit/identity/identity",
-            },
-          ].map((component) => (
-            <li key={component.name}>
-              <a target="_blank" rel="noreferrer" href={component.url}>
-                {component.name}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>}
+      </div>
     </div>
   );
 }
