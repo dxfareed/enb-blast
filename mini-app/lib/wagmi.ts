@@ -5,7 +5,7 @@ import { farcasterFrame as miniAppConnector } from '@farcaster/frame-wagmi-conne
 export const config = createConfig({
   chains: [base],
   transports: {
-    [base.id]: http(),
+    [base.id]: http("https://mainnet-preconf.base.org"),
   },
   connectors: [
     miniAppConnector()

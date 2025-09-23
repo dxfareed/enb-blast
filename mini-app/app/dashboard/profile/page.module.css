@@ -1,0 +1,98 @@
+.profileContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  
+  .profilePicture {
+    width: 8rem;
+    height: 8rem;
+    border-radius: 9999px;
+    background-color: #e5e7eb;
+    border: 4px solid white;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+  }
+  
+  .username {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #1f2937;
+  }
+  
+  .statsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    width: 100%;
+    text-align: center;
+  }
+  
+  .statCard {
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+  }
+  
+  .streakCard {
+    background-color: #ffedd5;
+    border-color: #fed7aa;
+  }
+  
+  .totalCard {
+    background-color: #f3e8ff;
+    border-color: #e9d5ff;
+  }
+  
+  .statLabel {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  
+  .statValue {
+    font-size: 1.875rem;
+    font-weight: 700;
+  }
+  
+  .streakCard .statLabel { color: #ea580c; }
+  .streakCard .statValue { color: #f97316; }
+  
+  .totalCard .statLabel { color: #9333ea; }
+  .totalCard .statValue { color: #a855f7; }
+  
+  .levelCard {
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    padding: 1rem;
+    border-radius: 1rem;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .levelIconWrapper {
+    background-color: #3b82f6;
+    padding: 0.5rem;
+    border-radius: 9999px;
+    color: white;
+  }
+  
+  .levelTextWrapper {
+  }
+  
+  .levelLabel {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #2563eb;
+  }
+  
+  .levelValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e40af;
+  }

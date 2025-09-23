@@ -1,43 +1,32 @@
-'use client';
-
-import { useState } from 'react';
+// We mark this as a client component because it will have interactive elements
+// like buttons that require JavaScript in the browser.
+'use client'; 
 
 export default function GamePage() {
-  const [isPopping, setIsPopping] = useState(false);
 
   const handleClaim = () => {
-    setIsPopping(true);
-    setTimeout(() => setIsPopping(false), 500);
+    // We'll add the logic for this later
+    alert("Tokens Claimed!");
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 relative m-4 rounded-lg bg-gray-50">
-        <div className="absolute inset-0 p-4">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-3 h-3 rounded-full bg-yellow-200"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            />
-          ))}
-        </div>
+    <div className="flex flex-col items-center justify-between h-full space-y-8">
+      {/* The main interactive area */}
+      <div 
+        className="w-full h-96 bg-yellow-100 border-2 border-dashed border-yellow-400 rounded-3xl flex items-center justify-center p-4"
+      >
+        <p className="text-yellow-600 text-center font-medium">
+          This is the interactive area where the "popping" game will happen.
+        </p>
       </div>
-
-      <div className="p-4">
-        <button
-          onClick={handleClaim}
-          className={`w-full py-3 rounded-full bg-blue-500 text-white font-medium text-lg
-            ${isPopping ? 'transform scale-95' : 'transform scale-100'}
-            transition-transform duration-200`}
-        >
-          Claim 100 $TOKENS
-        </button>
-      </div>
+      
+      {/* The claim button */}
+      <button 
+        onClick={handleClaim}
+        className="w-full bg-blue-500 text-white font-bold py-4 px-4 rounded-full shadow-lg hover:bg-blue-600 active:scale-95 transition-transform"
+      >
+        Claim 100 $TOKENS
+      </button>
     </div>
   );
-} 
+}

@@ -1,38 +1,86 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+// The Next.js Image component is no longer needed
+import { Star } from 'lucide-react';
+import styles from './page.module.css';
+import { useUser } from '@/app/context/UserContext';
+
+type UserProfile = {
+  username: string;
+  pfpUrl: string;
+  streak: number;
+  level: number;
+  totalClaimed: string;
+};
+
 export default function ProfilePage() {
+  const { fid, isLoading: isUserLoading } = useUser();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!fid) {
+      if (!isUserLoading) setIsLoading(false);
+      return;
+    }
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/user/profile?fid=${fid}`);
+        if (!response.ok) throw new Error('Failed to fetch profile data');
+        const data: UserProfile = await response.json();
+        setProfile(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [fid, isUserLoading]);
+
+  if (isLoading) return <div>Loading profile...</div>;
+  if (error) return <div>Error: {error}</div>;
+  if (!profile) return <div>Could not find user profile.</div>;
+
   return (
-    <div className="flex flex-col items-center p-4 space-y-4">
-      {/* Profile Picture */}
-      <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden">
-        {/* profile picture here */}
+    <div className={styles.profileContainer}>
+      
+      <div className={styles.profilePicture}>
+        {/* --- THIS IS THE CHANGE --- */}
+        <img 
+          src={profile.pfpUrl}
+          alt={`${profile.username}'s profile picture`}
+          width={128}
+          height={128}
+          style={{ borderRadius: '9999px', objectFit: 'cover' }} // We need to add the style directly
+        />
       </div>
 
-      {/* Username */}
-      <div className="text-lg font-medium">
-        @username
-      </div>
+      <h2 className={styles.username}>@{profile.username}</h2>
 
-      {/* Stats */}
-      <div className="flex gap-4 items-center">
-        <div className="flex items-center gap-2">
-          <span className="text-yellow-400">★</span>
-          <span>Level 1</span>
+      {/* ... the rest of the component remains the same ... */}
+      <div className={styles.statsGrid}>
+        <div className={`${styles.statCard} ${styles.streakCard}`}>
+          <p className={styles.statLabel}>Streak</p>
+          <p className={styles.statValue}>🔥 {profile.streak}</p>
         </div>
-        <div className="rounded-full bg-gray-100 px-4 py-1">
-          Total: 1000
+        <div className={`${styles.statCard} ${styles.totalCard}`}>
+          <p className={styles.statLabel}>Total Claimed</p>
+          <p className={styles.statValue}>{Number(profile.totalClaimed).toLocaleString()}</p>
         </div>
       </div>
-
-      {/* Level Progress */}
-      <div className="w-full max-w-xs">
-        <div className="bg-gray-100 rounded-full h-4">
-          <div 
-            className="bg-blue-500 h-full rounded-full" 
-            style={{ width: '60%' }}
-          />
+      <div className={styles.levelCard}>
+        <div className={styles.levelIconWrapper}>
+            <Star size={24} />
+        </div>
+        <div>
+            <p className={styles.levelLabel}>Level</p>
+            <p className={styles.levelValue}>Level {profile.level}</p>
         </div>
       </div>
     </div>
   );
-} 
+}

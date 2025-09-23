@@ -1,57 +1,57 @@
-'use client';
-
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Home, Trophy, History, User } from 'lucide-react';
+import styles from './layout.module.css';
+import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-
-  const navItems = [
-    { path: '/dashboard/game', label: 'Home' },
-    { path: '/dashboard/leaderboard', label: 'Leaderboard' },
-    { path: '/dashboard/history', label: 'History' },
-    { path: '/dashboard/profile', label: 'Me' },
-  ];
+  const userData = {
+    tokens: 250,
+  };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Token Display */}
-      <div className="w-full py-2 px-4 text-right">
-        <span className="inline-block rounded-full bg-gray-100 px-4 py-1">
-          250 $TOKENS
-        </span>
+    <div className={styles.container}>
+      <div className={styles.appWrapper}>
+
+        {/* === TOP BAR === */}
+        <header className={styles.header}>
+         {/*  <div className={styles.tokenDisplay}>
+            <div role="status" aria-label={`${userData.tokens} tokens`} className={styles.tokenBadge}>
+              {userData.tokens} $TOKENS
+            </div>
+          </div> */}
+           <TokenBalanceDisplay />
+          {/* If you need vertical space reserve a height-only element (no visible text): */}
+          <div aria-hidden className={styles.spacer} />
+        </header>
+
+        <main className={styles.main}>
+          {children}
+        </main>
+
+        {/* BOTTOM NAVIGATION */}
+        <nav className={styles.navigation}>
+          <Link href="/dashboard/game" className={styles.navLink}>
+            <Home size={28} className={styles.navIcon} />
+            <span className={styles.navLabel}>Home</span>
+          </Link>
+          <Link href="/dashboard/leaderboard" className={styles.navLink}>
+            <Trophy size={28} className={styles.navIcon} />
+            <span className={styles.navLabel}>Leaderboard</span>
+          </Link>
+          <Link href="/dashboard/history" className={styles.navLink}>
+            <History size={28} className={styles.navIcon} />
+            <span className={styles.navLabel}>History</span>
+          </Link>
+          <Link href="/dashboard/profile" className={styles.navLink}>
+            <User size={28} className={styles.navIcon} />
+            <span className={styles.navLabel}>Me</span>
+          </Link>
+        </nav>
       </div>
-
-      {/* Main Content */}
-      <main className="flex-1">
-        {children}
-      </main>
-
-      {/* Bottom Navigation */}
-      <nav className="border-t border-gray-200">
-        <div className="max-w-md mx-auto px-4">
-          <div className="flex justify-around py-3">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`flex flex-col items-center ${
-                  pathname === item.path
-                    ? 'text-blue-500'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {/* You can add icons here later */}
-                <span className="text-xs">{item.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </nav>
     </div>
   );
-} 
+}
