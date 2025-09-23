@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, Source_Code_Pro } from "next/font/google";
 import { minikitConfig } from "@/minikit.config";
 import { RootProvider } from "./rootProvider";
 
@@ -29,21 +28,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const sourceCodePro = Source_Code_Pro({
-  variable: "--font-source-code-pro",
-  subsets: ["latin"],
-});
-
 const spaceMono = Space_Mono({
   subsets: ['latin'],
   weight: ['400', '700'],
   style: ['normal', 'italic'],
   display: 'swap',
+  variable: "--font-space-mono",
 });
 
 export default function RootLayout({
@@ -53,8 +43,8 @@ export default function RootLayout({
 }) {
   return (
     <RootProvider>
-      <html lang="en" className={spaceMono.className}>
-        <body className={`${inter.variable} ${sourceCodePro.variable}`}>
+      <html lang="en" >
+        <body className={spaceMono.variable}>
           {children}
         </body>
       </html>

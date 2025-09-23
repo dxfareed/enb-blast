@@ -27,7 +27,7 @@ export default function WelcomePage() {
       const response = await fetch(`/api/user/profile?fid=${fid}`);
       if (response.ok) {
         console.log('User is registered, go to game');
-        router.push('dashboard/game');
+        router.push('/dashboard/game');
       } else {
         console.log("user is not registered, go to register");
         router.push('/onboarding/register');

@@ -10,16 +10,16 @@
 
 .buttonContainer {
   background: white;
-  padding: 1.2rem 3.5rem;
+  padding: 0.8rem 2.5rem;
   border-radius: 1rem;
-  min-width: 250px;
+  min-width: 200px;
   text-align: center;
   position: relative;
   z-index: 10;
 }
 
 .button {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: #000;
@@ -35,4 +35,4 @@
 .button:disabled {
   cursor: default;
   opacity: 0.8;
-} 
+}
