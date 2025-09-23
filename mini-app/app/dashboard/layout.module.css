@@ -3,6 +3,7 @@
   display: flex;
   justify-content: center;
   background-color: #1f2937;
+  font-family: var(--font-space-mono);
 }
 
 .appWrapper {
@@ -76,7 +77,7 @@
 
 .navLabel {
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .navIcon {

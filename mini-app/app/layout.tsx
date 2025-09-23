@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import { minikitConfig } from "@/minikit.config";
 import { RootProvider } from "./rootProvider";
-
-import "./globals.css";
 import { Space_Mono } from 'next/font/google';
+import "./globals.css";
+
+const spaceMono = Space_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'], // Regular and Bold
+  style: ['normal', 'italic'],
+  variable: '--font-space-mono', // 3. Create a CSS variable for it
+});
 
 
 
@@ -28,14 +34,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const spaceMono = Space_Mono({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
-  display: 'swap',
-  variable: "--font-space-mono",
-});
-
 export default function RootLayout({
   children,
 }: {
@@ -43,8 +41,8 @@ export default function RootLayout({
 }) {
   return (
     <RootProvider>
-      <html lang="en" >
-        <body className={spaceMono.variable}>
+      <html lang="en" className={spaceMono.variable}>
+        <body>
           {children}
         </body>
       </html>

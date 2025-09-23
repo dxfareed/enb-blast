@@ -3,6 +3,7 @@
     flex-direction: column;
     align-items: center;
     gap: 1.5rem;
+    font-family: var(--font-space-mono);
   }
   
   .profilePicture {
@@ -50,7 +51,7 @@
   
   .statLabel {
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 400;
   }
   
   .statValue {
@@ -87,7 +88,7 @@
   
   .levelLabel {
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     color: #2563eb;
   }
   

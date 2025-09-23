@@ -1,0 +1,65 @@
+.historyContainer {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-space-mono);
+  }
+  
+  .title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    color: #1f2937;
+  }
+  
+  .claimsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .claimItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background-color: #f9fafb;
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid #f3f4f6;
+  }
+  
+  .claimInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .claimLabel {
+    font-weight: 700;
+    color: #1f2937;
+  }
+  
+  .claimTimestamp {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+  
+  .txLink {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: #3b82f6;
+    text-decoration: none;
+    margin-top: 0.5rem;
+  }
+  
+  .txLink:hover {
+    text-decoration: underline;
+  }
+  
+  .amount {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #16a34a;
+    align-self: center;
+  }

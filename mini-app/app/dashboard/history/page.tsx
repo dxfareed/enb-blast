@@ -1,28 +1,87 @@
-// Mock data for the history list. This will eventually come from an API.
-const historyItems = [
-  { id: 1, time: "10:32 AM", amount: 100, currency: "$ENB" },
-  { id: 2, time: "9:15 AM", amount: 100, currency: "$ENB" },
-  { id: 3, time: "Yesterday, 8:00 PM", amount: 100, currency: "$ENB" },
-  { id: 4, time: "Yesterday, 7:12 PM", amount: 100, currency: "$ENB" },
-];
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useUser } from '@/app/context/UserContext';
+import styles from './page.module.css';
+import { ExternalLink } from 'lucide-react';
+
+type Claim = {
+  id: string;
+  txHash: string;
+  amount: string;
+  timestamp: string;
+};
 
 export default function HistoryPage() {
-  return (
-    <div className="flex flex-col space-y-3">
-      {historyItems.map((item) => (
-        <div 
-          key={item.id} 
-          className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-200"
-        >
-          <div>
-            <p className="font-semibold text-gray-800">Claimed Tokens</p>
-            <p className="text-sm text-gray-500">{item.time}</p>
+  const { fid } = useUser();
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!fid) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchHistory = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/user/history?fid=${fid}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch claim history');
+        }
+        const data: Claim[] = await response.json();
+        setClaims(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [fid]);
+
+  const renderContent = () => {
+    if (isLoading) {
+      return <p>Loading history...</p>;
+    }
+    if (error) {
+      return <p>Error: {error}</p>;
+    }
+    if (claims.length === 0) {
+      return <p>You have no claim history yet.</p>;
+    }
+    return (
+      <div className={styles.claimsList}>
+        {claims.map((claim) => (
+          <div key={claim.id} className={styles.claimItem}>
+            <div className={styles.claimInfo}>
+              <p className={styles.claimLabel}>Claimed Tokens</p>
+              <p className={styles.claimTimestamp}>
+                {new Date(claim.timestamp).toLocaleString()}
+              </p>
+              <a 
+                href={`https://basescan.org/tx/${claim.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.txLink}
+              >
+                View Transaction <ExternalLink size={14} />
+              </a>
+            </div>
+            <p className={styles.amount}>+ {Number(claim.amount).toLocaleString()}</p>
           </div>
-          <p className="font-bold text-lg text-green-500">
-            + {item.amount} {item.currency}
-          </p>
-        </div>
-      ))}
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className={styles.historyContainer}>
+      <h1 className={styles.title}>Claim History</h1>
+      {renderContent()}
     </div>
   );
 }

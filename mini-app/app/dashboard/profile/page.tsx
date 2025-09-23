@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// The Next.js Image component is no longer needed
 import { Star } from 'lucide-react';
 import styles from './page.module.css';
 import { useUser } from '@/app/context/UserContext';
@@ -49,19 +48,17 @@ export default function ProfilePage() {
     <div className={styles.profileContainer}>
       
       <div className={styles.profilePicture}>
-        {/* --- THIS IS THE CHANGE --- */}
         <img 
           src={profile.pfpUrl}
           alt={`${profile.username}'s profile picture`}
           width={128}
           height={128}
-          style={{ borderRadius: '9999px', objectFit: 'cover' }} // We need to add the style directly
+          style={{ borderRadius: '9999px', objectFit: 'cover' }}
         />
       </div>
 
       <h2 className={styles.username}>@{profile.username}</h2>
 
-      {/* ... the rest of the component remains the same ... */}
       <div className={styles.statsGrid}>
         <div className={`${styles.statCard} ${styles.streakCard}`}>
           <p className={styles.statLabel}>Streak</p>
