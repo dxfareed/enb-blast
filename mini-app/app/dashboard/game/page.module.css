@@ -1,0 +1,73 @@
+.gameContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  gap: 2rem;
+}
+
+.interactiveArea {
+  width: 100%;
+  height: 24rem;
+  background-color: #fefce8;
+  border: 2px dashed #facc15;
+  border-radius: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: #a16207;
+  text-align: center;
+  font-weight: 500;
+  font-size: 1.125rem;
+}
+
+.claimButton {
+  width: 100%;
+  background-color: #3b82f6;
+  color: white;
+  font-weight: 700;
+  padding: 1rem 0;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  font-size: 1rem;
+}
+
+.claimButton:hover {
+  background-color: #2563eb;
+}
+
+.claimButton:active {
+  transform: scale(0.98);
+}
+
+.claimButton:disabled {
+  background-color: #9ca3af;
+  color: #e5e7eb;
+  cursor: not-allowed;
+  transform: scale(1);
+}
+
+.statusMessage {
+  margin-top: 1rem;
+  padding: 0 1rem;
+  text-align: center;
+  font-weight: 500;
+  height: 24px;
+  font-size: 0.875rem;
+}
+
+.successMessage {
+  color: #16a34a;
+}
+
+.errorMessage {
+  color: #dc2626;
+  white-space: normal;
+  height: auto;
+  min-height: 24px;
+}

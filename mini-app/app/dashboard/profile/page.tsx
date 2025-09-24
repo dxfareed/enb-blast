@@ -4,41 +4,61 @@ import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
 import styles from './page.module.css';
 import { useUser } from '@/app/context/UserContext';
+import { useAccount, useReadContract } from 'wagmi';
+import {
+  TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
+  TOKEN_MEMBERSHIP_CONTRACT_ABI,
+  TOKEN_MEMBERSHIP_LEVELS
+} from '@/app/utils/constants';
 
 type UserProfile = {
   username: string;
   pfpUrl: string;
   streak: number;
-  level: number;
   totalClaimed: string;
 };
 
 export default function ProfilePage() {
-  const { fid, isLoading: isUserLoading } = useUser();
+  const { fid } = useUser();
+  const { address } = useAccount();
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isApiLoading, setIsApiLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: membershipData, isLoading: isContractLoading } = useReadContract({
+    address: TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
+    abi: TOKEN_MEMBERSHIP_CONTRACT_ABI,
+    functionName: 'userAccounts',
+    args: [address],
+    query: { enabled: !!address },
+  });
 
   useEffect(() => {
     if (!fid) {
-      if (!isUserLoading) setIsLoading(false);
+      setIsApiLoading(false);
       return;
     }
     const fetchProfile = async () => {
-      setIsLoading(true);
+      setIsApiLoading(true);
       try {
         const response = await fetch(`/api/user/profile?fid=${fid}`);
         if (!response.ok) throw new Error('Failed to fetch profile data');
-        const data: UserProfile = await response.json();
-        setProfile(data);
+        setProfile(await response.json());
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error');
       } finally {
-        setIsLoading(false);
+        setIsApiLoading(false);
       }
     };
     fetchProfile();
-  }, [fid, isUserLoading]);
+  }, [fid]);
+
+  const membershipLevelName = membershipData
+    ? TOKEN_MEMBERSHIP_LEVELS[Number((membershipData as any)[4])] || "Unknown"
+    : "Loading...";
+
+  const isLoading = isApiLoading || (!!address && isContractLoading);
 
   if (isLoading) return <div>Loading profile...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -46,9 +66,8 @@ export default function ProfilePage() {
 
   return (
     <div className={styles.profileContainer}>
-      
       <div className={styles.profilePicture}>
-        <img 
+        <img
           src={profile.pfpUrl}
           alt={`${profile.username}'s profile picture`}
           width={128}
@@ -56,9 +75,7 @@ export default function ProfilePage() {
           style={{ borderRadius: '9999px', objectFit: 'cover' }}
         />
       </div>
-
       <h2 className={styles.username}>@{profile.username}</h2>
-
       <div className={styles.statsGrid}>
         <div className={`${styles.statCard} ${styles.streakCard}`}>
           <p className={styles.statLabel}>Streak</p>
@@ -71,11 +88,11 @@ export default function ProfilePage() {
       </div>
       <div className={styles.levelCard}>
         <div className={styles.levelIconWrapper}>
-            <Star size={24} />
+          <Star size={24} />
         </div>
         <div>
-            <p className={styles.levelLabel}>Level</p>
-            <p className={styles.levelValue}>Level {profile.level}</p>
+          <p className={styles.levelLabel}>Membership Level</p>
+          <p className={styles.levelValue}>{membershipLevelName}</p>
         </div>
       </div>
     </div>

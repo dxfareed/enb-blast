@@ -1,5 +1,3 @@
-// scripts/indexer.mjs (Resilient version with retries)
-
 import { ethers } from 'ethers';
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
@@ -12,9 +10,9 @@ const GAME_CONTRACT_ABI = [
   "event TokensClaimed(address indexed user, uint256 amount, uint256 nonce)"
 ];
 
-const MAX_RETRIES = 3; // We will retry a failed DB operation up to 3 times
-const RETRY_DELAY = 5000; // Wait 5 seconds between retries
-const POLLING_INTERVAL = 2000; // Poll every 2 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 5000;
+const POLLING_INTERVAL = 2000;
 
 async function processEvent(user, amount, nonce, event, retryCount = 0) {
   console.log(`✅ Event received! Processing Nonce: ${nonce}...`);
@@ -50,20 +48,17 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
     console.log(`   - ✅ Successfully indexed claim with txHash: ${txHash}`);
 
   } catch (error) {
-    // Handle the specific "transaction timeout" error
     if (error.code === 'P2028' && retryCount < MAX_RETRIES) {
       console.warn(`   - ⚠️ Database connection timed out. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-      // Reconnect and retry the operation after a delay
       await prisma.$disconnect();
       await prisma.$connect();
       await new Promise(res => setTimeout(res, RETRY_DELAY));
       await processEvent(user, amount, nonce, event, retryCount + 1);
     
-    // Handle duplicate transaction hash errors
+    
     } else if (error.code === 'P2002') {
       console.warn(`   - ℹ️  Claim with txHash ${txHash} already exists. Skipping.`);
     
-    // Handle all other errors
     } else {
       console.error(`   - ❌ Error processing event after ${retryCount} retries:`, error);
     }
@@ -82,7 +77,7 @@ async function main() {
     process.exit(1);
   }
 
-  const provider = new ethers.WebSocketProvider(process.env.TESTNET_RPC_URL);
+  const provider = new ethers.WebSocketProvider(process.env.TESTNET_RPC_WSS_URL);
   const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
 
   if (!contractAddress) { throw new Error("Contract address not found."); }

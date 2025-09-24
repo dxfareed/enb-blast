@@ -6,9 +6,9 @@ import "./globals.css";
 
 const spaceMono = Space_Mono({
   subsets: ['latin'],
-  weight: ['400', '700'], // Regular and Bold
+  weight: ['400', '700'],
   style: ['normal', 'italic'],
-  variable: '--font-space-mono', // 3. Create a CSS variable for it
+  variable: '--font-space-mono',
 });
 
 
