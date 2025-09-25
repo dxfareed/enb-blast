@@ -2,29 +2,24 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; 
   height: 100%;
-  gap: 2rem;
+  gap: 0.5rem;
 }
 
-.interactiveArea {
+.actionContainer {
   width: 100%;
-  height: 24rem;
-  background-color: #fefce8;
-  border: 2px dashed #facc15;
-  border-radius: 1.5rem;
+  padding: 0 0.5rem;
+}
+
+.actionButtonsContainer {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  color: #a16207;
-  text-align: center;
-  font-weight: 500;
-  font-size: 1.125rem;
+  gap: 0.5rem;
+  width: 100%;
 }
 
 .claimButton {
-  width: 100%;
+  width: 100%; 
   background-color: #3b82f6;
   color: white;
   font-weight: 700;
@@ -35,6 +30,20 @@
   cursor: pointer;
   transition: background-color 0.2s, transform 0.1s;
   font-size: 1rem;
+  white-space: nowrap;
+}
+
+.actionButtonsContainer .claimButton {
+  flex-grow: 2;
+  flex-basis: 0;
+}
+
+.secondaryButton {
+  flex-grow: 1;
+  background-color: #8b5cf6;
+}
+.secondaryButton:hover {
+  background-color: #7c3aed;
 }
 
 .claimButton:hover {
@@ -46,10 +55,11 @@
 }
 
 .claimButton:disabled {
-  background-color: #9ca3af;
-  color: #e5e7eb;
+  background-color: #e5e7eb;
+  color: #9ca3af;
   cursor: not-allowed;
   transform: scale(1);
+  box-shadow: none;
 }
 
 .statusMessage {
