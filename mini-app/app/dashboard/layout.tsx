@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Home, Trophy, History, User } from 'lucide-react';
+import { Home, Trophy, History, User, ClipboardList } from 'lucide-react';
 import styles from './layout.module.css';
 import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 
@@ -38,14 +38,20 @@ export default function DashboardLayout({
             <Home size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>Home</span>
           </Link>
+
+          <Link href="/dashboard/tasks" className={styles.navLink}>
+            <ClipboardList size={28} className={styles.navIcon} />
+            <span className={styles.navLabel}>Tasks</span>
+          </Link>
+
           <Link href="/dashboard/leaderboard" className={styles.navLink}>
             <Trophy size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>Leaderboard</span>
           </Link>
-          <Link href="/dashboard/history" className={styles.navLink}>
+{/*           <Link href="/dashboard/history" className={styles.navLink}>
             <History size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>History</span>
-          </Link>
+          </Link> */}
           <Link href="/dashboard/profile" className={styles.navLink}>
             <User size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>Me</span>

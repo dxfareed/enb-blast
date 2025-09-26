@@ -1,0 +1,110 @@
+.tasksContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.taskSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #4b5563;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.taskItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.taskItem.completed {
+  background-color: #f9fafb;
+  opacity: 0.7;
+}
+
+.taskInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.taskTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.taskDescription {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.taskReward {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.rewardAmount {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #16a34a; /* Green */
+}
+
+.taskButton {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 9999px;
+  height: 2.25rem;
+  width: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.taskButton:hover {
+  background-color: #2563eb;
+}
+
+.taskButton:disabled {
+  background-color: #16a34a;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
