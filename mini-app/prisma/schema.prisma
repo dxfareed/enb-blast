@@ -22,6 +22,7 @@ model User {
   level         Int       @default(1)
   totalClaimed  Decimal   @default(0)
   totalPoints   BigInt       @default(0)
+  weeklyPoints  BigInt    @default(0)
   createdAt     DateTime  @default(now())
   claims        Claim[]
 }

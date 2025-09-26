@@ -20,9 +20,13 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
   const txHash = event.log.transactionHash;
 
   try {
-    const block = await event.log.getBlock();
+        const block = await event.log.getBlock();
     const timestamp = new Date(block.timestamp * 1000);
     
+    // --- THIS IS THE FIX ---
+    // Define amountDecimal here so it's available for the whole transaction.
+    const amountDecimal = ethers.formatUnits(amount, 18);
+
     await prisma.$transaction(async (tx) => {
       const dbUser = await tx.user.findUnique({
         where: { walletAddress: user.toLowerCase() },
@@ -41,20 +45,19 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
       await tx.claim.create({
         data: {
           txHash: txHash,
-          amount: ethers.formatUnits(amount, 18),
+          amount: amountDecimal, // Now this works
           timestamp: timestamp,
           userId: dbUser.id,
         },
       });
 
-      let newStreak = 1; // Default for a new or broken streak
+      let newStreak = 1;
       const lastClaim = dbUser.claims[0];
 
       if (lastClaim) {
         const timeDifference = timestamp.getTime() - lastClaim.timestamp.getTime();
         const TEN_MINUTES_MS = 10 * 60 * 1000;
 
-        // If the last claim was within 10 minutes, continue the streak.
         if (timeDifference > 0 && timeDifference <= TEN_MINUTES_MS) {
           newStreak = dbUser.streak + 1;
         }
@@ -65,9 +68,9 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
       await tx.user.update({
         where: { id: dbUser.id },
         data: { 
-          totalClaimed: { increment: parseFloat(amountDecimal) },
+          totalClaimed: { increment: parseFloat(amountDecimal) }, // And this works
           totalPoints: { increment: BigInt(Math.round(pointsScored)) },
-          streak: newStreak, // Use the calculated newStreak value
+          streak: newStreak,
         },
       });
     });

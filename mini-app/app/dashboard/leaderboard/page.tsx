@@ -1,4 +1,6 @@
 import styles from './page.module.css';
+import WeeklyCountdown from '@/app/components/WeeklyCountdown';
+import { Gift } from 'lucide-react'; 
 
 const leaderboardData = [
   { rank: 1, username: '@alice', score: 15_250, pfpUrl: "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/8fbbe5e2-0c53-48b8-c5f1-4a791b76ce00/rectcrop3", isCurrentUser: false },
@@ -19,34 +21,50 @@ const getRankStyling = (rank: number) => {
   }
 };
 
+const prizePoolAmount = 100000;
+
 export default function LeaderboardPage() {
   return (
     <div className={styles.leaderboardContainer}>
-      <h1 className={styles.title}>Leaderboard</h1>
-      {leaderboardData.map((user) => (
-        <div 
-          key={user.rank} 
-          className={`${styles.userRow} ${user.isCurrentUser ? styles.currentUser : ''}`}
-        >
-          <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>
-            {user.rank}
+      <div className={styles.headerContainer}>
+        <h1 className={styles.title}>Leaderboard</h1>
+        <div className={styles.subHeader}>
+          <div className={styles.prizePool}>
+            <Gift size={16} />
+            <span>Prize Pool: {prizePoolAmount.toLocaleString()}</span>
           </div>
-          <img 
-            src={user.pfpUrl}
-            alt={`${user.username}'s profile picture`}
-            className={styles.pfp}
-            width={48}
-            height={48}
-          />
-          <div className={styles.userInfo}>
-            <p className={styles.username}>{user.username}</p>
-          </div>
-          <div className={styles.scoreInfo}>
-            <p className={styles.score}>{user.score.toLocaleString()}</p>
-            <p className={styles.scoreLabel}>points</p>
+          <div className={styles.countdown}>
+            <WeeklyCountdown />
           </div>
         </div>
-      ))}
+      </div>
+
+      <div className={styles.userList}>
+        {leaderboardData.map((user) => (
+          <div
+            key={user.rank}
+            className={`${styles.userRow} ${user.isCurrentUser ? styles.currentUser : ''}`}
+          >
+            <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>
+              {user.rank}
+            </div>
+            <img
+              src={user.pfpUrl}
+              alt={`${user.username}'s profile picture`}
+              className={styles.pfp}
+              width={48}
+              height={48}
+            />
+            <div className={styles.userInfo}>
+              <p className={styles.username}>{user.username}</p>
+            </div>
+            <div className={styles.scoreInfo}>
+              <p className={styles.score}>{user.score.toLocaleString()}</p>
+              <p className={styles.scoreLabel}>points</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
