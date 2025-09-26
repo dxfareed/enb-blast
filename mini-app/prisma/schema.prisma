@@ -25,6 +25,8 @@ model User {
   weeklyPoints  BigInt    @default(0)
   createdAt     DateTime  @default(now())
   claims        Claim[]
+  taskCompletions UserTaskCompletion[]
+  events        UserEvent[]
 }
 
 model Claim {
@@ -34,4 +36,39 @@ model Claim {
   timestamp DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
   userId    String
+}
+
+model UserEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // e.g., 'LEADERBOARD_VISIT'
+  createdAt DateTime @default(now())
+
+  @@index([userId, type, createdAt])
+}
+
+enum TaskType {
+  DEFAULT
+  DAILY
+}
+
+model Task {
+  id              String    @id @default(cuid())
+  title           String
+  description     String
+  rewardPoints    Int
+  type            TaskType
+  actionUrl       String?
+  checkKey        String    @unique
+  completions     UserTaskCompletion[]
+}
+
+model UserTaskCompletion {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  task         Task     @relation(fields: [taskId], references: [id])
+  taskId       String
+  completedAt  DateTime @default(now())
 }

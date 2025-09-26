@@ -1,42 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useUser } from '@/app/context/UserContext';
 import styles from './page.module.css';
-import { Check, Loader } from 'lucide-react';
-import { 
-  checkWarpcastFollow, 
-  checkTelegramJoin, 
-  checkGamePlayed, 
-  checkTokenClaim, 
-  checkLeaderboardVisit 
-} from '@/lib/task-checker';
+import { Check, Loader, ExternalLink } from 'lucide-react';
 import { sdk } from '@farcaster/miniapp-sdk';
+import Toast from '@/app/components/Toast';
 
+type Task = {
+  id: string;
+  title: string;
+  description: string;
+  rewardPoints: number;
+  type: 'DEFAULT' | 'DAILY';
+  actionUrl?: string;
+  checkKey: string;
+  completed: boolean;
+};
 
-const initialDefaultTasks = [
-   { id: 1, title: 'Follow dxFareed', description: 'Follow ENB Pop Developer.', reward: 1000, completed: false },
-    { id: 2, title: 'Follow on Warpcast', description: 'Join our community for updates.', reward: 500, completed: true },
-    { id: 3, title: 'Join the Telegram', description: 'Get real-time support and news.', reward: 500, completed: false },
-];
-const initialDailyTasks = [
-  { id: 4, title: 'Play the Game', description: 'Play at least one round of ENB Pop.', reward: 100, completed: false },
-  { id: 5, title: 'Claim Your Tokens', description: 'Make a successful on-chain claim.', reward: 150, completed: false },
-  { id: 6, title: 'Visit the Leaderboard', description: 'Check out the competition.', reward: 50, completed: false },
-];
+type ToastState = {
+  message: string;
+  type: 'success' | 'error';
+} | null;
 
-function TaskItem({ task, onCheck, isChecking }) {
+function TaskItem({ task, onVerify, isChecking }) {
   const isButtonDisabled = task.completed || isChecking;
-  
+  const hasActionUrl = !!task.actionUrl;
+
   return (
     <div className={`${styles.taskItem} ${task.completed ? styles.completed : ''}`}>
       <div className={styles.taskInfo}>
         <h3 className={styles.taskTitle}>{task.title}</h3>
-        <p className={styles.taskDescription}>{task.description}</p>
+        <p className={styles.taskDescription}>
+          {task.description}
+        </p>
+        <span className={styles.rewardAmount}> +{task.rewardPoints} Points</span>
       </div>
-      <div className={styles.taskReward}>
-        <p className={styles.rewardAmount}>+{task.reward} Points</p>
-        <button onClick={() => onCheck(task.id)} disabled={isButtonDisabled} className={styles.taskButton}>
-          {isChecking ? <Loader size={16} className={styles.spinner} /> : (task.completed ? <Check size={16} /> : 'Go')}
+      <div className={styles.buttonContainer}>
+        {hasActionUrl && !task.completed && (
+          <button onClick={() => window.location.href = task.actionUrl} className={styles.goButton}>
+            <ExternalLink size={16} /> Go
+          </button>
+        )}
+        <button onClick={() => onVerify(task)} disabled={isButtonDisabled} className={`${styles.verifyButton} ${task.type === 'DEFAULT' ? styles.defaultVerifyButton : ''}`}>
+          {isChecking ? <Loader size={16} className={styles.spinner} /> : (task.completed ? <Check size={16} /> : 'Verify')}
         </button>
       </div>
     </div>
@@ -44,53 +51,73 @@ function TaskItem({ task, onCheck, isChecking }) {
 }
 
 export default function TasksPage() {
-  const [defaultTasks, setDefaultTasks] = useState(initialDefaultTasks);
-  const [dailyTasks, setDailyTasks] = useState(initialDailyTasks);
-  const [checkingTaskId, setCheckingTaskId] = useState<number | null>(null);
+  const { fid } = useUser();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [checkingTaskId, setCheckingTaskId] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
 
-  const handleTaskCheck = async (taskId: number) => {
-    sdk.haptics.impactOccurred('light');
-    setCheckingTaskId(taskId);
+  const fetchTasks = async () => {
+    if (!fid) return;
+    setIsLoading(true);
     try {
-      let result = false;
-      switch (taskId) {
-        case 1: result = await checkWarpcastFollow(); break;
-        case 2: result = await checkTelegramJoin(); break;
-        case 3: result = await checkGamePlayed(); break;
-        case 4: result = await checkTokenClaim(); break;
-        case 5: result = await checkLeaderboardVisit(); break;
-        default: throw new Error("Unknown task");
+      const response = await fetch(`/api/tasks?fid=${fid}`);
+      if (!response.ok) throw new Error("Failed to fetch tasks");
+      setTasks(await response.json());
+    } catch (error) { console.error(error); } 
+    finally { setIsLoading(false); }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fid]);
+
+  const handleVerifyTask = async (task: Task) => {
+    sdk.haptics.impactOccurred('medium');
+    setCheckingTaskId(task.id);
+    try {
+      const response = await fetch('/api/tasks/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid, checkKey: task.checkKey }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Verification failed');
       }
       
-      if (result) {
-        sdk.haptics.notificationOccurred('success');
-        setDefaultTasks(tasks => tasks.map(t => t.id === taskId ? { ...t, completed: true } : t));
-        setDailyTasks(tasks => tasks.map(t => t.id === taskId ? { ...t, completed: true } : t));
-      }
+      sdk.haptics.notificationOccurred('success');
+      setToast({ message: 'Task verified successfully!', type: 'success' });
+      await fetchTasks();
+
     } catch (error) {
-        sdk.haptics.notificationOccurred('error');
+      sdk.haptics.notificationOccurred('error');
+      setToast({ message: `Error: ${error.message}`, type: 'error' });
     } finally {
       setCheckingTaskId(null);
     }
   };
+  
+  const dailyTasks = tasks.filter(t => t.type === 'DAILY');
+  const defaultTasks = tasks.filter(t => t.type === 'DEFAULT');
+
+  if (isLoading) return <div>Loading tasks...</div>;
 
   return (
     <div className={styles.tasksContainer}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <h1 className={styles.title}>Tasks</h1>
       <section className={styles.taskSection}>
-        <h2 className={styles.sectionTitle}>Daily Tasks</h2>
+        <h2 className={`${styles.sectionTitle} ${styles.dailyTasksTitle}`}>Daily Tasks</h2>
         <div className={styles.taskList}>
-          {dailyTasks.map(task => 
-            <TaskItem key={task.id} task={task} onCheck={handleTaskCheck} isChecking={checkingTaskId === task.id} />
-          )}
+          {dailyTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
         </div>
       </section>
       <section className={styles.taskSection}>
-        <h2 className={styles.sectionTitle}>Default Tasks</h2>
+        <h2 className={`${styles.sectionTitle} ${styles.defaultTasksTitle}`}>Default Tasks</h2>
         <div className={styles.taskList}>
-          {defaultTasks.map(task => 
-            <TaskItem key={task.id} task={task} onCheck={handleTaskCheck} isChecking={checkingTaskId === task.id} />
-          )}
+          {defaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
         </div>
       </section>
     </div>

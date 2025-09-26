@@ -1,6 +1,4 @@
-'use client';
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import gameStyles from '@/app/dashboard/game/game.module.css';
 
 const GAME_DURATION = 30;
@@ -15,10 +13,11 @@ const PICTURE_URL = "/Enb_000.png";
 type Item = { id: number; type: 'picture' | 'bomb'; x: number; y: number; speed: number; isPopped?: boolean; };
 type GameState = 'idle' | 'playing' | 'won' | 'lost';
 type GameEngineProps = { onGameWin: (finalScore: number) => void; };
+export type GameEngineHandle = { resetGame: () => void; };
 
 let nextItemId = 0;
 
-export default function GameEngine({ onGameWin }: GameEngineProps) {
+const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin }, ref) => {
   const [gameState, setGameState] = useState<GameState>('idle');
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
@@ -33,6 +32,10 @@ export default function GameEngine({ onGameWin }: GameEngineProps) {
     setCurrentSpawnRate(INITIAL_SPAWN_RATE);
     setGameState('idle');
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    resetGame,
+  }));
 
    const handleItemClick = (clickedItem: Item) => {
     if (gameState !== 'playing' || clickedItem.isPopped) return;
@@ -119,4 +122,7 @@ export default function GameEngine({ onGameWin }: GameEngineProps) {
       </div>
     </>
   );
-}
+});
+
+GameEngine.displayName = 'GameEngine';
+export default GameEngine;

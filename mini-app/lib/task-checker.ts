@@ -1,37 +1,67 @@
+import prisma from './prisma';
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+type Checker = (fid: bigint) => Promise<boolean>;
 
-export async function checkWarpcastFollow(): Promise<boolean> {
-  console.log("Checking Warpcast API...");
-  await wait(1500);
-  console.log("Warpcast check successful.");
-  return true;
-}
+const checkers: Record<string, Checker> = {
+  has_played_a_round: async (fid) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-export async function checkTelegramJoin(): Promise<boolean> {
-  console.log("Checking Telegram API...");
-  await wait(2000);
-  console.log("Telegram check failed.");
-  throw new Error("Could not verify Telegram membership.");
-}
+    const airdropClaim = await prisma.claim.findFirst({
+      where: {
+        user: {
+          fid,
+        },
+        timestamp: {
+          gte: today,
+        },
+      },
+    });
+    return !!airdropClaim;
+  },
+  has_claimed_tokens: async (fid) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-export async function checkGamePlayed(): Promise<boolean> {
-  console.log("Checking game activity...");
-  await wait(500);
-  console.log("Game play verified.");
-  return true;
-}
+    const airdropClaim = await prisma.claim.findFirst({
+      where: {
+        user: {
+          fid,
+        },
+        timestamp: {
+          gte: today,
+        },
+      },
+    });
+    return !!airdropClaim;
+  },
+  has_visited_leaderboard: async (fid) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-export async function checkTokenClaim(): Promise<boolean> {
-  console.log("Checking database for recent claims...");
-  await wait(1800);
-  console.log("On-chain claim verified.");
-  return true;
-}
+    const visit = await prisma.userEvent.findFirst({
+      where: {
+        user: {
+          fid,
+        },
+        type: 'LEADERBOARD_VISIT',
+        createdAt: {
+          gte: today,
+        },
+      },
+    });
+    return !!visit;
+  },
+};
 
-export async function checkLeaderboardVisit(): Promise<boolean> {
-  console.log("Checking leaderboard visit...");
-  await wait(800);
-  console.log("Leaderboard visit verified.");
-  return true;
-}
+export const checkTask = async (
+  fid: bigint,
+  checkKey: string,
+): Promise<boolean> => {
+  const checker = checkers[checkKey];
+  if (!checker) {
+    console.error(`No checker found for key: ${checkKey}`);
+    return false;
+  }
+  return checker(fid);
+};

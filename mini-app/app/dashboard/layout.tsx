@@ -1,4 +1,9 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useUser } from '@/app/context/UserContext';
 import { Home, Trophy, History, User, ClipboardList } from 'lucide-react';
 import styles from './layout.module.css';
 import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
@@ -8,9 +13,29 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const userData = {
-    tokens: 250,
-  };
+  const { fid } = useUser();
+  const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!fid) return;
+
+    const checkTaskStatus = async () => {
+      try {
+        const response = await fetch(`/api/tasks/status?fid=${fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          setHasIncompleteTasks(data.hasIncompleteDailyTasks);
+        }
+      } catch (error) {
+        console.error('Failed to fetch task status:', error);
+      }
+    };
+
+    checkTaskStatus();
+    const interval = setInterval(checkTaskStatus, 30000);
+    return () => clearInterval(interval);
+  }, [fid]);
 
   return (
     <div className={styles.container}>
@@ -18,13 +43,7 @@ export default function DashboardLayout({
 
         {/* === TOP BAR === */}
         <header className={styles.header}>
-         {/*  <div className={styles.tokenDisplay}>
-            <div role="status" aria-label={`${userData.tokens} tokens`} className={styles.tokenBadge}>
-              {userData.tokens} $TOKENS
-            </div>
-          </div> */}
            <TokenBalanceDisplay />
-          {/* If you need vertical space reserve a height-only element (no visible text): */}
           <div aria-hidden className={styles.spacer} />
         </header>
 
@@ -34,25 +53,24 @@ export default function DashboardLayout({
 
         {/* BOTTOM NAVIGATION */}
         <nav className={styles.navigation}>
-          <Link href="/dashboard/game" className={styles.navLink}>
+          <Link href="/dashboard/game" className={`${styles.navLink} ${pathname === '/dashboard/game' ? styles.navLinkActive : ''}`}>
             <Home size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>Home</span>
           </Link>
 
-          <Link href="/dashboard/tasks" className={styles.navLink}>
-            <ClipboardList size={28} className={styles.navIcon} />
+          <Link href="/dashboard/tasks" className={`${styles.navLink} ${pathname === '/dashboard/tasks' ? styles.navLinkActive : ''}`}>
+            <div className={styles.navIconContainer}>
+              <ClipboardList size={28} className={styles.navIcon} />
+              {hasIncompleteTasks && <div className={styles.notificationDot}></div>}
+            </div>
             <span className={styles.navLabel}>Tasks</span>
           </Link>
 
-          <Link href="/dashboard/leaderboard" className={styles.navLink}>
+          <Link href="/dashboard/leaderboard" className={`${styles.navLink} ${pathname === '/dashboard/leaderboard' ? styles.navLinkActive : ''}`}>
             <Trophy size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>Leaderboard</span>
           </Link>
-{/*           <Link href="/dashboard/history" className={styles.navLink}>
-            <History size={28} className={styles.navIcon} />
-            <span className={styles.navLabel}>History</span>
-          </Link> */}
-          <Link href="/dashboard/profile" className={styles.navLink}>
+          <Link href="/dashboard/profile" className={`${styles.navLink} ${pathname === '/dashboard/profile' ? styles.navLinkActive : ''}`}>
             <User size={28} className={styles.navIcon} />
             <span className={styles.navLabel}>Me</span>
           </Link>
@@ -61,3 +79,5 @@ export default function DashboardLayout({
     </div>
   );
 }
+
+

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useUser } from '@/app/context/UserContext';
 import { ethers } from 'ethers';
-import GameEngine from '@/app/components/GameEngine';
+import { RefreshCw } from 'lucide-react';
+import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
 import styles from './page.module.css';
-import { sdk } from '@farcaster/miniapp-sdk'; // Import the Farcaster SDK
+import { sdk } from '@farcaster/miniapp-sdk';
 
 const GAME_CONTRACT_ADDRESS = '0x854cec65437d6420316b2eb94fecaaf417690227';
 const GAME_CONTRACT_ABI = [{"inputs":[{"internalType":"uint256","name":"_amount","type":"uint256"},{"internalType":"bytes","name":"_signature","type":"bytes"}],"name":"claimTokens","outputs":[],"stateMutability":"nonpayable","type":"function"}];
@@ -20,6 +21,7 @@ export default function GamePage() {
   const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [isMultiplierUsed, setIsMultiplierUsed] = useState(false); // New state
+  const gameEngineRef = useRef<GameEngineHandle>(null);
 
   const { data: hash, writeContract, isPending: isWritePending, error: writeError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
@@ -51,20 +53,15 @@ export default function GamePage() {
     }
   };
   
-  // --- THIS IS THE NEW, FUNCTIONAL MULTIPLIER ---
   const handleMultiplier = async () => {
     sdk.haptics.impactOccurred('heavy');
     setApiState({ loading: true, error: null });
 
     try {
       const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score?`;
-      // Replace with your actual app URL
       const appUrl = 'https://warpcast.com/~/channel/enb'; 
-
-      // This opens the Farcaster cast composer
       await sdk.cast({ text: `${castText}\n\n${appUrl}` });
 
-      // Once the user closes the composer, we double the score and hide the button
       setFinalScore(prev => prev * 2);
       setIsMultiplierUsed(true);
     } catch (error) {
@@ -75,10 +72,18 @@ export default function GamePage() {
     }
   };
 
+  const handleTryAgain = () => {
+    if (gameEngineRef.current) {
+      gameEngineRef.current.resetGame();
+    }
+    setIsClaimUnlocked(false);
+    setFinalScore(0);
+    setIsMultiplierUsed(false);
+  };
+
   useEffect(() => {
     if (isConfirmed) {
       queryClient.invalidateQueries({ queryKey: ['balance'] });
-      // The streak logic is no longer in this useEffect, it was moved to the indexer
     }
   }, [isConfirmed, queryClient]);
 
@@ -100,25 +105,32 @@ export default function GamePage() {
 
   return (
    <div className={styles.gameContainer}>
-      <GameEngine onGameWin={handleGameWin} />
+      <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} />
       
       <div className={styles.actionContainer}>
         {isClaimUnlocked ? (
           <div className={styles.actionButtonsContainer}>
-            <button 
-              onClick={handleClaim}
-              disabled={isLoading}
-              className={styles.claimButton}
-            >
-              {getButtonText()}
-            </button>
+            <div className={styles.topButtonsWrapper}>
+              <button 
+                onClick={handleClaim}
+                disabled={isLoading}
+                className={`${styles.claimButton} ${styles.claimButtonGreen}`}
+              >
+                {getButtonText()}
+              </button>
+              <button
+                onClick={handleTryAgain}
+                className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}
+              >
+                <RefreshCw size={24} />
+              </button>
+            </div>
             
-            {/* The 2x button is now only visible if it hasn't been used */}
             {!isMultiplierUsed && (
               <button
                 onClick={handleMultiplier}
                 disabled={isLoading}
-                className={`${styles.claimButton} ${styles.secondaryButton}`}
+                className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
               >
                 2x
               </button>

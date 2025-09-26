@@ -10,14 +10,14 @@ export async function GET() {
     const topUsers = await prisma.user.findMany({
       //highest first
       orderBy: {
-        totalClaimed: 'desc',
+        weeklyPoints: 'desc',
       },
       // limit top 10 only
       take: 10,
       select: {
         username: true,
         pfpUrl: true,
-        totalClaimed: true,
+        weeklyPoints: true,
         level: true,
         walletAddress:true,
       },
@@ -26,7 +26,7 @@ export async function GET() {
     //@ts-ignore
     const serializableUsers = topUsers.map(user => ({
       ...user,
-      totalClaimed: user.totalClaimed.toString(),
+      weeklyPoints: user.weeklyPoints.toString(),
     }));
 
     return NextResponse.json(serializableUsers, { status: 200 });

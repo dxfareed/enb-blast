@@ -1,21 +1,25 @@
 .leaderboardContainer {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.5rem;
   font-family: var(--font-space-mono);
-  }
+  padding-bottom: 80px;
+}
   
-  .headerContainer {
+.headerContainer {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  padding: 0 0.5rem;
+  gap: 1rem;
+  background-color: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .title {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.25rem;
+  font-weight: 800;
   color: #1f2937;
   margin: 0;
   text-align: left;
@@ -26,6 +30,10 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  background-color: #ffffff;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  border: 2px solid #e5e7eb;
 }
 
 .prizePool {
@@ -33,16 +41,16 @@
   align-items: center;
   gap: 0.5rem;
   font-family: var(--font-space-mono);
-  font-weight: 600;
-  color: #4b5563;
-  font-size: 0.875rem;
+  font-weight: 700;
+  color: #16a34a;
+  font-size: 1rem;
 }
 
 .countdown {
   font-family: var(--font-space-mono);
   font-weight: 600;
-  color: #6b7280;
-  font-size: 0.875rem;
+  color: #4b5563;
+  font-size: 1rem;
 }
 
 .userList {
@@ -63,8 +71,9 @@
   }
   
   .currentUser {
-  background-color: #dbeafe;
-  border-color: #3b82f6;
+  background-color: #eff6ff;
+  border-color: #60a5fa;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
   }
   
   .rankCircle {
@@ -81,22 +90,25 @@
   }
   
   .rank1 {
-  background-color: #facc15;
-  color: #78350f;
-  border-color: #f59e0b;
+  background-color: #fef08a;
+  color: #a16207;
+  border-color: #facc15;
+  box-shadow: 0 0 10px #facc15;
   }
   .rank2 {
-  background-color: #d1d5db;
-  color: #374151;
+  background-color: #e5e7eb;
+  color: #4b5563;
   border-color: #9ca3af;
+  box-shadow: 0 0 10px #d1d5db;
   }
   .rank3 {
-  background-color: #d97706;
-  color: white;
-  border-color: #b45309;
+  background-color: #fcd3a1;
+  color: #9a3412;
+  border-color: #fb923c;
+  box-shadow: 0 0 10px #fb923c;
   }
   .rankDefault {
-  background-color: #e5e7eb;
+  background-color: #f3f4f6;
   color: #4b5563;
   border-color: #d1d5db;
   }
@@ -106,6 +118,7 @@
   height: 3rem;
   border-radius: 9999px;
   object-fit: cover;
+  border: 2px solid #e5e7eb;
   }
   
   .userInfo {
@@ -137,3 +150,43 @@
   .currentUser .score {
   color: #1e40af;
   }
+
+.currentUserFooter {
+  position: fixed;
+  bottom: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 428px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-radius: 1rem;
+  background-color: #1e40af;
+  color: white;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+  border: 2px solid #93c5fd;
+  z-index: 100;
+}
+
+.currentUserFooter .username {
+  color: white;
+  font-weight: 700;
+}
+
+.currentUserFooter .score {
+  color: white;
+  font-weight: 700;
+}
+
+.currentUserFooter .scoreLabel {
+  color: #dbeafe;
+}
+
+.currentUserFooter .rankCircle {
+  background-color: #3b82f6;
+  border-color: #93c5fd;
+  color: white;
+}
+

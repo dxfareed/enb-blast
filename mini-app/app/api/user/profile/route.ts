@@ -1,3 +1,4 @@
+import { convertBigIntsToStrings } from '../../../../lib/json';
 import prisma from '../../../../lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, Hash } from 'viem';
@@ -117,6 +118,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
+    // --- Weekly Rank Calculation ---
+    const allUsers = await prisma.user.findMany({
+      orderBy: {
+        weeklyPoints: 'desc',
+      },
+    });
+
+    const userRank = allUsers.findIndex((u) => u.id === user.id) + 1;
+
     if (user.streak > 0) {
       const lastClaim = user.claims[0];
       const now = new Date();
@@ -136,14 +146,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const userProfile = {
-      ...user,
-      fid: user.fid.toString(),
-      totalClaimed: user.totalClaimed.toString(),
-      totalPoints: user.totalPoints.toString(),
-    };
+    const userProfile = convertBigIntsToStrings(user);
     delete (userProfile as any).claims;
     
+    // --- Add rank to the response ---
+    (userProfile as any).weeklyRank = userRank;
 
     return NextResponse.json(userProfile, { status: 200 });
 
@@ -171,12 +178,7 @@ export async function POST(req: NextRequest) {
     if (existingUser) {
       console.log('User already exists:', existingUser);
 
-     const serializableExistingUser = {
-        ...existingUser,
-        fid: existingUser.fid.toString(),
-        totalClaimed: existingUser.totalClaimed.toString(),
-        totalPoints: existingUser.totalPoints.toString(),
-      };
+     const serializableExistingUser = convertBigIntsToStrings(existingUser);
       return NextResponse.json(serializableExistingUser, { status: 200 });
     }
 
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest) {
 
     const block = await publicClient.getBlock({ blockNumber: txReceipt.blockNumber });
     const transactionTime = Number(block.timestamp);
-    if (Date.now() / 1000 - transactionTime > (30 * 60)) { // 30 minutes
+    if (Date.now() / 1000 - transactionTime > (30 * 60)) {
       return NextResponse.json({ message: 'Transaction is too old. Please try again.' }, { status: 400 });
     }
 
@@ -218,12 +220,7 @@ export async function POST(req: NextRequest) {
     });
 
     console.log('User created successfully:', newUser);
-    const serializableNewUser = {
-      ...newUser,
-      fid: newUser.fid.toString(),
-      totalClaimed: newUser.totalClaimed.toString(),
-      totalPoints: newUser.totalPoints.toString(),
-    };
+    const serializableNewUser = convertBigIntsToStrings(newUser);
     return NextResponse.json(serializableNewUser, { status: 201 });
 
   } catch (error) {

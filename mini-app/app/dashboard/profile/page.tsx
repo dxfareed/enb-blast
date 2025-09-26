@@ -62,7 +62,7 @@ export default function ProfilePage() {
 
   const isLoading = isApiLoading || (!!address && isContractLoading);
 
-  const displayProfile = profile ? { ...profile, weeklyRank: 12 } : null;
+  const displayProfile = profile;
 
   if (isLoading) return <div>Loading profile...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -96,7 +96,7 @@ export default function ProfilePage() {
         </div>
         <div className={`${styles.statCard} ${styles.claimedCard}`}>
           <p className={styles.statLabel}>Total Claimed</p>
-          <p className={styles.statValue}><Droplets size={28} /> {Number(displayProfile.totalClaimed).toFixed(2)}</p>
+          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(displayProfile.totalClaimed).toFixed(2)}</p>
         </div>
       </div>
 

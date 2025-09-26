@@ -70,6 +70,7 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
         data: { 
           totalClaimed: { increment: parseFloat(amountDecimal) }, // And this works
           totalPoints: { increment: BigInt(Math.round(pointsScored)) },
+          weeklyPoints: { increment: BigInt(Math.round(pointsScored)) },
           streak: newStreak,
         },
       });

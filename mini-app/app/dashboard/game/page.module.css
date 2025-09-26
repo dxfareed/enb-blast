@@ -14,6 +14,14 @@
 
 .actionButtonsContainer {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.topButtonsWrapper {
+  display: flex;
   gap: 0.5rem;
   width: 100%;
 }
@@ -33,9 +41,37 @@
   white-space: nowrap;
 }
 
-.actionButtonsContainer .claimButton {
-  flex-grow: 2;
-  flex-basis: 0;
+.claimButtonGreen {
+  background-color: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  width: 67%;
+}
+.claimButtonGreen:hover {
+  background-color: #bbf7d0;
+}
+
+.tryAgainButtonRed {
+  background-color: #ffedd5;
+  color: #f97316;
+  border: 1px solid #fed7aa;
+  width: 33%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tryAgainButtonRed:hover {
+  background-color: #fed7aa;
+}
+
+.multiplierButtonPurple {
+  background-color: #f3e8ff;
+  color: #9333ea;
+  border: 1px solid #e9d5ff;
+  width: 100%;
+}
+.multiplierButtonPurple:hover {
+  background-color: #e9d5ff;
 }
 
 .secondaryButton {
@@ -47,7 +83,7 @@
 }
 
 .claimButton:hover {
-  background-color: #2563eb;
+  /* background-color: rgb(116, 51, 235); */
 }
 
 .claimButton:active {
