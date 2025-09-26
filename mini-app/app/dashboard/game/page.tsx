@@ -57,15 +57,8 @@ export default function GamePage() {
   useEffect(() => {
     if (isConfirmed) {
       queryClient.invalidateQueries({ queryKey: ['balance'] });
-      if (fid) {
-        fetch('/api/claim/update-streak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fid }),
-        }).catch(err => console.error("Streak update failed:", err));
-      }
     }
-  }, [isConfirmed, fid, queryClient]);
+  }, [isConfirmed, queryClient]);
 
   const isLoading = apiState.loading || isWritePending || isConfirming;
   const error = apiState.error || writeError;

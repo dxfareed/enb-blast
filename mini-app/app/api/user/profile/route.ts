@@ -14,11 +14,22 @@ const publicClient = createPublicClient({
   transport: http("https://mainnet-preconf.base.org"),
 });
 
-function makeUserSerializable(user: any) {
-  return {
-    ...user,
-    fid: user.fid.toString(),
-  };
+/* function makeUserSerializable(user: any) {
+  const serializableUser = { ...user };
+  for (const key in serializableUser) {
+    if (typeof serializableUser[key] === 'bigint') {
+      serializableUser[key] = serializableUser[key].toString();
+    } else if (serializableUser[key] instanceof require('decimal.js')) {
+      serializableUser[key] = serializableUser[key].toString();
+    }
+  }
+  return serializableUser;
+} */
+
+function isSameDay(date1: Date, date2: Date): boolean {
+  return date1.getUTCFullYear() === date2.getUTCFullYear() &&
+    date1.getUTCMonth() === date2.getUTCMonth() &&
+    date1.getUTCDate() === date2.getUTCDate();
 }
 
 async function waitForTransactionConfirmation(hash: string, maxRetries = 10, delay = 2000) {
@@ -29,8 +40,8 @@ async function waitForTransactionConfirmation(hash: string, maxRetries = 10, del
       console.log('Transaction receipt found:', receipt);
       return receipt;
     } catch (error: any) {
-      if (error.message?.includes('Transaction receipt not found') || 
-          error.message?.includes('could not be found')) {
+      if (error.message?.includes('Transaction receipt not found') ||
+        error.message?.includes('could not be found')) {
         console.log(`Transaction not yet confirmed, waiting ${delay}ms before retry...`);
         if (i < maxRetries - 1) {
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -51,7 +62,7 @@ async function fetchFarcasterProfile(fid: string | number) {
 
 
   const url = `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`;
-  
+
   try {
     const response = await fetch(url, {
       method: 'GET',
@@ -67,7 +78,7 @@ async function fetchFarcasterProfile(fid: string | number) {
     }
 
     const data = await response.json();
-    
+
     if (!data.users || data.users.length === 0) {
       throw new Error(`Farcaster user with FID ${fid} not found.`);
     }
@@ -92,12 +103,50 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { fid: BigInt(fid) } });
+    let user = await prisma.user.findUnique({
+      where: { fid: BigInt(fid) },
+      include: {
+        claims: {
+          orderBy: { timestamp: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
-    const serializableUser = makeUserSerializable(user);
-    return NextResponse.json(serializableUser, { status: 200 });
+
+    if (user.streak > 0) {
+      const lastClaim = user.claims[0];
+      const now = new Date();
+      const FIVE_MINUTES_MS = 5 * 60 * 1000;
+      
+      if (!lastClaim) {
+        user = await prisma.user.update({ where: { id: user.id }, data: { streak: 0 } });
+      } else {
+        const timeDifference = now.getTime() - lastClaim.timestamp.getTime();
+        if (timeDifference > (2 * FIVE_MINUTES_MS)) {
+          console.log(`User ${user.username}'s streak broken (test mode). Resetting to 0.`);
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { streak: 0 },
+          });
+        }
+      }
+    }
+
+    const userProfile = {
+      ...user,
+      fid: user.fid.toString(),
+      totalClaimed: user.totalClaimed.toString(),
+      totalPoints: user.totalPoints.toString(),
+    };
+    delete (userProfile as any).claims;
+    
+
+    return NextResponse.json(userProfile, { status: 200 });
+
   } catch (error) {
     console.error("Error fetching user:", error);
     return NextResponse.json({ message: 'Error fetching user' }, { status: 500 });
@@ -107,7 +156,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     console.log('Starting POST /api/user/profile handler');
-    
+
     const body = await req.json();
     const { fid, hash, walletAddress } = body;
     console.log('Received registration request:', { fid, hash, walletAddress });
@@ -115,13 +164,20 @@ export async function POST(req: NextRequest) {
     if (!fid || !hash || !walletAddress) {
       return NextResponse.json({ message: 'Farcaster ID (fid), transaction hash, and wallet address are required' }, { status: 400 });
     }
-    
+
     const userFid = BigInt(fid);
 
     const existingUser = await prisma.user.findUnique({ where: { fid: userFid } });
     if (existingUser) {
       console.log('User already exists:', existingUser);
-      return NextResponse.json(makeUserSerializable(existingUser), { status: 200 });
+
+     const serializableExistingUser = {
+        ...existingUser,
+        fid: existingUser.fid.toString(),
+        totalClaimed: existingUser.totalClaimed.toString(),
+        totalPoints: existingUser.totalPoints.toString(),
+      };
+      return NextResponse.json(serializableExistingUser, { status: 200 });
     }
 
     console.log('Waiting for transaction confirmation:', hash);
@@ -136,7 +192,7 @@ export async function POST(req: NextRequest) {
     if (Date.now() / 1000 - transactionTime > (30 * 60)) { // 30 minutes
       return NextResponse.json({ message: 'Transaction is too old. Please try again.' }, { status: 400 });
     }
-    
+
     const gameContractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase();
     if (txReceipt.to?.toLowerCase() !== gameContractAddress) {
       return NextResponse.json({ message: 'Transaction was not sent to the correct game contract.' }, { status: 400 });
@@ -151,18 +207,24 @@ export async function POST(req: NextRequest) {
       username: farcasterProfile.username,
       pfpUrl: farcasterProfile.pfpUrl,
     });
-    
+
     const newUser = await prisma.user.create({
       data: {
         fid: userFid,
         walletAddress: walletAddress.toLowerCase(),
-        username: farcasterProfile.username, 
-        pfpUrl: farcasterProfile.pfpUrl,  
+        username: farcasterProfile.username,
+        pfpUrl: farcasterProfile.pfpUrl,
       },
     });
-    
+
     console.log('User created successfully:', newUser);
-    return NextResponse.json(makeUserSerializable(newUser), { status: 201 });
+    const serializableNewUser = {
+      ...newUser,
+      fid: newUser.fid.toString(),
+      totalClaimed: newUser.totalClaimed.toString(),
+      totalPoints: newUser.totalPoints.toString(),
+    };
+    return NextResponse.json(serializableNewUser, { status: 201 });
 
   } catch (error) {
     console.error("Failed to create user:", error);

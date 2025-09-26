@@ -25,6 +25,11 @@
     color: #1f2937;
   }
   
+  .pointsCard {
+    background-color: #dcfce7;
+    border-color: #bbf7d0;
+  }
+
   .statsGrid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

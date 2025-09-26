@@ -81,9 +81,9 @@ export default function ProfilePage() {
           <p className={styles.statLabel}>Streak</p>
           <p className={styles.statValue}>🔥 {profile.streak}</p>
         </div>
-        <div className={`${styles.statCard} ${styles.totalCard}`}>
-          <p className={styles.statLabel}>Total Claimed</p>
-          <p className={styles.statValue}>{Number(profile.totalClaimed).toLocaleString()}</p>
+        <div className={`${styles.statCard} ${styles.pointsCard}`}>
+          <p className={styles.statLabel}>Total Points</p>
+          <p className={styles.statValue}>{Number(profile.totalPoints).toLocaleString()}</p>
         </div>
       </div>
       <div className={styles.levelCard}>

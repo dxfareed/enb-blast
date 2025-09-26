@@ -24,7 +24,15 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
     const timestamp = new Date(block.timestamp * 1000);
     
     await prisma.$transaction(async (tx) => {
-      const dbUser = await tx.user.findUnique({ where: { walletAddress: user.toLowerCase() } });
+      const dbUser = await tx.user.findUnique({
+        where: { walletAddress: user.toLowerCase() },
+        include: {
+          claims: {
+            orderBy: { timestamp: 'desc' },
+            take: 1,
+          },
+        },
+      });
       if (!dbUser) { 
         console.warn(`   - User ${user} not found in DB. Claim will not be indexed.`);
         return;
@@ -39,9 +47,28 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
         },
       });
 
+      let newStreak = 1; // Default for a new or broken streak
+      const lastClaim = dbUser.claims[0];
+
+      if (lastClaim) {
+        const timeDifference = timestamp.getTime() - lastClaim.timestamp.getTime();
+        const TEN_MINUTES_MS = 10 * 60 * 1000;
+
+        // If the last claim was within 10 minutes, continue the streak.
+        if (timeDifference > 0 && timeDifference <= TEN_MINUTES_MS) {
+          newStreak = dbUser.streak + 1;
+        }
+      }
+
+      const pointsScored = parseFloat(amountDecimal) * 10;
+
       await tx.user.update({
         where: { id: dbUser.id },
-        data: { totalClaimed: { increment: parseFloat(ethers.formatUnits(amount, 18)) } },
+        data: { 
+          totalClaimed: { increment: parseFloat(amountDecimal) },
+          totalPoints: { increment: BigInt(Math.round(pointsScored)) },
+          streak: newStreak, // Use the calculated newStreak value
+        },
       });
     });
 
