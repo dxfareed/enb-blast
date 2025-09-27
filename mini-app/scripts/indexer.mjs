@@ -12,7 +12,6 @@ const GAME_CONTRACT_ABI = [
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
-const POLLING_INTERVAL = 2000;
 
 async function processEvent(user, amount, nonce, event, retryCount = 0) {
   console.log(`✅ Event received! Processing Nonce: ${nonce}...`);
@@ -20,58 +19,35 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
   const txHash = event.log.transactionHash;
 
   try {
-        const block = await event.log.getBlock();
+    const block = await event.log.getBlock();
     const timestamp = new Date(block.timestamp * 1000);
-    
-    // --- THIS IS THE FIX ---
-    // Define amountDecimal here so it's available for the whole transaction.
     const amountDecimal = ethers.formatUnits(amount, 18);
 
     await prisma.$transaction(async (tx) => {
       const dbUser = await tx.user.findUnique({
         where: { walletAddress: user.toLowerCase() },
-        include: {
-          claims: {
-            orderBy: { timestamp: 'desc' },
-            take: 1,
-          },
-        },
       });
+
       if (!dbUser) { 
         console.warn(`   - User ${user} not found in DB. Claim will not be indexed.`);
         return;
       }
 
+      // 1. Create the historical claim record
       await tx.claim.create({
         data: {
           txHash: txHash,
-          amount: amountDecimal, // Now this works
+          amount: amountDecimal,
           timestamp: timestamp,
           userId: dbUser.id,
         },
       });
 
-      let newStreak = 1;
-      const lastClaim = dbUser.claims[0];
-
-      if (lastClaim) {
-        const timeDifference = timestamp.getTime() - lastClaim.timestamp.getTime();
-        const TEN_MINUTES_MS = 10 * 60 * 1000;
-
-        if (timeDifference > 0 && timeDifference <= TEN_MINUTES_MS) {
-          newStreak = dbUser.streak + 1;
-        }
-      }
-
-      const pointsScored = parseFloat(amountDecimal) * 10;
-
+      // 2. Update the user's total on-chain claimed amount
       await tx.user.update({
         where: { id: dbUser.id },
         data: { 
-          totalClaimed: { increment: parseFloat(amountDecimal) }, // And this works
-          totalPoints: { increment: BigInt(Math.round(pointsScored)) },
-          weeklyPoints: { increment: BigInt(Math.round(pointsScored)) },
-          streak: newStreak,
+          totalClaimed: { increment: parseFloat(amountDecimal) },
         },
       });
     });
@@ -85,11 +61,8 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
       await prisma.$connect();
       await new Promise(res => setTimeout(res, RETRY_DELAY));
       await processEvent(user, amount, nonce, event, retryCount + 1);
-    
-    
     } else if (error.code === 'P2002') {
       console.warn(`   - ℹ️  Claim with txHash ${txHash} already exists. Skipping.`);
-    
     } else {
       console.error(`   - ❌ Error processing event after ${retryCount} retries:`, error);
     }
@@ -114,7 +87,6 @@ async function main() {
   if (!contractAddress) { throw new Error("Contract address not found."); }
   
   const contract = new ethers.Contract(contractAddress, GAME_CONTRACT_ABI, provider);
-
 
   contract.on("TokensClaimed", (user, amount, nonce, event) => {
     processEvent(user, amount, nonce, event);

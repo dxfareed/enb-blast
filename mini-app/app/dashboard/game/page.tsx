@@ -7,6 +7,7 @@ import { useUser } from '@/app/context/UserContext';
 import { ethers } from 'ethers';
 import { RefreshCw } from 'lucide-react';
 import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
+import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
 
@@ -17,26 +18,37 @@ export default function GamePage() {
   const { address } = useAccount();
   const { fid } = useUser();
   const queryClient = useQueryClient();
-  const [apiState, setApiState] = useState({ loading: false, error: null });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
-  const [isMultiplierUsed, setIsMultiplierUsed] = useState(false); // New state
+  const [isMultiplierUsed, setIsMultiplierUsed] = useState(false);
+  const [isMultiplierLoading, setIsMultiplierLoading] = useState(false);
+  const [isSignatureLoading, setIsSignatureLoading] = useState(false);
   const gameEngineRef = useRef<GameEngineHandle>(null);
 
-  const { data: hash, writeContract, isPending: isWritePending, error: writeError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
   const handleClaim = async () => {
     if (!address || finalScore <= 0) return;
     const claimAmount = finalScore / 10;
-    setApiState({ loading: true, error: null });
+    setIsSignatureLoading(true);
+    
     try {
-      const signatureResponse = await fetch('/api/claim/generate-signature', {
+      const signatureResponse = await sdk.quickAuth.fetch('/api/claim/generate-signature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address, amount: claimAmount }),
+        body: JSON.stringify({ 
+          walletAddress: address, 
+          amount: claimAmount,
+          points: finalScore,
+        }),
       });
-      if (!signatureResponse.ok) throw new Error('Could not get signature from server.');
+
+      if (!signatureResponse.ok) {
+        const errorBody = await signatureResponse.json();
+        throw new Error(errorBody.message || 'Could not get signature from server.');
+      }
       const { signature } = await signatureResponse.json();
 
       const amountInWei = ethers.parseUnits(claimAmount.toString(), 18);
@@ -47,28 +59,39 @@ export default function GamePage() {
         args: [amountInWei, signature],
       });
     } catch (err) {
-      setApiState({ loading: false, error: err.message });
+      setToast({ message: err.message, type: 'error' });
     } finally {
-      setApiState({ loading: false });
+      setIsSignatureLoading(false);
     }
   };
   
   const handleMultiplier = async () => {
     sdk.haptics.impactOccurred('heavy');
-    setApiState({ loading: true, error: null });
+    setIsMultiplierLoading(true);
 
     try {
       const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score?`;
-      const appUrl = 'https://warpcast.com/~/channel/enb'; 
-      await sdk.cast({ text: `${castText}\n\n${appUrl}` });
+      const appUrl = 'https://block-cir-cayman-tiles.trycloudflare.com/';
 
-      setFinalScore(prev => prev * 2);
-      setIsMultiplierUsed(true);
+      const result = await sdk.actions.composeCast({
+        text: castText,
+        embeds: [appUrl],
+      });
+
+      // The result.cast returns null if the user cancels the cast
+      if (result.cast) {
+        setFinalScore(prev => prev * 2);
+        setIsMultiplierUsed(true);
+      } else {
+        // Handle the case where the user cancels the cast
+        setToast({ message: "Cast was cancelled.", type: 'info' });
+      }
+
     } catch (error) {
-      console.error("Cast failed or was cancelled by user:", error);
-      alert("Failed to open cast composer.");
+      console.error("Cast failed:", error);
+      setToast({ message: "An error occurred while casting.", type: 'error' });
     } finally {
-      setApiState({ loading: false, error: null });
+      setIsMultiplierLoading(false);
     }
   };
 
@@ -79,19 +102,31 @@ export default function GamePage() {
     setIsClaimUnlocked(false);
     setFinalScore(0);
     setIsMultiplierUsed(false);
+    if (isConfirmed) {
+      resetWriteContract();
+    }
   };
 
   useEffect(() => {
     if (isConfirmed) {
+      setToast({ message: "Successfully claimed!", type: 'success' });
       queryClient.invalidateQueries({ queryKey: ['balance'] });
     }
   }, [isConfirmed, queryClient]);
 
-  const isLoading = apiState.loading || isWritePending || isConfirming;
-  const error = apiState.error || writeError;
+  useEffect(() => {
+    const error = writeError || confirmationError;
+    if (error) {
+      setToast({ message: error.shortMessage || error.message, type: 'error' });
+      resetWriteContract();
+    }
+  }, [writeError, confirmationError, resetWriteContract]);
+
+  const isClaimLoading = isWritePending || isConfirming;
+  const isAnyActionLoading = isClaimLoading || isMultiplierLoading || isSignatureLoading;
 
   const getButtonText = () => {
-    if (apiState.loading) return 'Preparing...';
+    if (isSignatureLoading) return 'Preparing...';
     if (isWritePending) return 'Check Wallet...';
     if (isConfirming) return 'Confirming...';
     if (isConfirmed) return 'Success!';
@@ -105,6 +140,7 @@ export default function GamePage() {
 
   return (
    <div className={styles.gameContainer}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} />
       
       <div className={styles.actionContainer}>
@@ -113,7 +149,7 @@ export default function GamePage() {
             <div className={styles.topButtonsWrapper}>
               <button 
                 onClick={handleClaim}
-                disabled={isLoading}
+                disabled={isAnyActionLoading || isConfirmed}
                 className={`${styles.claimButton} ${styles.claimButtonGreen}`}
               >
                 {getButtonText()}
@@ -129,10 +165,10 @@ export default function GamePage() {
             {!isMultiplierUsed && (
               <button
                 onClick={handleMultiplier}
-                disabled={isLoading}
+                disabled={isAnyActionLoading || isConfirmed}
                 className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
               >
-                2x
+                {isMultiplierLoading ? 'Preparing...' : '2x'}
               </button>
             )}
           </div>
@@ -142,8 +178,8 @@ export default function GamePage() {
           </button>
         )}
         <div className={styles.statusMessage}>
-          {isConfirmed && !error && <p className={styles.successMessage}>Success!</p>}
-          {error && <p className={styles.errorMessage}>{error.shortMessage || error.message}</p>}
+          {/* This space is intentionally left for layout consistency, 
+              ** messages are now handled by toasts. */}
         </div>
       </div>
     </div>

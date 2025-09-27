@@ -3,6 +3,7 @@ import prisma from '../../../../lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, Hash } from 'viem';
 import { baseSepolia, base } from 'viem/chains';
+import { Errors, createClient } from "@farcaster/quick-auth";
 
 // --- VIEM Public Client Setup ---
 /* const publicClient = createPublicClient({
@@ -129,15 +130,18 @@ export async function GET(req: NextRequest) {
 
     if (user.streak > 0) {
       const lastClaim = user.claims[0];
-      const now = new Date();
-      const FIVE_MINUTES_MS = 5 * 60 * 1000;
-      
       if (!lastClaim) {
+        // If user has a streak but no claims, reset it.
         user = await prisma.user.update({ where: { id: user.id }, data: { streak: 0 } });
       } else {
-        const timeDifference = now.getTime() - lastClaim.timestamp.getTime();
-        if (timeDifference > (2 * FIVE_MINUTES_MS)) {
-          console.log(`User ${user.username}'s streak broken (test mode). Resetting to 0.`);
+        const now = new Date();
+        const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const yesterdayUTC = new Date(todayUTC);
+        yesterdayUTC.setUTCDate(todayUTC.getUTCDate() - 1);
+
+        // If the last claim was before the start of yesterday, the streak is broken.
+        if (lastClaim.timestamp < yesterdayUTC) {
+          console.log(`User ${user.username}'s streak broken. Last claim: ${lastClaim.timestamp}. Resetting to 0.`);
           user = await prisma.user.update({
             where: { id: user.id },
             data: { streak: 0 },
@@ -160,13 +164,68 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const client = createClient({
+  fetch: (url, options) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    return fetch(url, { ...options, signal: controller.signal })
+      .finally(() => clearTimeout(timeout));
+  }
+});
+
+function getUrlHost(request: NextRequest) {
+    // First try to get the origin from the Origin header
+    const origin = request.headers.get("origin");
+    if (origin) {
+      try {
+        const url = new URL(origin);
+        return url.host;
+      } catch (error) {
+        console.warn("Invalid origin header:", origin, error);
+      }
+    }
+  
+    // Fallback to Host header
+    const host = request.headers.get("host");
+    if (host) {
+      return host;
+    }
+  
+    // Final fallback to environment variables
+    let urlValue: string;
+    if (process.env.VERCEL_ENV === "production") {
+      urlValue = process.env.NEXT_PUBLIC_URL!;
+    } else if (process.env.VERCEL_URL) {
+      urlValue = `https://${process.env.VERCEL_URL}`;
+    } else {
+      urlValue = "http://localhost:3000";
+    }
+  
+    const url = new URL(urlValue);
+    return url.host;
+  }
+
 export async function POST(req: NextRequest) {
   try {
     console.log('Starting POST /api/user/profile handler');
+    const authorization = req.headers.get("Authorization");
+    if (!authorization || !authorization.startsWith("Bearer ")) {
+        return NextResponse.json({ message: "Missing token" }, { status: 401 });
+    }
+
+    const payload = await client.verifyJwt({
+        token: authorization.split(" ")[1] as string,
+        domain: getUrlHost(req),
+    });
+    const authenticatedFid = payload.sub;
 
     const body = await req.json();
     const { fid, hash, walletAddress } = body;
     console.log('Received registration request:', { fid, hash, walletAddress });
+
+    if (authenticatedFid !== fid) {
+        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
 
     if (!fid || !hash || !walletAddress) {
       return NextResponse.json({ message: 'Farcaster ID (fid), transaction hash, and wallet address are required' }, { status: 400 });
@@ -224,6 +283,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(serializableNewUser, { status: 201 });
 
   } catch (error) {
+    if (error instanceof Errors.InvalidTokenError) {
+        return NextResponse.json({ message: "Invalid token" }, { status: 401 });
+    }
     console.error("Failed to create user:", error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json({ message: errorMessage }, { status: 500 });

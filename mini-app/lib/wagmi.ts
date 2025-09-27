@@ -1,6 +1,6 @@
-import { http, createConfig, webSocket } from 'wagmi'
-import { base } from 'wagmi/chains'
-import { /* farcasterFrame as miniAppConnector, */ farcasterMiniApp } from '@farcaster/frame-wagmi-connector'
+import { http, createConfig, webSocket } from 'wagmi';
+import { base } from 'wagmi/chains';
+import {farcasterMiniApp} from '@farcaster/miniapp-wagmi-connector'
 
 const ws = process.env.NEXT_PUBLIC_WS
 export const config = createConfig({

@@ -23,6 +23,7 @@ model User {
   totalClaimed  Decimal   @default(0)
   totalPoints   BigInt       @default(0)
   weeklyPoints  BigInt    @default(0)
+  lastClaimedAt DateTime?
   createdAt     DateTime  @default(now())
   claims        Claim[]
   taskCompletions UserTaskCompletion[]
