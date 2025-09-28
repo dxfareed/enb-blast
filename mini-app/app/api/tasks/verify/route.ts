@@ -7,7 +7,56 @@ function getStartOfUTCDay() {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+import {
+  TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
+  TOKEN_MEMBERSHIP_CONTRACT_ABI,
+} from '@/app/utils/constants';
+import { createPublicClient, http } from 'viem';
+import { base } from 'viem/chains';
+
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
+});
+
+async function checkAndSyncMembershipLevel(user: { id: string; walletAddress: string; }): Promise<number> {
+  try {
+    const data = await publicClient.readContract({
+      address: TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
+      abi: TOKEN_MEMBERSHIP_CONTRACT_ABI,
+      functionName: 'userAccounts',
+      args: [user.walletAddress],
+    });
+
+    const membershipLevel = Number((data as any)[4]);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { level: membershipLevel },
+    });
+    
+    return membershipLevel;
+
+  } catch (error) {
+    console.error("Failed to check or sync membership level:", error);
+    // Return a default/low level on failure to prevent accidental task completion
+    return -1; 
+  }
+}
+
 const taskCheckers = {
+  MEMBERSHIP_BASED: async (user: { id: string; walletAddress: string; }) => {
+    const level = await checkAndSyncMembershipLevel(user);
+    return level >= 0;
+  },
+  MEMBERSHIP_SUPERBASED: async (user: { id: string; walletAddress: string; }) => {
+    const level = await checkAndSyncMembershipLevel(user);
+    return level >= 1;
+  },
+  MEMBERSHIP_LEGENDARY: async (user: { id: string; walletAddress: string; }) => {
+    const level = await checkAndSyncMembershipLevel(user);
+    return level >= 2;
+  },
   WARPCAST_FOLLOW: async (user: { id: string; fid: bigint; }): Promise<boolean> => {
     const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
     const FARCASTER_CHANNEL_ID = process.env.FARCASTER_CHANNEL_ID || "enb";
@@ -35,7 +84,7 @@ const taskCheckers = {
       return data.members.length > 0;
     } catch (error) {
       console.error("Failed to verify Warpcast follow:", error);
-      return false;
+      throw error;
     }
   },
 
@@ -63,10 +112,10 @@ const taskCheckers = {
       }
 
       const data = await response.json();
-      return data.users?.some(follower => follower.fid === Number(user.fid)) || false;
+      return data.users?.some((follower: { fid: number }) => follower.fid === Number(user.fid)) || false;
     } catch (error) {
       console.error("Failed to verify Farcaster channel follow:", error);
-      return false;
+      throw error;
     }
   },
 
@@ -124,18 +173,66 @@ const taskCheckers = {
 
   LEADERBOARD_VISIT: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying leaderboard visit for user ${user.id}...`);
-    return true;
+    const todayUTC = getStartOfUTCDay();
+    const visitEvent = await prisma.userEvent.findFirst({
+      where: {
+        userId: user.id,
+        type: 'LEADERBOARD_VISIT',
+        createdAt: { gte: todayUTC },
+      },
+    });
+    return !!visitEvent;
   },
+
+  HOLD_100K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 100000),
+  HOLD_500K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 500000),
+  HOLD_1M_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 1000000),
 };
 
-const client = createClient({
-  fetch: (url, options) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-    return fetch(url, { ...options, signal: controller.signal })
-      .finally(() => clearTimeout(timeout));
+async function checkTokenBalance(walletAddress: string, requiredBalance: number): Promise<boolean> {
+  const TOKEN_CONTRACT_ADDRESS = '0xf73978b3a7d1d4974abae11f696c1b4408c027a0';
+  const BASE_MAINNET_RPC_URL = process.env.BASE_MAINNET_RPC_URL;
+
+  if (!BASE_MAINNET_RPC_URL) {
+    console.error('Missing BASE_MAINNET_RPC_URL');
+    return false;
   }
-});
+
+  try {
+    const response = await fetch(BASE_MAINNET_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_call',
+        params: [{
+          to: TOKEN_CONTRACT_ADDRESS,
+          data: `0x70a08231000000000000000000000000${walletAddress.substring(2)}`
+        }, 'latest']
+      })
+    });
+
+    if (!response.ok) {
+      console.error(`RPC request failed with status ${response.status}`);
+      return false;
+    }
+
+    const data = await response.json();
+    if (data.error) {
+      console.error('RPC error:', data.error);
+      return false;
+    }
+
+    const balance = parseInt(data.result, 16) / 1e18;
+    return balance >= requiredBalance;
+  } catch (error) {
+    console.error('Failed to check token balance:', error);
+    return false;
+  }
+}
+
+const client = createClient();
 
 function getUrlHost(request: NextRequest) {
     // First try to get the origin from the Origin header
@@ -235,6 +332,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {
         return NextResponse.json({ message: "Invalid token" }, { status: 401 });
+    }
+    if (error instanceof SyntaxError && error.message.includes('Unexpected token')) {
+      return NextResponse.json({ message: 'server error, try again' }, { status: 500 });
     }
     console.error("Failed to verify task:", error);
     return new NextResponse('Error verifying task', { status: 500 });

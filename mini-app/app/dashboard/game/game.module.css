@@ -23,6 +23,12 @@
   overflow: hidden;
   cursor: pointer;
   min-height: 20rem;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.bombHitEffect {
+  background-color: #ff000033;
+  border-color: #ff0000;
 }
 
 .item {
@@ -31,6 +37,10 @@
   transform: translate(-50%, -50%);
   width: 48px;
   height: 48px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .itemImage {

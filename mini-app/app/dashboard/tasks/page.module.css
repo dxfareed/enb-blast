@@ -132,3 +132,13 @@
 }
 
 */
+
+.disabledTask {
+  opacity: 0.5;
+}
+
+.disabledButton {
+  cursor: not-allowed !important;
+  background-color: #d1d5db !important;
+  color: #6b7280 !important;
+}

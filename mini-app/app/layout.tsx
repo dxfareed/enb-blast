@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { minikitConfig } from "@/minikit.config";
 import { RootProvider } from "./rootProvider";
 import { Space_Mono } from 'next/font/google';
 import "./globals.css";
+//import { ErudaLoader } from "./components/ErudaLoader";
 
 const spaceMono = Space_Mono({
   subsets: ['latin'],
@@ -11,7 +12,13 @@ const spaceMono = Space_Mono({
   variable: '--font-space-mono',
 });
 
-
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1.0,
+  maximumScale: 1.0,
+  userScalable: false,
+  viewportFit: 'cover',
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   
@@ -39,13 +46,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+
   return (
-    <RootProvider>
-      <html lang="en" className={spaceMono.variable}>
-        <body>
-          {children}
-        </body>
-      </html>
-    </RootProvider>
+    <html lang="en" className={spaceMono.variable}>
+      <body>
+        <RootProvider>{children}</RootProvider>
+      </body>
+    </html>
   );
 }

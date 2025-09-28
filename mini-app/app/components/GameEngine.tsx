@@ -1,25 +1,27 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
+import { RotateCcw } from 'lucide-react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import gameStyles from '@/app/dashboard/game/game.module.css';
 
 const GAME_DURATION = 25;
-const INITIAL_SPAWN_RATE = 800;
-const FINAL_SPAWN_RATE = 300;
-const INITIAL_BOMB_SPEED = 0.5;
-const FINAL_BOMB_SPEED = 0.8;
-const PICTURE_SPEED_MULTIPLIER = 1.2;
-const BOMB_CHANCE = 0.33;
+const INITIAL_SPAWN_RATE = 350;
+const FINAL_SPAWN_RATE = 450;
+const INITIAL_BOMB_SPEED = 0.6;
+const FINAL_BOMB_SPEED = 0.9;
+const PICTURE_SPEED_MULTIPLIER = 1.32;
+const BOMB_CHANCE = 0.35;
 const PICTURE_URL = "/Enb_000.png";
 const POWER_UP_POINT_5_URL = "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/8fbbe5e2-0c53-48b8-c5f1-4a791b76ce00/rectcrop3";
 const POWER_UP_POINT_5_VALUE = 5;
-const POWER_UP_POINT_5_CHANCE = 0.05; // 5% spawn chance
+const POWER_UP_POINT_5_CHANCE = 0.01;
 
 const POWER_UP_POINT_10_URL = "https://pbs.twimg.com/profile_images/1945608199500910592/rnk6ixxH_400x400.jpg";
 const POWER_UP_POINT_10_VALUE = 10;
-const POWER_UP_POINT_10_CHANCE = 0.01; // 1% spawn chance
+const POWER_UP_POINT_10_CHANCE = 0.005;
 
 const POWER_UP_POINT_2_URL = "https://pbs.twimg.com/profile_images/1945283028441341952/KoUAOCOk_400x400.jpg";
 const POWER_UP_POINT_2_VALUE = 2;
-const POWER_UP_POINT_2_CHANCE = 0.10; // 10% spawn chance
+const POWER_UP_POINT_2_CHANCE = 0.03;
 
 type Item = { id: number; type: 'picture' | 'bomb' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_point_2'; x: number; y: number; speed: number; isPopped?: boolean; points?: number; };
 type GameState = 'idle' | 'playing' | 'won' | 'lost';
@@ -29,14 +31,19 @@ export type GameEngineHandle = { resetGame: () => void; };
 let nextItemId = 0;
 
 const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin }, ref) => {
-  const [gameState, setGameState] = useState<GameState>('idle');
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
+  const [gameState, setGameState] = useState<GameState>('idle');
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [floatingScores, setFloatingScores] = useState<{ id: number; points: number; x: number; y: number; }[]>([]);
 
   const [currentBombSpeed, setCurrentBombSpeed] = useState(INITIAL_BOMB_SPEED);
   const [currentSpawnRate, setCurrentSpawnRate] = useState(INITIAL_SPAWN_RATE);
+  const [isBombHit, setIsBombHit] = useState(false);
+  const scoreRef = useRef(score);
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
 
   const resetGame = useCallback(() => {
     setItems([]); setScore(0); setTimeLeft(GAME_DURATION);
@@ -53,8 +60,13 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
     if (gameState !== 'playing' || clickedItem.isPopped) return;
 
     if (clickedItem.type === 'bomb') {
-      setGameState('lost');
+      sdk.haptics.impactOccurred('heavy');
+      setScore(0);
+      setItems([]);
+      setIsBombHit(true);
+      setTimeout(() => setIsBombHit(false), 2000);
     } else {
+      sdk.haptics.impactOccurred('soft');
       let points = 0;
       switch (clickedItem.type) {
         case 'powerup_point_10':
@@ -87,18 +99,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
   };
 
   useEffect(() => {
-    if (gameState === 'won') {
-      onGameWin(score);
-    }
-  }, [gameState, onGameWin, score]);
-
-  useEffect(() => {
     if (gameState !== 'playing') return;
 
     const timerInterval = setInterval(() => {
       setTimeLeft(prevTime => {
         if (prevTime <= 1) {
+          clearInterval(timerInterval);
           setGameState('won');
+          onGameWin(scoreRef.current);
           return 0;
         }
         return prevTime - 1;
@@ -110,31 +118,44 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
     }, 1000 / 60);
 
     const spawnInterval = setInterval(() => {
-      const rand = Math.random();
-      let type: Item['type'];
-      if (rand < BOMB_CHANCE) {
-        type = 'bomb';
-      } else if (rand < BOMB_CHANCE + POWER_UP_POINT_10_CHANCE) {
-        type = 'powerup_point_10';
-      } else if (rand < BOMB_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) {
-        type = 'powerup_point_5';
-      } else if (rand < BOMB_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) {
-        type = 'powerup_point_2';
-      } else {
-        type = 'picture';
-      }
+      setItems(prevItems => {
+        const newItems: Item[] = [];
+        const rand = Math.random();
+        let specialItem: Item | null = null;
 
-      const speed = type === 'bomb' ? currentBombSpeed : currentBombSpeed * PICTURE_SPEED_MULTIPLIER;
-      const newItem: Item = { id: nextItemId++, type, x: Math.random() * 90 + 5, y: -10, speed: speed };
-      setItems(prev => [...prev, newItem]);
+        if (rand < BOMB_CHANCE) {
+          specialItem = { id: nextItemId++, type: 'bomb', x: Math.random() * 90 + 5, y: -10, speed: currentBombSpeed };
+        } else if (rand < BOMB_CHANCE + POWER_UP_POINT_10_CHANCE) {
+          specialItem = { id: nextItemId++, type: 'powerup_point_10', x: Math.random() * 90 + 5, y: -10, speed: currentBombSpeed * PICTURE_SPEED_MULTIPLIER };
+        } else if (rand < BOMB_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) {
+          specialItem = { id: nextItemId++, type: 'powerup_point_5', x: Math.random() * 90 + 5, y: -10, speed: currentBombSpeed * PICTURE_SPEED_MULTIPLIER };
+        } else if (rand < BOMB_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) {
+          specialItem = { id: nextItemId++, type: 'powerup_point_2', x: Math.random() * 90 + 5, y: -10, speed: currentBombSpeed * PICTURE_SPEED_MULTIPLIER };
+        }
+        
+        if (specialItem) {
+          newItems.push(specialItem);
+        }
+
+        const pictureCount = 1 + Math.floor(Math.random() * 1);
+        for (let i = 0; i < pictureCount; i++) {
+          const speed = currentBombSpeed * PICTURE_SPEED_MULTIPLIER;
+          newItems.push({ id: nextItemId++, type: 'picture', x: Math.random() * 90 + 5, y: -10, speed: speed });
+        }
+        
+        return [...prevItems, ...newItems];
+      });
     }, currentSpawnRate);
 
     const difficultyInterval = setInterval(() => {
-      const progress = (GAME_DURATION - timeLeft) / GAME_DURATION;
-      const newBombSpeed = INITIAL_BOMB_SPEED + (FINAL_BOMB_SPEED - INITIAL_BOMB_SPEED) * progress;
-      setCurrentBombSpeed(newBombSpeed);
-      setCurrentSpawnRate(INITIAL_SPAWN_RATE - (INITIAL_SPAWN_RATE - FINAL_SPAWN_RATE) * progress);
-      setItems(prev => prev.map(item => ({ ...item, speed: item.type === 'bomb' ? newBombSpeed : newBombSpeed * PICTURE_SPEED_MULTIPLIER })));
+      setTimeLeft(prevTimeLeft => {
+        const progress = (GAME_DURATION - prevTimeLeft) / GAME_DURATION;
+        const newBombSpeed = INITIAL_BOMB_SPEED + (FINAL_BOMB_SPEED - INITIAL_BOMB_SPEED) * progress;
+        setCurrentBombSpeed(newBombSpeed);
+        setCurrentSpawnRate(INITIAL_SPAWN_RATE - (INITIAL_SPAWN_RATE - FINAL_SPAWN_RATE) * progress);
+        setItems(prev => prev.map(item => ({ ...item, speed: item.type === 'bomb' ? newBombSpeed : newBombSpeed * PICTURE_SPEED_MULTIPLIER })));
+        return prevTimeLeft;
+      });
     }, 2000);
 
     return () => {
@@ -143,7 +164,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
       clearInterval(spawnInterval);
       clearInterval(difficultyInterval);
     };
-  }, [gameState, timeLeft, currentBombSpeed, currentSpawnRate, onGameWin, score]);
+  }, [gameState, onGameWin]);
 
   const startGame = () => setGameState('playing');
 
@@ -167,12 +188,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
   return (
     <>
       <div className={gameStyles.gameStats}>
-        <span>Score: <strong>{score}</strong></span>
+        <span onClick={() => { setScore(0); setItems([]); }} style={{ cursor: 'pointer' }}>Score: <strong>{score}</strong></span>
         <span>Time Left: <strong>{timeLeft}s</strong></span>
       </div>
-      <div className={gameStyles.gameArea} onClick={gameState === 'idle' ? startGame : undefined}>
+      <div className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`} onClick={gameState === 'idle' ? startGame : undefined}>
         {gameState === 'idle' && <div className={gameStyles.overlay}><h2>ENB Pop</h2><p>Survive for 25 seconds.<br/>Avoid the bombs!<br/><br/>Click to Start</p></div>}
-        {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p>You hit a bomb.<br/>Click to try again.</p></div>}
+        {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}
         {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {score}<br/>Claim is unlocked below.</p></div>}
         
          {items.map(item => (
@@ -180,7 +201,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
             key={item.id}
             className={`${gameStyles.item} ${item.isPopped ? gameStyles.popped : ''}`} 
             style={{ top: `${item.y}%`, left: `${item.x}%` }} 
-            onClick={() => handleItemClick(item)}
+            onPointerDown={() => handleItemClick(item)}
           >
             {renderItem(item)}
           </div>

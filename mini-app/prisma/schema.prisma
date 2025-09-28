@@ -23,6 +23,8 @@ model User {
   totalClaimed  Decimal   @default(0)
   totalPoints   BigInt       @default(0)
   weeklyPoints  BigInt    @default(0)
+  claimsToday   Int       @default(0)
+  lastClaimDate DateTime?
   lastClaimedAt DateTime?
   createdAt     DateTime  @default(now())
   claims        Claim[]
@@ -72,4 +74,9 @@ model UserTaskCompletion {
   task         Task     @relation(fields: [taskId], references: [id])
   taskId       String
   completedAt  DateTime @default(now())
+}
+
+model IndexerState {
+  id                 String @id @default("main_indexer")
+  lastProcessedBlock BigInt
 }

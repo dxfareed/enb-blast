@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '@/app/context/UserContext';
 import styles from './page.module.css';
-import { Check, Loader, ExternalLink } from 'lucide-react';
+import Loader from '@/app/components/Loader';
+import VerifyLoader from '@/app/components/VerifyLoader';
+import { useRouter } from 'next/navigation';
+import { Check, ExternalLink } from 'lucide-react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import Toast from '@/app/components/Toast';
 
@@ -23,12 +26,54 @@ type ToastState = {
   type: 'success' | 'error';
 } | null;
 
-function TaskItem({ task, onVerify, isChecking }) {
-  const isButtonDisabled = task.completed || isChecking;
+const DISABLED_TASKS = [
+  'WARPCAST_FOLLOW',
+  'FARCASTER_FOLLOW_ENB_CHANNEL',
+  'FARCASTER_FOLLOW_DXFAREED',
+  'FARCASTER_FOLLOW_KOKOCODES'
+];
+
+type TaskItemProps = {
+  task: Task;
+  onVerify: (task: Task) => void;
+  isChecking: boolean;
+};
+
+function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
+  const router = useRouter();
+  const isTaskDisabled = DISABLED_TASKS.includes(task.checkKey);
+  const isButtonDisabled = task.completed || isChecking || isTaskDisabled;
   const hasActionUrl = !!task.actionUrl;
 
+  const handleGoClick = () => {
+    if (task.actionUrl) {
+      const url = task.actionUrl;
+      if (url.startsWith('/')) {
+        router.push(url);
+        return;
+      }
+      if (url.startsWith('https://farcaster.xyz/') && !url.includes('/~/channel/')) {
+        let fid: number | null = null;
+        if (url.includes('dxfareed')) {
+          fid = 849768;
+        } else if (url.includes('kokocodes')) {
+          fid = 738574;
+        }
+        
+        if (fid) {
+          console.log('Viewing profile for fid:', fid);
+          sdk.actions.viewProfile({ fid });
+        } else {
+          window.open(url, '_blank');
+        }
+      } else {
+        window.open(url, '_blank');
+      }
+    }
+  };
+
   return (
-    <div className={`${styles.taskItem} ${task.completed ? styles.completed : ''}`}>
+    <div className={`${styles.taskItem} ${task.completed ? styles.completed : ''} ${isTaskDisabled ? styles.disabledTask : ''}`}>
       <div className={styles.taskInfo}>
         <h3 className={styles.taskTitle}>{task.title}</h3>
         <p className={styles.taskDescription}>
@@ -38,12 +83,20 @@ function TaskItem({ task, onVerify, isChecking }) {
       </div>
       <div className={styles.buttonContainer}>
         {hasActionUrl && !task.completed && (
-          <button onClick={() => window.location.href = task.actionUrl} className={styles.goButton}>
+          <button 
+            onClick={handleGoClick} 
+            className={`${styles.goButton} ${isTaskDisabled ? styles.disabledButton : ''}`}
+            disabled={isTaskDisabled}
+          >
             <ExternalLink size={16} /> Go
           </button>
         )}
-        <button onClick={() => onVerify(task)} disabled={isButtonDisabled} className={`${styles.verifyButton} ${task.type === 'DEFAULT' ? styles.defaultVerifyButton : ''}`}>
-          {isChecking ? <Loader size={16} className={styles.spinner} /> : (task.completed ? <Check size={16} /> : 'Verify')}
+        <button 
+          onClick={() => onVerify(task)} 
+          disabled={isButtonDisabled} 
+          className={`${styles.verifyButton} ${task.type === 'DEFAULT' ? styles.defaultVerifyButton : ''} ${isTaskDisabled ? styles.disabledButton : ''}`}
+        >
+          {isChecking ? <VerifyLoader /> : (task.completed ? <Check size={16} /> : 'Verify')}
         </button>
       </div>
     </div>
@@ -76,10 +129,10 @@ export default function TasksPage() {
     sdk.haptics.impactOccurred('medium');
     setCheckingTaskId(task.id);
     try {
-      const response = await fetch('/api/tasks/verify', {
+      const response = await sdk.quickAuth.fetch('/api/tasks/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fid, checkKey: task.checkKey }),
+        body: JSON.stringify({ checkKey: task.checkKey }),
       });
 
       if (!response.ok) {
@@ -93,7 +146,7 @@ export default function TasksPage() {
 
     } catch (error) {
       sdk.haptics.notificationOccurred('error');
-      setToast({ message: `Error: ${error.message}`, type: 'error' });
+      setToast({ message: `Error: ${(error as Error).message}`, type: 'error' });
     } finally {
       setCheckingTaskId(null);
     }
@@ -102,7 +155,7 @@ export default function TasksPage() {
   const dailyTasks = tasks.filter(t => t.type === 'DAILY');
   const defaultTasks = tasks.filter(t => t.type === 'DEFAULT');
 
-  if (isLoading) return <div>Loading tasks...</div>;
+  if (isLoading) return <Loader />;
 
   return (
     <div className={styles.tasksContainer}>

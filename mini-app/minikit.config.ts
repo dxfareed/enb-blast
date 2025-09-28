@@ -24,7 +24,7 @@ export const minikitConfig = {
     webhookUrl: `${ROOT_URL}/api/webhook`,
     primaryCategory: "utility",
     tags: [],
-    heroImageUrl: `${ROOT_URL}/output2.gif`,
+    heroImageUrl: `https://jane-unfetched-nonmortally.ngrok-free.dev/output2.gif`,
     ogTitle: "",
     ogDescription: "",
     ogImageUrl: `${ROOT_URL}/hero.png`,

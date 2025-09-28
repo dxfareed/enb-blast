@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '@/app/context/UserContext';
 import styles from './page.module.css';
+import { sdk } from '@farcaster/miniapp-sdk';
 import WeeklyCountdown from '@/app/components/WeeklyCountdown';
 import { DollarSign } from 'lucide-react';
+import Loader from '@/app/components/Loader';
 
 type LeaderboardUser = {
   username: string;
@@ -26,10 +28,26 @@ const getRankStyling = (rank: number) => {
 const prizePoolAmount = 100000;
 
 export default function LeaderboardPage() {
-  const { username } = useUser();
+  const { userProfile } = useUser();
+  const username = userProfile?.username;
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
   const [currentUser, setCurrentUser] = useState<LeaderboardUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const logVisit = async () => {
+      try {
+        await sdk.quickAuth.fetch('/api/events/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventType: 'LEADERBOARD_VISIT' }),
+        });
+      } catch (error) {
+        console.error("Failed to log leaderboard visit:", error);
+      }
+    };
+    logVisit();
+  }, []);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -63,7 +81,7 @@ export default function LeaderboardPage() {
   }, [username, leaderboardData]);
 
   if (isLoading) {
-    return <div className={styles.leaderboardContainer}>Loading...</div>;
+    return <Loader />;
   }
 
   return (
@@ -87,9 +105,11 @@ export default function LeaderboardPage() {
               key={user.rank}
               className={`${styles.userRow} ${user.username === username ? styles.currentUser : ''}`}
             >
-              <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>
-                {user.rank}
-              </div>
+              {user.rank && (
+                <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>
+                  {user.rank}
+                </div>
+              )}
               <img
                 src={user.pfpUrl || '/icon.png'}
                 alt={`${user.username}'s profile picture`}
@@ -110,9 +130,11 @@ export default function LeaderboardPage() {
 
       {currentUser && (
         <div className={styles.currentUserFooter}>
-           <div className={`${styles.rankCircle} ${getRankStyling(currentUser.rank)}`}>
-                {currentUser.rank}
+           {currentUser.rank && (
+              <div className={`${styles.rankCircle} ${getRankStyling(currentUser.rank)}`}>
+                  {currentUser.rank}
               </div>
+            )}
               <img
                 src={currentUser.pfpUrl || '/icon.png'}
                 alt={`${currentUser.username}'s profile picture`}

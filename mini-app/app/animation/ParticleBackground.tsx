@@ -14,23 +14,23 @@ class Particle {
 
   constructor(p5: p5) {
     this.p5 = p5;
-    this.reset();
+    this.reset(0);
     this.y = this.p5.random(-200, 0);
   }
 
-  reset() {
-    this.x = this.p5.random(0, this.p5.windowWidth);
+  reset(containerWidth: number) {
+    this.x = this.p5.random(0, containerWidth);
     this.y = -50;
     this.speed = this.p5.random(1, 3);
     this.opacity = this.p5.random(180, 255);
     this.rotation = this.p5.random(0, 360);
   }
 
-  update() {
+  update(containerWidth: number, containerHeight: number) {
     this.y += this.speed;
     this.rotation += 0.5;
-    if (this.y > this.p5.windowHeight + 50) {
-      this.reset();
+    if (this.y > containerHeight + 50) {
+      this.reset(containerWidth);
     }
   }
 
@@ -57,8 +57,15 @@ export default function ParticleBackground() {
     let isSetupComplete = false;
 
     const sketch = (p: p5) => {
+      let containerWidth = 0;
+      let containerHeight = 0;
+
       p.setup = () => {
-        const canvas = p.createCanvas(p.windowWidth, p.windowHeight);
+        if (containerRef.current) {
+          containerWidth = containerRef.current.offsetWidth;
+          containerHeight = containerRef.current.offsetHeight;
+        }
+        const canvas = p.createCanvas(containerWidth, containerHeight);
         canvas.position(0, 0);
         canvas.style('z-index', '1');
         canvas.style('pointer-events', 'none');
@@ -66,7 +73,9 @@ export default function ParticleBackground() {
         p.loadImage('/Enb_000.png', (img) => {
           particleImg = img;
           for (let i = 0; i < PARTICLE_COUNT; i++) {
-            particles.push(new Particle(p));
+            const particle = new Particle(p);
+            particle.reset(containerWidth);
+            particles.push(particle);
           }
           isSetupComplete = true;
         }, (err) => {
@@ -80,13 +89,17 @@ export default function ParticleBackground() {
         p.clear();
 
         particles.forEach(particle => {
-          particle.update();
+          particle.update(containerWidth, containerHeight);
           particle.draw(particleImg);
         });
       };
 
       p.windowResized = () => {
-        p.resizeCanvas(p.windowWidth, p.windowHeight);
+        if (containerRef.current) {
+          containerWidth = containerRef.current.offsetWidth;
+          containerHeight = containerRef.current.offsetHeight;
+          p.resizeCanvas(containerWidth, containerHeight);
+        }
       };
     };
 

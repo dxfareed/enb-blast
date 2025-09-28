@@ -10,6 +10,7 @@ import {
   TOKEN_MEMBERSHIP_CONTRACT_ABI,
   TOKEN_MEMBERSHIP_LEVELS
 } from '@/app/utils/constants';
+import Loader from '@/app/components/Loader';
 
 type UserProfile = {
   username: string;
@@ -21,12 +22,8 @@ type UserProfile = {
 };
 
 export default function ProfilePage() {
-  const { fid } = useUser();
+  const { userProfile, isLoading: isUserLoading } = useUser();
   const { address } = useAccount();
-
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isApiLoading, setIsApiLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const { data: membershipData, isLoading: isContractLoading } = useReadContract({
     address: TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
@@ -36,67 +33,44 @@ export default function ProfilePage() {
     query: { enabled: !!address },
   });
 
-  useEffect(() => {
-    if (!fid) {
-      setIsApiLoading(false);
-      return;
-    }
-    const fetchProfile = async () => {
-      setIsApiLoading(true);
-      try {
-        const response = await fetch(`/api/user/profile?fid=${fid}`);
-        if (!response.ok) throw new Error('Failed to fetch profile data');
-        setProfile(await response.json());
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error');
-      } finally {
-        setIsApiLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [fid]);
-
   const membershipLevelName = membershipData
     ? TOKEN_MEMBERSHIP_LEVELS[Number((membershipData as any)[4])] || "Unknown"
     : "Loading...";
 
-  const isLoading = isApiLoading || (!!address && isContractLoading);
+  const isLoading = isUserLoading || (!!address && isContractLoading);
 
-  const displayProfile = profile;
-
-  if (isLoading) return <div>Loading profile...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!displayProfile) return <div>Could not find user profile.</div>;
+  if (isLoading) return <Loader />;
+  if (!userProfile) return <div>Could not find user profile.</div>;
 
   return (
     <div className={styles.profileContainer}>
       <div className={styles.profilePicture}>
         <img
-          src={displayProfile.pfpUrl}
-          alt={`${displayProfile.username}'s profile picture`}
+          src={userProfile.pfpUrl || '/default-pfp.png'}
+          alt={`${userProfile.username}'s profile picture`}
           width={128}
           height={128}
           style={{ borderRadius: '9999px', objectFit: 'cover' }}
         />
       </div>
-      <h2 className={styles.username}>@{displayProfile.username}</h2>
+      <h2 className={styles.username}>@{userProfile.username}</h2>
 
       <div className={styles.statsGrid}>
         <div className={`${styles.statCard} ${styles.streakCard}`}>
           <p className={styles.statLabel}>Streak</p>
-          <p className={styles.statValue}>🔥 {displayProfile.streak}</p>
+          <p className={styles.statValue}>🔥 {userProfile.streak}</p>
         </div>
         <div className={`${styles.statCard} ${styles.pointsCard}`}>
           <p className={styles.statLabel}>Total Points</p>
-          <p className={styles.statValue}>{Number(displayProfile.totalPoints).toLocaleString()}</p>
+          <p className={styles.statValue}>{Number(userProfile.totalPoints).toLocaleString()}</p>
         </div>
         <div className={`${styles.statCard} ${styles.rankCard}`}>
           <p className={styles.statLabel}>Weekly Rank</p>
-          <p className={styles.statValue}><BarChart2 size={28} /> #{displayProfile.weeklyRank}</p>
+          <p className={styles.statValue}><BarChart2 size={28} /> #{userProfile.weeklyRank}</p>
         </div>
         <div className={`${styles.statCard} ${styles.claimedCard}`}>
           <p className={styles.statLabel}>Total Claimed</p>
-          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(displayProfile.totalClaimed).toFixed(2)}</p>
+          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(userProfile.totalClaimed).toFixed(2)}</p>
         </div>
       </div>
 

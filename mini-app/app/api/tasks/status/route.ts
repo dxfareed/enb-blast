@@ -44,7 +44,24 @@ export async function GET(request: Request) {
 
     const hasIncompleteDailyTasks = completedDailyTasksCount < totalDailyTasks;
 
-    return NextResponse.json({ hasIncompleteDailyTasks });
+    const totalDefaultTasks = await prisma.task.count({
+      where: { type: TaskType.DEFAULT },
+    });
+
+    const completedDefaultTasksCount = await prisma.userTaskCompletion.count({
+      where: {
+        userId: user.id,
+        task: {
+          type: TaskType.DEFAULT,
+        },
+      },
+    });
+
+    const hasIncompleteDefaultTasks = completedDefaultTasksCount < totalDefaultTasks;
+
+    const hasIncompleteTasks = hasIncompleteDailyTasks || hasIncompleteDefaultTasks;
+
+    return NextResponse.json({ hasIncompleteTasks });
 
   } catch (error) {
     console.error('Failed to fetch task status:', error);

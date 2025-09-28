@@ -18,12 +18,13 @@
   gap: 0.5rem;
   width: 100%;
   justify-content: center;
+  align-items: center;
 }
 
 .topButtonsWrapper {
   display: flex;
   gap: 0.5rem;
-  width: 100%;
+  flex-grow: 1;
 }
 
 .claimButton {
@@ -45,7 +46,6 @@
   background-color: #dcfce7;
   color: #16a34a;
   border: 1px solid #bbf7d0;
-  width: 67%;
 }
 .claimButtonGreen:hover {
   background-color: #bbf7d0;
@@ -55,7 +55,7 @@
   background-color: #ffedd5;
   color: #f97316;
   border: 1px solid #fed7aa;
-  width: 33%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -68,7 +68,8 @@
   background-color: #f3e8ff;
   color: #9333ea;
   border: 1px solid #e9d5ff;
-  width: 100%;
+  flex-basis: 30%;
+  flex-grow: 0;
 }
 .multiplierButtonPurple:hover {
   background-color: #e9d5ff;

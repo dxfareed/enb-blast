@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 
-const WARM_URL = 'http://localhost:3000/api/warm';
+///onboarding/welcome
+const WARM_URL = 'https://enb-pop.vercel.app/api/warm';
 const INTERVAL = 1.2 * 60 * 1000;
 
 async function pingWarmEndpoint() {

@@ -118,34 +118,35 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
+    const userId = user.id;
 
-    // --- Weekly Rank Calculation ---
     const allUsers = await prisma.user.findMany({
       orderBy: {
         weeklyPoints: 'desc',
       },
     });
 
-    const userRank = allUsers.findIndex((u) => u.id === user.id) + 1;
+    const userRank = allUsers.findIndex((u) => u.id === userId) + 1;
 
     if (user.streak > 0) {
       const lastClaim = user.claims[0];
       if (!lastClaim) {
         // If user has a streak but no claims, reset it.
-        user = await prisma.user.update({ where: { id: user.id }, data: { streak: 0 } });
+        await prisma.user.update({ where: { id: userId }, data: { streak: 0 } });
+        user.streak = 0;
       } else {
         const now = new Date();
         const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         const yesterdayUTC = new Date(todayUTC);
         yesterdayUTC.setUTCDate(todayUTC.getUTCDate() - 1);
 
-        // If the last claim was before the start of yesterday, the streak is broken.
         if (lastClaim.timestamp < yesterdayUTC) {
           console.log(`User ${user.username}'s streak broken. Last claim: ${lastClaim.timestamp}. Resetting to 0.`);
-          user = await prisma.user.update({
-            where: { id: user.id },
+          await prisma.user.update({
+            where: { id: userId },
             data: { streak: 0 },
           });
+          user.streak = 0;
         }
       }
     }
@@ -153,7 +154,6 @@ export async function GET(req: NextRequest) {
     const userProfile = convertBigIntsToStrings(user);
     delete (userProfile as any).claims;
     
-    // --- Add rank to the response ---
     (userProfile as any).weeklyRank = userRank;
 
     return NextResponse.json(userProfile, { status: 200 });
@@ -164,17 +164,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-const client = createClient({
-  fetch: (url, options) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-    return fetch(url, { ...options, signal: controller.signal })
-      .finally(() => clearTimeout(timeout));
-  }
-});
+const client = createClient();
 
 function getUrlHost(request: NextRequest) {
-    // First try to get the origin from the Origin header
     const origin = request.headers.get("origin");
     if (origin) {
       try {
@@ -220,15 +212,15 @@ export async function POST(req: NextRequest) {
     const authenticatedFid = payload.sub;
 
     const body = await req.json();
-    const { fid, hash, walletAddress } = body;
-    console.log('Received registration request:', { fid, hash, walletAddress });
+    const { fid, walletAddress } = body;
+    console.log('Received registration request:', { fid, walletAddress });
 
     if (authenticatedFid !== fid) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!fid || !hash || !walletAddress) {
-      return NextResponse.json({ message: 'Farcaster ID (fid), transaction hash, and wallet address are required' }, { status: 400 });
+    if (!fid || !walletAddress) {
+      return NextResponse.json({ message: 'Farcaster ID (fid) and wallet address are required' }, { status: 400 });
     }
 
     const userFid = BigInt(fid);
@@ -241,25 +233,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(serializableExistingUser, { status: 200 });
     }
 
-    console.log('Waiting for transaction confirmation:', hash);
-    const txReceipt = await waitForTransactionConfirmation(hash);
-
-    if (txReceipt.status !== 'success') {
-      return NextResponse.json({ message: 'Transaction failed or is not yet confirmed.' }, { status: 400 });
-    }
-
-    const block = await publicClient.getBlock({ blockNumber: txReceipt.blockNumber });
-    const transactionTime = Number(block.timestamp);
-    if (Date.now() / 1000 - transactionTime > (30 * 60)) {
-      return NextResponse.json({ message: 'Transaction is too old. Please try again.' }, { status: 400 });
-    }
-
-    const gameContractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase();
-    if (txReceipt.to?.toLowerCase() !== gameContractAddress) {
-      return NextResponse.json({ message: 'Transaction was not sent to the correct game contract.' }, { status: 400 });
-    }
-
-    console.log(`Transaction verified. Fetching Farcaster profile for FID: ${fid}...`);
+    console.log(`Fetching Farcaster profile for FID: ${fid}...`);
     const farcasterProfile = await fetchFarcasterProfile(fid);
 
     console.log('Attempting to create user in database with real Farcaster data:', {

@@ -25,7 +25,7 @@ export default function DashboardLayout({
         const response = await fetch(`/api/tasks/status?fid=${fid}`);
         if (response.ok) {
           const data = await response.json();
-          setHasIncompleteTasks(data.hasIncompleteDailyTasks);
+          setHasIncompleteTasks(data.hasIncompleteTasks);
         }
       } catch (error) {
         console.error('Failed to fetch task status:', error);

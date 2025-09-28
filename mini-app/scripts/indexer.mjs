@@ -69,6 +69,49 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
   }
 }
 
+async function connectAndListen() {
+  console.log("... Attempting to connect to WebSocket provider...");
+  const provider = new ethers.WebSocketProvider(process.env.TESTNET_RPC_WSS_URL);
+  const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
+
+  if (!contractAddress) { throw new Error("Contract address not found."); }
+  
+  const contract = new ethers.Contract(contractAddress, GAME_CONTRACT_ABI, provider);
+
+  let heartbeatInterval;
+
+  const cleanup = () => {
+    console.log("Cleaning up old listeners and timers.");
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    contract.removeAllListeners();
+    if (provider.destroy) {
+        provider.destroy();
+    }
+  };
+
+  const reconnect = () => {
+    console.log("Connection lost. Reconnecting in 10 seconds...");
+    cleanup();
+    setTimeout(connectAndListen, 10000);
+  };
+
+  // Heartbeat to check connection
+  heartbeatInterval = setInterval(async () => {
+    try {
+      await provider.getBlockNumber();
+    } catch (error) {
+      console.error("Heartbeat failed, connection likely lost. Triggering reconnect.");
+      reconnect();
+    }
+  }, 15000);
+
+  contract.on("TokensClaimed", (user, amount, nonce, event) => {
+    processEvent(user, amount, nonce, event);
+  });
+
+  console.log("... Indexer is running. Waiting for events...");
+}
+
 async function main() {
   console.log("🚀 Starting resilient indexer...");
 
@@ -81,18 +124,7 @@ async function main() {
     process.exit(1);
   }
 
-  const provider = new ethers.WebSocketProvider(process.env.TESTNET_RPC_WSS_URL);
-  const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
-
-  if (!contractAddress) { throw new Error("Contract address not found."); }
-  
-  const contract = new ethers.Contract(contractAddress, GAME_CONTRACT_ABI, provider);
-
-  contract.on("TokensClaimed", (user, amount, nonce, event) => {
-    processEvent(user, amount, nonce, event);
-  });
-
-  console.log("... Indexer is running. Waiting for events...");
+  connectAndListen();
 }
 
 main().catch(async (error) => {

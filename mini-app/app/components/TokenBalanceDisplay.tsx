@@ -12,7 +12,9 @@ export default function TokenBalanceDisplay() {
   const { data: balanceData, isLoading } = useBalance({
     address: address,
     token: TOKEN_ADDRESS,
-    watch: true,
+    query: {
+      refetchInterval: 5000,
+    },
   });
 
   useEffect(() => {

@@ -2,16 +2,11 @@
 import Image from "next/image";
 import styles from "./page.module.css";
 import { useAccount, useConnect } from 'wagmi'
+import { useEffect } from "react";
 
 export default function Home() {
   const { isConnected, address } = useAccount()
   const { connect, connectors } = useConnect()
-
-  const handleConnect = () => {
-    if (connectors.length > 0) {
-      connect({ connector: connectors[0] });
-    }
-  }
 
   return (
     <div className={styles.container}>
@@ -19,9 +14,7 @@ export default function Home() {
         {isConnected ? (
           <div>{address}</div>
         ) : (
-          <button type="button" onClick={handleConnect}>
-            Connect
-          </button>
+          <button onClick={() => connect({ connector: connectors[0] })}>Connect</button>
         )}
       </header>
 
