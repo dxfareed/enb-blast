@@ -11,7 +11,17 @@ const GAME_CONTRACT_ABI = [
 ];
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 5000;
+const RETRY_DELAY = 5000; 
+const KEEP_ALIVE_INTERVAL = 60 * 1000; // 1 minute
+
+const RETRYABLE_ERROR_CODES = new Set(['P1001', 'P2028']);
+
+function isSameDay(date1, date2) {
+  if (!date1 || !date2) return false;
+  return date1.getUTCFullYear() === date2.getUTCFullYear() &&
+         date1.getUTCMonth() === date2.getUTCMonth() &&
+         date1.getUTCDate() === date2.getUTCDate();
+}
 
 async function processEvent(user, amount, nonce, event, retryCount = 0) {
   console.log(`✅ Event received! Processing Nonce: ${nonce}...`);
@@ -22,18 +32,34 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
     const block = await event.log.getBlock();
     const timestamp = new Date(block.timestamp * 1000);
     const amountDecimal = ethers.formatUnits(amount, 18);
+    const points = parseFloat(amountDecimal) * 10;
+
+    const dbUser = await prisma.user.findUnique({
+      where: { walletAddress: user.toLowerCase() },
+    });
+
+    if (!dbUser) { 
+      console.warn(`   - User ${user} not found in DB. Claim will not be indexed.`);
+      return;
+    }
+
+    let newStreak = 1;
+    if (dbUser.lastClaimedAt) {
+        if (!isSameDay(dbUser.lastClaimedAt, timestamp)) {
+            const yesterday = new Date(timestamp);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            if (isSameDay(dbUser.lastClaimedAt, yesterday)) {
+                newStreak = dbUser.streak + 1;
+            }
+        } else {
+            newStreak = dbUser.streak; 
+        }
+    }
+
+    const isNewDay = !dbUser.lastClaimDate || !isSameDay(dbUser.lastClaimDate, timestamp);
+    const newClaimsToday = isNewDay ? 1 : dbUser.claimsToday + 1;
 
     await prisma.$transaction(async (tx) => {
-      const dbUser = await tx.user.findUnique({
-        where: { walletAddress: user.toLowerCase() },
-      });
-
-      if (!dbUser) { 
-        console.warn(`   - User ${user} not found in DB. Claim will not be indexed.`);
-        return;
-      }
-
-      // 1. Create the historical claim record
       await tx.claim.create({
         data: {
           txHash: txHash,
@@ -43,11 +69,16 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
         },
       });
 
-      // 2. Update the user's total on-chain claimed amount
       await tx.user.update({
         where: { id: dbUser.id },
         data: { 
           totalClaimed: { increment: parseFloat(amountDecimal) },
+          totalPoints: { increment: points },
+          weeklyPoints: { increment: points },
+          streak: newStreak,
+          lastClaimedAt: timestamp,
+          claimsToday: newClaimsToday,
+          lastClaimDate: timestamp,
         },
       });
     });
@@ -55,16 +86,14 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
     console.log(`   - ✅ Successfully indexed claim with txHash: ${txHash}`);
 
   } catch (error) {
-    if (error.code === 'P2028' && retryCount < MAX_RETRIES) {
-      console.warn(`   - ⚠️ Database connection timed out. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-      await prisma.$disconnect();
-      await prisma.$connect();
+    if (error.code === 'P2002') {
+      console.warn(`   - ℹ️  Claim with txHash ${txHash} already exists. Skipping.`);
+    } else if (RETRYABLE_ERROR_CODES.has(error.code) && retryCount < MAX_RETRIES) {
+      console.warn(`   - ⚠️  A transient database error occurred (${error.code}). Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
       await new Promise(res => setTimeout(res, RETRY_DELAY));
       await processEvent(user, amount, nonce, event, retryCount + 1);
-    } else if (error.code === 'P2002') {
-      console.warn(`   - ℹ️  Claim with txHash ${txHash} already exists. Skipping.`);
     } else {
-      console.error(`   - ❌ Error processing event after ${retryCount} retries:`, error);
+      console.error(`   - ❌ Error processing event for txHash ${txHash} after ${retryCount} retries:`, error);
     }
   }
 }
@@ -79,10 +108,12 @@ async function connectAndListen() {
   const contract = new ethers.Contract(contractAddress, GAME_CONTRACT_ABI, provider);
 
   let heartbeatInterval;
+  let dbKeepAliveInterval;
 
   const cleanup = () => {
     console.log("Cleaning up old listeners and timers.");
     if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (dbKeepAliveInterval) clearInterval(dbKeepAliveInterval);
     contract.removeAllListeners();
     if (provider.destroy) {
         provider.destroy();
@@ -95,7 +126,6 @@ async function connectAndListen() {
     setTimeout(connectAndListen, 10000);
   };
 
-  // Heartbeat to check connection
   heartbeatInterval = setInterval(async () => {
     try {
       await provider.getBlockNumber();
@@ -104,6 +134,15 @@ async function connectAndListen() {
       reconnect();
     }
   }, 15000);
+
+  dbKeepAliveInterval = setInterval(async () => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log("   - 핑 (Ping) DB connection is alive.");
+    } catch (error) {
+      console.error("   - 핑 (Ping) DB connection keep-alive failed:", error);
+    }
+  }, KEEP_ALIVE_INTERVAL);
 
   contract.on("TokensClaimed", (user, amount, nonce, event) => {
     processEvent(user, amount, nonce, event);
@@ -114,21 +153,11 @@ async function connectAndListen() {
 
 async function main() {
   console.log("🚀 Starting resilient indexer...");
-
-  try {
-    console.log("🔌 Connecting to database...");
-    await prisma.$connect();
-    console.log("✅ Database connection successful.");
-  } catch (error) {
-    console.error("❌ Failed to connect to the database on startup. Exiting.", error);
-    process.exit(1);
-  }
-
   connectAndListen();
 }
 
 main().catch(async (error) => {
-  console.error("Indexer failed:", error);
+  console.error("Indexer failed with a critical error:", error);
   await prisma.$disconnect();
   process.exit(1);
 });

@@ -56,16 +56,16 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { fid } });
     if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+        return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    // --- SAFETY CHECK: Check the daily limit BEFORE signing ---
     const now = new Date();
     const isNewDay = !user.lastClaimDate || !isSameDay(user.lastClaimDate, now);
-    if (!isNewDay && user.claimsToday >= 5) {
+    const claimsToday = isNewDay ? 0 : user.claimsToday;
+
+    if (claimsToday >= 5) {
         return NextResponse.json({ message: 'Daily claim limit reached' }, { status: 429 });
     }
-    // --- NOTICE: We DO NOT update the database here ---
 
     const serverWallet = new ethers.Wallet(process.env.SERVER_SIGNER_PRIVATE_KEY!);
     const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS!;

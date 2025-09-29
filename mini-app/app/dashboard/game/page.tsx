@@ -24,17 +24,16 @@ export default function GamePage() {
     const [isMultiplierUsed, setIsMultiplierUsed] = useState(false);
     const [isMultiplierLoading, setIsMultiplierLoading] = useState(false);
     const [isSignatureLoading, setIsSignatureLoading] = useState(false);
+    const [isClaimFinalized, setIsClaimFinalized] = useState(false);
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
-    const [isConfirmingOnBackend, setIsConfirmingOnBackend] = useState(false);
-    const [isClaimFinalized, setIsClaimFinalized] = useState(false);
 
     const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
     const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
-    const handleClaim = async (scoreToClaim: number) => {
-        if (!address || scoreToClaim <= 0) return;
-        const claimAmount = scoreToClaim / 10;
+    const handleClaim = async () => {
+        if (!address || finalScore <= 0) return;
+        const claimAmount = finalScore / 10;
         setIsSignatureLoading(true);
         try {
             const signatureResponse = await sdk.quickAuth.fetch('/api/claim/signature', {
@@ -43,6 +42,11 @@ export default function GamePage() {
                 body: JSON.stringify({ walletAddress: address, amount: claimAmount }),
             });
             if (!signatureResponse.ok) {
+                if (signatureResponse.status === 500) throw new Error('Server timeout, please try again.');
+                if (signatureResponse.status === 401) throw new Error('Authentication error. Please reconnect.');
+                if (signatureResponse.status === 404) throw new Error('User not found. Please register first.');
+                if (signatureResponse.status === 429) throw new Error('Daily claim limit reached.');
+                
                 const errorBody = await signatureResponse.json();
                 throw new Error(errorBody.message || 'Could not get signature.');
             }
@@ -86,34 +90,6 @@ export default function GamePage() {
         }
     };
 
-    useEffect(() => {
-        if (isConfirmed && hash) {
-            const confirmClaimOnBackend = async () => {
-                setIsConfirmingOnBackend(true);
-                try {
-                    const confirmResponse = await sdk.quickAuth.fetch('/api/claim/confirm', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ txHash: hash, points: finalScore }),
-                    });
-                    if (!confirmResponse.ok) {
-                        const errorBody = await confirmResponse.json();
-                        throw new Error(errorBody.message || "Failed to confirm claim with server.");
-                    }
-                    setToast({ message: "Successfully claimed!", type: 'success' });
-                    queryClient.invalidateQueries({ queryKey: ['balance'] });
-                    refetchUserProfile();
-                } catch (error) {
-                    setToast({ message: (error as Error).message, type: 'error' });
-                } finally {
-                    setIsConfirmingOnBackend(false);
-                    setIsClaimFinalized(true);
-                }
-            };
-            confirmClaimOnBackend();
-        }
-    }, [isConfirmed, hash, finalScore, queryClient, refetchUserProfile]);
-
     const handleGameWin = (scoreFromGame: number) => {
         setIsClaimUnlocked(true);
         setFinalScore(scoreFromGame);
@@ -135,41 +111,52 @@ export default function GamePage() {
         if (error) {
             setToast({ message: 'shortMessage' in error ? error.shortMessage : error.message, type: 'error' });
             resetWriteContract();
+            return;
         }
-    }, [writeError, confirmationError, resetWriteContract]);
+
+        if (isConfirmed && !isClaimFinalized) {
+            setToast({ message: 'Claim successful!', type: 'success' });
+            setIsClaimFinalized(true);
+
+            setTimeout(() => {
+                refetchUserProfile();
+                queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
+                queryClient.invalidateQueries({ queryKey: ['userHistory'] });
+            }, 5000);
+        }
+    }, [writeError, confirmationError, resetWriteContract, isConfirmed, isClaimFinalized, refetchUserProfile, queryClient]);
 
     return (
         <div className={styles.gameContainer}>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} />
+            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} />
             <div className={styles.actionContainer}>
                 {isClaimUnlocked ? (
                     <div className={styles.actionButtonsContainer}>
                         {finalScore > 0 ? (
-                            !isClaimFinalized ? (
+                            !isConfirmed ? (
                                 <>
                                     <div className={styles.topButtonsWrapper}>
                                         <button
-                                            onClick={() => handleClaim(finalScore)}
-                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmingOnBackend || isConfirmed}
+                                            onClick={handleClaim}
+                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmed}
                                             className={`${styles.claimButton} ${styles.claimButtonGreen}`}
                                         >
                                             {isSignatureLoading ? 'Preparing...' :
                                              isWritePending ? 'Check Wallet...' :
                                              isConfirming ? 'Confirming on-chain...' :
-                                             isConfirmingOnBackend ? 'Finalizing claim...' :
                                              claimButtonText}
                                         </button>
+                                        {//!isMultiplierUsed && !isConfirmed && (
+                                            <button
+                                                onClick={handleMultiplier}
+                                                disabled={true/* isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading */}
+                                                className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
+                                            >
+                                                {isMultiplierLoading ? 'Preparing...' : '2x'}
+                                            </button>
+                                        /* ) */}
                                     </div>
-                                    {!isMultiplierUsed && !isConfirmed && (
-                                        <button
-                                            onClick={handleMultiplier}
-                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmingOnBackend}
-                                            className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
-                                        >
-                                            {isMultiplierLoading ? 'Preparing...' : '2x'}
-                                        </button>
-                                    )}
                                 </>
                             ) : (
                                 <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>

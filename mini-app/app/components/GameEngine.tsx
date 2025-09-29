@@ -23,14 +23,31 @@ const POWER_UP_POINT_2_URL = "https://pbs.twimg.com/profile_images/1945283028441
 const POWER_UP_POINT_2_VALUE = 2;
 const POWER_UP_POINT_2_CHANCE = 0.03;
 
-type Item = { id: number; type: 'picture' | 'bomb' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_point_2'; x: number; y: number; speed: number; isPopped?: boolean; points?: number; };
-type GameState = 'idle' | 'playing' | 'won' | 'lost';
-type GameEngineProps = { onGameWin: (finalScore: number) => void; };
+type GameEngineProps = { onGameWin: (finalScore: number) => void; displayScore: number; };
 export type GameEngineHandle = { resetGame: () => void; };
+
+type ItemType = 
+  | 'bomb' 
+  | 'picture' 
+  | 'powerup_point_2' 
+  | 'powerup_point_5' 
+  | 'powerup_point_10';
+
+type Item = {
+  id: number;
+  type: ItemType;
+  x: number;
+  y: number;
+  speed: number;
+  isPopped?: boolean; // Optional property, as it's added on click
+  points?: number;    // Optional property, as it's added on click
+};
+
+type GameState = 'idle' | 'playing' | 'won' | 'lost';
 
 let nextItemId = 0;
 
-const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin }, ref) => {
+const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, displayScore }, ref) => {
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<GameState>('idle');
@@ -106,7 +123,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
         if (prevTime <= 1) {
           clearInterval(timerInterval);
           setGameState('won');
-          onGameWin(scoreRef.current);
           return 0;
         }
         return prevTime - 1;
@@ -166,6 +182,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
     };
   }, [gameState, onGameWin]);
 
+  useEffect(() => {
+    if (gameState === 'won') {
+      onGameWin(scoreRef.current);
+    }
+  }, [gameState, onGameWin, scoreRef]);
+
   const startGame = () => setGameState('playing');
 
   const renderItem = (item: Item) => {
@@ -194,7 +216,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin },
       <div className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`} onClick={gameState === 'idle' ? startGame : undefined}>
         {gameState === 'idle' && <div className={gameStyles.overlay}><h2>ENB Pop</h2><p>Survive for 25 seconds.<br/>Avoid the bombs!<br/><br/>Click to Start</p></div>}
         {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}
-        {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {score}<br/>Claim is unlocked below.</p></div>}
+        {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {displayScore}<br/>Claim is unlocked below.</p></div>}
         
          {items.map(item => (
           <div 

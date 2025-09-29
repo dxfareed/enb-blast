@@ -115,9 +115,17 @@ export default function TasksPage() {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/tasks?fid=${fid}`);
-      if (!response.ok) throw new Error("Failed to fetch tasks");
+      if (!response.ok) {
+        if (response.status === 500) throw new Error('Server timeout, please try again.');
+        if (response.status === 404) throw new Error('User not found. Please register first.');
+        if (response.status === 400) throw new Error('Invalid Farcaster ID.');
+        throw new Error("Failed to fetch tasks");
+      }
       setTasks(await response.json());
-    } catch (error) { console.error(error); } 
+    } catch (error) { 
+      console.error(error);
+      setToast({ message: (error as Error).message, type: 'error' });
+    } 
     finally { setIsLoading(false); }
   };
 
@@ -136,6 +144,14 @@ export default function TasksPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 500) throw new Error('Server timeout, please try again.');
+        if (response.status === 401) throw new Error('Authentication error. Please reconnect.');
+        if (response.status === 404) throw new Error('User or task not found.');
+        if (response.status === 429) throw new Error('Please wait before verifying again.');
+        if (response.status === 400) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Verification condition not met.');
+        }
         const errorData = await response.json();
         throw new Error(errorData.message || 'Verification failed');
       }

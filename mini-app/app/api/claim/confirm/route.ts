@@ -59,12 +59,19 @@ export async function POST(req: NextRequest) {
     }
     
     const now = new Date();
-    const isNewDay = !user.lastClaimDate || !isSameDay(user.lastClaimDate, now);
-    let newStreak = user.streak;
-    if (isNewDay) {
-        const yesterday = new Date(now);
-        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-        newStreak = (user.lastClaimDate && isSameDay(user.lastClaimDate, yesterday)) ? user.streak + 1 : 1;
+    let newStreak = 1; // Default to 1 for a new streak
+
+    if (user.lastClaimedAt) {
+        if (isSameDay(user.lastClaimedAt, now)) {
+            newStreak = user.streak; // Same day, no change
+        } else {
+            const yesterday = new Date(now);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            if (isSameDay(user.lastClaimedAt, yesterday)) {
+                newStreak = user.streak + 1; // Consecutive day
+            }
+            // If it's not the same day and not yesterday, it defaults to 1 (streak reset)
+        }
     }
 
     await prisma.user.update({
@@ -72,10 +79,8 @@ export async function POST(req: NextRequest) {
         data: {
             totalPoints: { increment: points },
             weeklyPoints: { increment: points },
-            streak: { set: newStreak },
+            streak: newStreak,
             lastClaimedAt: now,
-            claimsToday: isNewDay ? 1 : { increment: 1 },
-            lastClaimDate: now,
         },
     });
 

@@ -107,12 +107,6 @@ export async function GET(req: NextRequest) {
   try {
     let user = await prisma.user.findUnique({
       where: { fid: BigInt(fid) },
-      include: {
-        claims: {
-          orderBy: { timestamp: 'desc' },
-          take: 1,
-        },
-      },
     });
 
     if (!user) {
@@ -128,32 +122,25 @@ export async function GET(req: NextRequest) {
 
     const userRank = allUsers.findIndex((u) => u.id === userId) + 1;
 
-    if (user.streak > 0) {
-      const lastClaim = user.claims[0];
-      if (!lastClaim) {
-        // If user has a streak but no claims, reset it.
-        await prisma.user.update({ where: { id: userId }, data: { streak: 0 } });
-        user.streak = 0;
-      } else {
-        const now = new Date();
-        const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        const yesterdayUTC = new Date(todayUTC);
-        yesterdayUTC.setUTCDate(todayUTC.getUTCDate() - 1);
+    // Lazily reset streak if a day was missed
+    if (user.streak > 0 && user.lastClaimedAt) {
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setUTCDate(now.getUTCDate() - 1);
 
-        if (lastClaim.timestamp < yesterdayUTC) {
-          console.log(`User ${user.username}'s streak broken. Last claim: ${lastClaim.timestamp}. Resetting to 0.`);
-          await prisma.user.update({
-            where: { id: userId },
-            data: { streak: 0 },
-          });
-          user.streak = 0;
-        }
+      const lastClaimWasToday = isSameDay(user.lastClaimedAt, now);
+      const lastClaimWasYesterday = isSameDay(user.lastClaimedAt, yesterday);
+
+      if (!lastClaimWasToday && !lastClaimWasYesterday) {
+        console.log(`User ${user.username}'s streak broken. Last claim: ${user.lastClaimedAt}. Resetting to 0.`);
+        user = await prisma.user.update({
+          where: { id: userId },
+          data: { streak: 0 },
+        });
       }
     }
 
     const userProfile = convertBigIntsToStrings(user);
-    delete (userProfile as any).claims;
-    
     (userProfile as any).weeklyRank = userRank;
 
     return NextResponse.json(userProfile, { status: 200 });
