@@ -12,7 +12,7 @@ export function RootProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true)
-    sdk.actions.ready();
+    sdk.actions.ready({disableNativeGestures: true});
   }, []);
 
   return (
