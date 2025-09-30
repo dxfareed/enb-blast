@@ -156,11 +156,22 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !gameAreaRef.current) return;
+    if (!isDragging || !gameAreaRef.current || !avatarRef.current) return; // Ensure avatarRef is available
     const gameRect = gameAreaRef.current.getBoundingClientRect();
-    const x = e.clientX - gameRect.left;
-    const y = e.clientY - gameRect.top;
-    setAvatarPosition({ x, y });
+    const avatarRect = avatarRef.current.getBoundingClientRect();
+
+    const avatarHalfWidth = avatarRect.width / 2;
+    const avatarHalfHeight = avatarRect.height / 2;
+
+    let newX = e.clientX - gameRect.left;
+    let newY = e.clientY - gameRect.top;
+
+    // Clamp X coordinate
+    newX = Math.max(avatarHalfWidth, Math.min(newX, gameRect.width - avatarHalfWidth));
+    // Clamp Y coordinate
+    newY = Math.max(avatarHalfHeight, Math.min(newY, gameRect.height - avatarHalfHeight));
+
+    setAvatarPosition({ x: newX, y: newY });
   };
   const handlePointerUp = (e: React.PointerEvent) => {
     setIsDragging(false);
