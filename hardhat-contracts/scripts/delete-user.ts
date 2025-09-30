@@ -11,7 +11,7 @@ task("delete-user", "Completely deletes a user's data from the Game contract")
       process.exit(1);
     }
 
-    const contractAddress = "0xcbc4c882f044734e308996e2dba8552df0b2be10" as Address;
+    const contractAddress = "0x854cec65437d6420316b2eb94fecaaf417690227" as Address;
 
     try {
       console.log(`\nPreparing to permanently delete user ${addressToDelete} from the Game contract...`);

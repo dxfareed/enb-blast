@@ -5,6 +5,7 @@ const tasks = [
   { title: 'Follow DEV', description: 'Follow the developer on Farcaster.', rewardPoints: 200, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/dxfareed', checkKey: 'FARCASTER_FOLLOW_DXFAREED' },
   { title: 'Follow ENB FOUNDER', description: 'Follow ENB founder on Farcaster.', rewardPoints: 200, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/kokocodes', checkKey: 'FARCASTER_FOLLOW_KOKOCODES' },
   { title: 'Follow ENB Community on farcaster', description: 'Join the ENB community channel for the latest updates and discussions.', rewardPoints: 300, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/~/channel/enb', checkKey: 'FARCASTER_FOLLOW_ENB_CHANNEL' },
+  { title: 'Follow ENB account', description: 'Follow the official ENB account on Farcaster.', rewardPoints: 200, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/enb', checkKey: 'FARCASTER_FOLLOW_ENB' },
   { title: 'Subscribe to ENB YouTube Channel', description: 'Subscribe to the official ENB Mini Apps YouTube channel.', rewardPoints: 300, type: TaskType.DEFAULT, actionUrl: 'https://youtube.com/@enbminiapps?si=Vzf_-DeReYEVK3lu', checkKey: 'YOUTUBE_SUBSCRIBE_ENBMINIAPPS' },
   { title: 'Subscribe to ENB on Paragraph', description: 'Subscribe to the ENB Bit-Sized Scoop on Paragraph.', rewardPoints: 300, type: TaskType.DEFAULT, actionUrl: 'https://paragraph.com/@enb-bit-sized-scoop/enb-ecosystem-weekly-scoops-7', checkKey: 'PARAGRAPH_SUBSCRIBE_ENB' },
   { title: 'Follow ENB on Zora', description: 'Follow the official ENB account on Zora.', rewardPoints: 500, type: TaskType.DEFAULT, actionUrl: 'https://zora.co/@enb', checkKey: 'ZORA_FOLLOW_ENB' },
@@ -17,6 +18,16 @@ const tasks = [
   { title: 'Play the Game', description: 'Play at least one round of ENB Pop.', rewardPoints: 100, type: TaskType.DAILY, checkKey: 'GAME_PLAYED' },
   { title: 'Claim Your Tokens', description: 'Make a successful on-chain claim.', rewardPoints: 100, type: TaskType.DAILY, checkKey: 'TOKEN_CLAIMED' },
   { title: 'Visit the Leaderboard', description: 'Check out the competition.', rewardPoints: 50, type: TaskType.DAILY, actionUrl: '/dashboard/leaderboard', checkKey: 'LEADERBOARD_VISIT' },
+  { title: 'Use the ENB Mining App', description: 'Engage with the ENB ecosystem by using the ENB Mining App.', rewardPoints: 500, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/4uqcueQifUYV/enb-mining', checkKey: 'MINI_APP_OPEN_MINING' },
+  { title: 'Use the ENB Bounty App', description: 'Explore bounties and opportunities within the ENB ecosystem through the Bounty App.', rewardPoints: 500, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/0GzdUkFK2f7A/enb-bounty', checkKey: 'MINI_APP_OPEN_BOUNTY' },
+  { 
+    title: 'Partner Task: Special Event', 
+    description: 'Complete this special event task for a unique reward!', 
+    rewardPoints: 1000, 
+    type: TaskType.PARTNER, 
+    checkKey: 'PARTNER_SPECIAL_EVENT',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+  },
 ];
 
 async function main() {

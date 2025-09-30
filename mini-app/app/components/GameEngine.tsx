@@ -8,7 +8,7 @@ import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
 
 const GAME_DURATION = 25;
-// Initial game parameters at the start
+
 const INITIAL_SPAWN_RATE = 310; // ms between spawns
 const INITIAL_BOMB_SPEED = 2.4; // pixels per frame
 const INITIAL_PICTURE_SPEED = 2.2; // pixels per frame
@@ -32,7 +32,12 @@ const POWER_UP_POINT_2_URL = "https://pbs.twimg.com/profile_images/1878738447067
 const POWER_UP_POINT_2_VALUE = 2;
 const POWER_UP_POINT_2_CHANCE = 0.03;
 
-type GameEngineProps = { onGameWin: (finalScore: number) => void; displayScore: number; };
+type GameEngineProps = {
+  onGameWin: (finalScore: number) => void;
+  displayScore: number;
+  isMuted: boolean;
+  onToggleMute: () => void;
+};
 export type GameEngineHandle = { resetGame: () => void; };
 
 type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10';
@@ -48,9 +53,8 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
   return !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
 }
 
-const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, displayScore }, ref) => {
+const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, displayScore, isMuted, onToggleMute }, ref) => {
   // --- STATE MANAGEMENT ---
-  // React state for values that directly cause UI re-renders.
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<GameState>('idle');
@@ -59,27 +63,45 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const [isBombHit, setIsBombHit] = useState(false);
   const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 300 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
 
   // --- REFS ---
-  // Refs for DOM elements and for values needed inside loops that should not trigger re-renders.
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef(score);
   const lastSpawnTimeRef = useRef(0);
-  
-  // Ref to hold all dynamic game parameters. This is the key to preventing stale state in the game loop.
+  const coinSoundRef = useRef<HTMLAudioElement | null>(null);
+  const bombSoundRef = useRef<HTMLAudioElement | null>(null);
+  const backgroundSoundRef = useRef<HTMLAudioElement | null>(null);
+  const gameOverSoundRef = useRef<HTMLAudioElement | null>(null);
+
   const gameParamsRef = useRef({
     bombSpeed: INITIAL_BOMB_SPEED,
     pictureSpeed: INITIAL_PICTURE_SPEED,
     spawnRate: INITIAL_SPAWN_RATE,
     bombChance: INITIAL_BOMB_CHANCE,
   });
-  
+
   const { userProfile } = useUser();
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
-  
-  // Keep the scoreRef synchronized with the score state for reliable access on game win.
+
   useEffect(() => { scoreRef.current = score; }, [score]);
+
+  useEffect(() => {
+    coinSoundRef.current = new Audio('/sounds/coin.wav');
+    coinSoundRef.current.load();
+    coinSoundRef.current.volume = 1.0;
+    bombSoundRef.current = new Audio('/sounds/bomb.wav');
+    bombSoundRef.current.load();
+    bombSoundRef.current.volume = 1.0;
+    backgroundSoundRef.current = new Audio('/sounds/background.mp3');
+    backgroundSoundRef.current.load();
+    backgroundSoundRef.current.loop = true;
+    backgroundSoundRef.current.volume = 0.3;
+    gameOverSoundRef.current = new Audio('/sounds/game-over.wav');
+    gameOverSoundRef.current.load();
+    gameOverSoundRef.current.volume = 1.0;
+  }, []);
 
   // --- GAME CONTROL FUNCTIONS ---
   const resetGame = useCallback(() => {
@@ -91,6 +113,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     setIsBombHit(false);
     setFloatingScores([]);
     setIsDragging(false);
+    setIsGameOverSoundPlayed(false);
     
     // Explicitly reset game parameters to their initial values.
     gameParamsRef.current = {
@@ -106,6 +129,24 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const startGame = () => {
     resetGame();
     setGameState('playing');
+
+    // Unlock audio on first user gesture
+    if (coinSoundRef.current && coinSoundRef.current.paused) {
+      coinSoundRef.current.play().catch(() => {});
+      coinSoundRef.current.pause();
+    }
+    if (bombSoundRef.current && bombSoundRef.current.paused) {
+      bombSoundRef.current.play().catch(() => {});
+      bombSoundRef.current.pause();
+    }
+    if (backgroundSoundRef.current && backgroundSoundRef.current.paused) {
+      backgroundSoundRef.current.play().catch(() => {});
+      backgroundSoundRef.current.pause();
+    }
+    if (gameOverSoundRef.current && gameOverSoundRef.current.paused) {
+      gameOverSoundRef.current.play().catch(() => {});
+      gameOverSoundRef.current.pause();
+    }
   };
 
   // --- POINTER HANDLERS for AVATAR ---
@@ -125,6 +166,17 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     setIsDragging(false);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   };
+
+  useEffect(() => {
+    if (gameState === 'playing' && !isMuted) {
+      backgroundSoundRef.current?.play().catch(e => console.error("Background audio play failed:", e));
+    } else {
+      if (backgroundSoundRef.current) {
+        backgroundSoundRef.current.pause();
+        backgroundSoundRef.current.currentTime = 0;
+      }
+    }
+  }, [gameState, isMuted]);
 
   useEffect(() => {
     // This effect only runs when the game starts ('playing') and cleans up when it stops.
@@ -199,6 +251,11 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
             if (item.type === 'bomb') {
               hitBomb = true;
             } else {
+              if (!isMuted && coinSoundRef.current) {
+                console.log("Playing coin sound");
+                coinSoundRef.current.currentTime = 0;
+                coinSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
+              }
               sdk.haptics.impactOccurred('soft');
               let points = 1;
               if (item.type === 'powerup_point_2') points = POWER_UP_POINT_2_VALUE;
@@ -213,6 +270,11 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
           });
 
           if (hitBomb) {
+            if (!isMuted && bombSoundRef.current) {
+              console.log("Playing bomb sound");
+              bombSoundRef.current.currentTime = 0;
+              bombSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
+            }
             sdk.haptics.impactOccurred('heavy');
             setIsBombHit(true);
             setTimeout(() => setIsBombHit(false), 2000);
@@ -237,8 +299,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   }, [gameState]);
 
   useEffect(() => {
-    if (gameState === 'won') { onGameWin(scoreRef.current); }
-  }, [gameState, onGameWin]);
+    if (gameState === 'won' && !isGameOverSoundPlayed) {
+      onGameWin(scoreRef.current);
+      if (!isMuted && gameOverSoundRef.current) {
+        gameOverSoundRef.current.play().catch(e => console.error(e));
+      }
+      setIsGameOverSoundPlayed(true);
+    }
+  }, [gameState, onGameWin, isMuted, isGameOverSoundPlayed]);
 
   const renderItem = (item: Item) => {
     switch (item.type) {
@@ -266,7 +334,15 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-        {gameState === 'idle' && <div className={gameStyles.overlay}><h2>ENB Pop</h2><p>Drag your avatar to collect.<br/>Avoid the bombs!<br/><br/>Click to Start</p></div>}
+                {gameState === 'idle' && (
+          <div className={gameStyles.overlay}>
+            <button onClick={onToggleMute} className={gameStyles.muteButton}>
+              {isMuted ? 'Unmute' : 'Mute'}
+            </button>
+            <h2>ENB Pop</h2>
+            <p>Drag your avatar to collect.<br/>Avoid the bombs!<br/><br/>Click to Start</p>
+          </div>
+        )}
         {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}
         {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {displayScore}<br/>Claim is unlocked below.</p></div>}
         

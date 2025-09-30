@@ -116,3 +116,17 @@
   pointer-events: none;
   user-select: none;
 }
+
+.muteButton {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: white;
+  border: 1px solid white;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  z-index: 20;
+}

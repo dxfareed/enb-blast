@@ -2,6 +2,13 @@ import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Errors, createClient } from "@farcaster/quick-auth";
 
+class EasterEggError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EasterEggError';
+  }
+}
+
 function getStartOfUTCDay() {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -34,13 +41,13 @@ async function checkAndSyncMembershipLevel(user: { id: string; walletAddress: st
       where: { id: user.id },
       data: { level: membershipLevel },
     });
-    
+
     return membershipLevel;
 
   } catch (error) {
     console.error("Failed to check or sync membership level:", error);
     // Return a default/low level on failure to prevent accidental task completion
-    return -1; 
+    return -1;
   }
 }
 
@@ -97,12 +104,12 @@ const taskCheckers = {
       return false;
     }
 
-    const url = `https://api.neynar.com/v2/farcaster/channel/followers?id=${FARCASTER_CHANNEL_ID}&fid=${user.fid}`;
+    const url = `https://api.neynar.com/v2/farcaster/channel/member/list/?channel_id=${FARCASTER_CHANNEL_ID}&fid=${user.fid}`;
 
     try {
       const response = await fetch(url, {
         headers: {
-          'api_key': NEYNAR_API_KEY,
+          'x-api-key': NEYNAR_API_KEY,
         },
       });
 
@@ -112,7 +119,7 @@ const taskCheckers = {
       }
 
       const data = await response.json();
-      return data.users?.some((follower: { fid: number }) => follower.fid === Number(user.fid)) || false;
+      return data.members.length > 0;
     } catch (error) {
       console.error("Failed to verify Farcaster channel follow:", error);
       throw error;
@@ -123,17 +130,21 @@ const taskCheckers = {
     const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
     const DXFAREED_FID = 849768;
 
+    if (user.fid === BigInt(DXFAREED_FID)) {
+      throw new EasterEggError('what are you doing ??');
+    }
+
     if (!NEYNAR_API_KEY) {
       console.error("Missing Neynar API key");
       return false;
     }
 
-    const url = `https://api.neynar.com/v2/farcaster/user/bulk?fids=${DXFAREED_FID}&viewer_fid=${user.fid}`;
+    const url = `https://hub-api.neynar.com/v1/linkById?fid=${user.fid}&target_fid=${DXFAREED_FID}&link_type=follow`;
 
     try {
       const response = await fetch(url, {
         headers: {
-          'api_key': NEYNAR_API_KEY,
+          'x-api-key': NEYNAR_API_KEY,
         },
       });
 
@@ -142,14 +153,102 @@ const taskCheckers = {
         return false;
       }
 
-      const data = await response.json();
-      return data.users[0]?.viewer_context?.following || false;
+      const text = await response.text();
+      if (!text) {
+        return false;
+      }
+
+      const data = JSON.parse(text);
+      return !!data.data && !data.error;
+
     } catch (error) {
       console.error("Failed to verify Farcaster follow:", error);
       return false;
     }
   },
-  
+
+  FARCASTER_FOLLOW_KOKOCODES: async (user: { id: string; fid: bigint; }): Promise<boolean> => {
+    const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+    const KOKOCODES_FID = 738574;
+
+    if (user.fid === BigInt(KOKOCODES_FID)) {
+      throw new EasterEggError('what are you doing ??');
+    }
+
+    if (!NEYNAR_API_KEY) {
+      console.error("Missing Neynar API key");
+      return false;
+    }
+
+    const url = `https://hub-api.neynar.com/v1/linkById?fid=${user.fid}&target_fid=${KOKOCODES_FID}&link_type=follow`;
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'x-api-key': NEYNAR_API_KEY,
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`Neynar API request failed with status ${response.status}`);
+        return false;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        return false;
+      }
+
+      const data = JSON.parse(text);
+      return !!data.data && !data.error;
+
+    } catch (error) {
+      console.error("Failed to verify Farcaster follow:", error);
+      return false;
+    }
+  },
+
+  FARCASTER_FOLLOW_ENB: async (user: { id: string; fid: bigint; }): Promise<boolean> => {
+    const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+    const ENB_FID = 1089736;
+
+    if (user.fid === BigInt(ENB_FID)) {
+      throw new EasterEggError('what are you doing ??');
+    }
+
+    if (!NEYNAR_API_KEY) {
+      console.error("Missing Neynar API key");
+      return false;
+    }
+
+    const url = `https://hub-api.neynar.com/v1/linkById?fid=${user.fid}&target_fid=${ENB_FID}&link_type=follow`;
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'x-api-key': NEYNAR_API_KEY,
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`Neynar API request failed with status ${response.status}`);
+        return false;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        return false;
+      }
+
+      const data = JSON.parse(text);
+      return !!data.data && !data.error;
+
+    } catch (error) {
+      console.error("Failed to verify Farcaster follow:", error);
+      return false;
+    }
+  },
+
   TELEGRAM_JOIN: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying Telegram join for user ${user.id}...`);
     return true; // Dummy implementation
@@ -187,6 +286,18 @@ const taskCheckers = {
   HOLD_100K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 100000),
   HOLD_500K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 500000),
   HOLD_1M_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 1000000),
+  MINI_APP_OPEN_MINING: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying Mini App open (Mining) for user ${user.id}...`);
+    return true;
+  },
+  MINI_APP_OPEN_BOUNTY: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying Mini App open (Bounty) for user ${user.id}...`);
+    return true;
+  },
+  PARTNER_SPECIAL_EVENT: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying Partner Special Event for user ${user.id}...`);
+    return true;
+  },
 };
 
 async function checkTokenBalance(walletAddress: string, requiredBalance: number): Promise<boolean> {
@@ -235,47 +346,47 @@ async function checkTokenBalance(walletAddress: string, requiredBalance: number)
 const client = createClient();
 
 function getUrlHost(request: NextRequest) {
-    // First try to get the origin from the Origin header
-    const origin = request.headers.get("origin");
-    if (origin) {
-      try {
-        const url = new URL(origin);
-        return url.host;
-      } catch (error) {
-        console.warn("Invalid origin header:", origin, error);
-      }
+  // First try to get the origin from the Origin header
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      return url.host;
+    } catch (error) {
+      console.warn("Invalid origin header:", origin, error);
     }
-  
-    // Fallback to Host header
-    const host = request.headers.get("host");
-    if (host) {
-      return host;
-    }
-  
-    // Final fallback to environment variables
-    let urlValue: string;
-    if (process.env.VERCEL_ENV === "production") {
-      urlValue = process.env.NEXT_PUBLIC_URL!;
-    } else if (process.env.VERCEL_URL) {
-      urlValue = `https://${process.env.VERCEL_URL}`;
-    } else {
-      urlValue = "http://localhost:3000";
-    }
-  
-    const url = new URL(urlValue);
-    return url.host;
   }
 
+  // Fallback to Host header
+  const host = request.headers.get("host");
+  if (host) {
+    return host;
+  }
+
+  // Final fallback to environment variables
+  let urlValue: string;
+  if (process.env.VERCEL_ENV === "production") {
+    urlValue = process.env.NEXT_PUBLIC_URL!;
+  } else if (process.env.VERCEL_URL) {
+    urlValue = `https://${process.env.VERCEL_URL}`;
+  } else {
+    urlValue = "http://localhost:3000";
+  }
+
+  const url = new URL(urlValue);
+  return url.host;
+}
+
 export async function POST(request: NextRequest) {
-    const authorization = request.headers.get("Authorization");
-    if (!authorization || !authorization.startsWith("Bearer ")) {
-        return NextResponse.json({ message: "Missing token" }, { status: 401 });
-    }
+  const authorization = request.headers.get("Authorization");
+  if (!authorization || !authorization.startsWith("Bearer ")) {
+    return NextResponse.json({ message: "Missing token" }, { status: 401 });
+  }
 
   try {
     const payload = await client.verifyJwt({
-        token: authorization.split(" ")[1] as string,
-        domain: getUrlHost(request),
+      token: authorization.split(" ")[1] as string,
+      domain: getUrlHost(request),
     });
     const fid = payload.sub;
     const { checkKey } = await request.json();
@@ -291,7 +402,7 @@ export async function POST(request: NextRequest) {
 
     if (!user) return new NextResponse('User not found', { status: 404 });
     if (!task) return new NextResponse('Task not found', { status: 404 });
-    
+
     const todayUTC = getStartOfUTCDay();
     const existingCompletion = await prisma.userTaskCompletion.findFirst({
       where: {
@@ -330,8 +441,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Task verified and points awarded!' });
 
   } catch (error) {
+    if (error instanceof EasterEggError) {
+      return NextResponse.json({ message: error.message }, { status: 418 });
+    }
     if (error instanceof Errors.InvalidTokenError) {
-        return NextResponse.json({ message: "Invalid token" }, { status: 401 });
+      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
     }
     if (error instanceof SyntaxError && error.message.includes('Unexpected token')) {
       return NextResponse.json({ message: 'server error, try again' }, { status: 500 });

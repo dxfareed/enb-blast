@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useUser } from '@/app/context/UserContext';
 import { ethers } from 'ethers';
-import { RefreshCw } from 'lucide-react';
 import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
 import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
@@ -27,8 +26,13 @@ export default function GamePage() {
     const [isClaimFinalized, setIsClaimFinalized] = useState(false);
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
+    const [isMuted, setIsMuted] = useState(false);
 
     const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
+
+    const toggleMute = () => {
+        setIsMuted(prevState => !prevState);
+    };
     const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
     const handleClaim = async () => {
@@ -46,7 +50,7 @@ export default function GamePage() {
                 if (signatureResponse.status === 401) throw new Error('Authentication error. Please reconnect.');
                 if (signatureResponse.status === 404) throw new Error('User not found. Please register first.');
                 if (signatureResponse.status === 429) throw new Error('Daily claim limit reached.');
-                
+
                 const errorBody = await signatureResponse.json();
                 throw new Error(errorBody.message || 'Could not get signature.');
             }
@@ -90,11 +94,11 @@ export default function GamePage() {
         }
     };
 
-    const handleGameWin = (scoreFromGame: number) => {
+    const handleGameWin = useCallback((scoreFromGame: number) => {
         setIsClaimUnlocked(true);
         setFinalScore(scoreFromGame);
         setClaimButtonText(`Claim ${(scoreFromGame / 10).toFixed(1)} $ENB`);
-    };
+    }, []);
 
     const handleTryAgain = () => {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
@@ -129,7 +133,7 @@ export default function GamePage() {
     return (
         <div className={styles.gameContainer}>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} />
+            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
             <div className={styles.actionContainer}>
                 {isClaimUnlocked ? (
                     <div className={styles.actionButtonsContainer}>
@@ -143,9 +147,9 @@ export default function GamePage() {
                                             className={`${styles.claimButton} ${styles.claimButtonGreen}`}
                                         >
                                             {isSignatureLoading ? 'Preparing...' :
-                                             isWritePending ? 'Check Wallet...' :
-                                             isConfirming ? 'Confirming on-chain...' :
-                                             claimButtonText}
+                                                isWritePending ? 'Check Wallet...' :
+                                                    isConfirming ? 'Confirming on-chain...' :
+                                                        claimButtonText}
                                         </button>
                                         {//!isMultiplierUsed && !isConfirmed && (
                                             <button
