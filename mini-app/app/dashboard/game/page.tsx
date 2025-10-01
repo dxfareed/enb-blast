@@ -68,27 +68,45 @@ export default function GamePage() {
         }
     };
 
-    const handleMultiplier = async () => {
+    const handleShareScoreFrame = async () => {
         sdk.haptics.impactOccurred('heavy');
-        setIsMultiplierLoading(true);
+        setIsMultiplierLoading(true); // Reusing this state for sharing loading
         try {
-            const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score?`;
             const appUrl = process.env.NEXT_PUBLIC_URL || '';
-            const result = await sdk.actions.composeCast({ text: castText, embeds: [appUrl] });
+            const username = userProfile?.username || '@johndoe';
+            const pfpUrl = userProfile?.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg';
+            const streak = userProfile?.streak || 0;
+            const claimed = userProfile?.totalClaimed || 0;
+            const points = userProfile?.totalPoints || 0;
+            // Rank is not available in userProfile, so we'll omit it for now or fetch it separately if needed.
+
+            const fid = userProfile?.fid;
+            const frameImageUrl = `${appUrl}/api/frame-image?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&points=${points}&fid=${fid}`;
+            const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&points=${points}&fid=${fid}`; // Define frameUrl
+            const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score? Play now!`;
+            
+            const result = await sdk.actions.composeCast({
+                text: castText,
+                embeds: [frameUrl], // Embed our dynamic frame page
+            });
 
             if (result.cast) {
+                setToast({ message: "Score shared successfully!", type: 'success' });
+                // Commented out multiplier logic as requested
+                /*
                 const newScore = finalScore * 2;
                 const newClaimAmount = (newScore / 10).toFixed(1);
                 setFinalScore(newScore);
                 setClaimButtonText(`Claim ${newClaimAmount} $ENB`);
                 setIsMultiplierUsed(true);
                 setToast({ message: `Success! Claim doubled to ${newClaimAmount} $ENB.`, type: 'success' });
+                */
             } else {
-                setToast({ message: "Cast was cancelled.", type: 'error' });
+                setToast({ message: "Sharing was cancelled.", type: 'error' });
             }
         } catch (error) {
-            console.error("Cast failed:", error);
-            setToast({ message: "An error occurred while casting.", type: 'error' });
+            console.error("Sharing failed:", error);
+            setToast({ message: "An error occurred while sharing your score.", type: 'error' });
         } finally {
             setIsMultiplierLoading(false);
         }
@@ -151,15 +169,14 @@ export default function GamePage() {
                                                     isConfirming ? 'Confirming on-chain...' :
                                                         claimButtonText}
                                         </button>
-                                        {//!isMultiplierUsed && !isConfirmed && (
-                                            <button
-                                                onClick={handleMultiplier}
-                                                disabled={true/* isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading */}
-                                                className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
-                                            >
-                                                {isMultiplierLoading ? 'Preparing...' : '2x'}
-                                            </button>
-                                        /* ) */}
+                                        {/* Multiplier button replaced with Share Score button */}
+                                        <button
+                                            onClick={handleShareScoreFrame}
+                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading}
+                                            className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
+                                        >
+                                            {isMultiplierLoading ? 'Sharing...' : 'Share Score'}
+                                        </button>
                                     </div>
                                 </>
                             ) : (

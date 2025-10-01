@@ -13,7 +13,7 @@ export const minikitConfig = {
   },
   frame: {
     version: "1",
-    name: "mini-app",
+    name: "ENB POP",
     subtitle: "",
     description: "",
     screenshotUrls: [],

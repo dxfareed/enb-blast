@@ -4,6 +4,7 @@ import { RootProvider } from "./rootProvider";
 import { Space_Mono } from 'next/font/google';
 import "./globals.css";
 //import { ErudaLoader } from "./components/ErudaLoader";
+import { Analytics } from "@vercel/analytics/next"; // Import Analytics
 
 const spaceMono = Space_Mono({
   subsets: ['latin'],
@@ -30,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
         version: minikitConfig.frame.version,
         imageUrl: minikitConfig.frame.heroImageUrl,
         button: {
-          title: `Launch ${minikitConfig.frame.name}`,
+          title: `pop ENBs`,
           action: {
             name: `Launch ${minikitConfig.frame.name}`,
             type: "launch_frame",
@@ -51,6 +52,7 @@ export default function RootLayout({
     <html lang="en" className={spaceMono.variable}>
       <body>
         <RootProvider>{children}</RootProvider>
+        <Analytics /> {/* Add Analytics component */}
       </body>
     </html>
   );

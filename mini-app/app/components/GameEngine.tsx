@@ -7,18 +7,18 @@ import gameStyles from '@/app/dashboard/game/game.module.css';
 import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
 
-const GAME_DURATION = 25;
+const GAME_DURATION = 30;
 
 const INITIAL_SPAWN_RATE = 310; // ms between spawns
 const INITIAL_BOMB_SPEED = 2.4; // pixels per frame
 const INITIAL_PICTURE_SPEED = 2.2; // pixels per frame
-const INITIAL_BOMB_CHANCE = 0.1; // 10% chance
+const INITIAL_BOMB_CHANCE = 0.08; // 10% chance
 
 // Final game parameters at the end of the timer for scaling
 const FINAL_SPAWN_RATE = 250; // ms between spawns
 const FINAL_BOMB_SPEED = 4.5; // pixels per frame
 const FINAL_PICTURE_SPEED = 5.4; // pixels per frame
-const FINAL_BOMB_CHANCE = 0.36; // 40% chance
+const FINAL_BOMB_CHANCE = 0.33; // 40% chance
 
 // Power-up configuration
 const PICTURE_URL = "/Enb_000.png";
@@ -321,7 +321,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
 
   const renderItem = (item: Item) => {
     switch (item.type) {
-      case 'bomb': return <span style={{fontSize: '36px'}}>💣</span>;
+      case 'bomb': return <img src="/bomb.png" alt="Bomb" className={gameStyles.itemImage} />;
       case 'picture': return <img src={PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
       case 'powerup_point_5': return <img src={POWER_UP_POINT_5_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_10': return <img src={POWER_UP_POINT_10_URL} alt="Power Up" className={gameStyles.itemImage} />;

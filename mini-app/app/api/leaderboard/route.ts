@@ -15,6 +15,7 @@ export async function GET() {
       // limit top 10 only
       take: 10,
       select: {
+        fid: true, // Include fid
         username: true,
         pfpUrl: true,
         weeklyPoints: true,
@@ -27,6 +28,7 @@ export async function GET() {
     const serializableUsers = topUsers.map(user => ({
       ...user,
       weeklyPoints: user.weeklyPoints.toString(),
+      fid: user.fid.toString(), // Convert fid to string
     }));
 
     return NextResponse.json(serializableUsers, { status: 200 });
