@@ -34,6 +34,9 @@ export default function WelcomePage() {
         router.push('/dashboard/game');
       } else if (response.status === 500) {
         setToast({ message: 'Server timeout. Please try again in a moment.', type: 'error' });
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
       } else {
         console.log("User is not registered or other error, redirecting to register");
         router.push('/onboarding/register');
