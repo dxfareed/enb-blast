@@ -15,27 +15,10 @@ export async function GET(request: Request) {
     const pfpUrl = searchParams.get('pfpUrl') || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg'; // Default PFP
     const streak = searchParams.get('streak') || '0';
     const claimed = searchParams.get('claimed') || '0';
-    const points = searchParams.get('points') || '0';
-    const fid = searchParams.get('fid'); // Get fid from query params
+    const weeklyPoints = searchParams.get('weeklyPoints') || '0';
+    const rank = searchParams.get('rank') || 'N/A';
 
-    let rank = 'N/A';
-    if (fid) {
-      const leaderboardResponse = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/leaderboard`);
-      console.log("frame-image API: Leaderboard response OK:", leaderboardResponse.ok);
-      if (leaderboardResponse.ok) {
-        const leaderboard = await leaderboardResponse.json();
-        console.log("frame-image API: Leaderboard data:", leaderboard);
-        const userRankIndex = leaderboard.findIndex((u: any) => u.fid === fid);
-        console.log("frame-image API: userRankIndex:", userRankIndex);
-        if (userRankIndex !== -1) {
-          rank = (userRankIndex + 1).toString();
-        }
-      } else {
-        console.error("frame-image API: Failed to fetch leaderboard:", leaderboardResponse.status);
-      }
-    }
-
-    console.log("frame-image API: Points value before ImageResponse:", points); // Debug points
+    console.log("frame-image API: Points value before ImageResponse:", weeklyPoints); // Debug points
     return new ImageResponse(
       (
         <div
@@ -52,7 +35,7 @@ export async function GET(request: Request) {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <h1 style={{ fontSize: '48px', margin: '0' }}>ENB POP STATS</h1>
+              <h1 style={{ fontSize: '48px', margin: '0', paddingLeft:'20px' }}>ENB BLAST STATS</h1>
               <img
                 src={pfpUrl}
                 width={200}
@@ -72,6 +55,7 @@ export async function GET(request: Request) {
                 borderRadius: '20px',
                 border: '2px solid white',
                 marginTop: '20px',
+                marginLeft: '35px',
               }}
             >
               <p style={{ fontSize: '36px', margin: '0' }}>Current Rank</p>
@@ -89,8 +73,8 @@ export async function GET(request: Request) {
               <p style={{ fontSize: '48px', margin: '0' }}>{claimed}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <p style={{ fontSize: '48px', margin: '0' }}>POINTS</p>
-              <p style={{ fontSize: '48px', margin: '0' }}>{points}</p>
+              <p style={{ fontSize: '48px', margin: '0' }}>WEEKLY POINTS</p>
+              <p style={{ fontSize: '48px', margin: '0' }}>{weeklyPoints}</p>
             </div>
           </div>
         </div>

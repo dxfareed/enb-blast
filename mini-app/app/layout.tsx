@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
         version: minikitConfig.frame.version,
         imageUrl: minikitConfig.frame.heroImageUrl,
         button: {
-          title: `pop ENBs`,
+          title: `blast ENBs`,
           action: {
             name: `Launch ${minikitConfig.frame.name}`,
             type: "launch_frame",

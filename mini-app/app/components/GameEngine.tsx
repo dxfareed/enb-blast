@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef, createRef } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw,Volume2, VolumeX } from 'lucide-react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import gameStyles from '@/app/dashboard/game/game.module.css';
 import Avatar from './Avatar';
@@ -18,7 +18,7 @@ const INITIAL_BOMB_CHANCE = 0.08; // 10% chance
 const FINAL_SPAWN_RATE = 250; // ms between spawns
 const FINAL_BOMB_SPEED = 4.5; // pixels per frame
 const FINAL_PICTURE_SPEED = 5.4; // pixels per frame
-const FINAL_BOMB_CHANCE = 0.33; // 40% chance
+const FINAL_BOMB_CHANCE = 0.25; // 40% chance
 
 // Power-up configuration
 const PICTURE_URL = "/Enb_000.png";
@@ -345,13 +345,17 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-                {gameState === 'idle' && (
-          <div className={gameStyles.overlay}>
+        {gameState === 'idle' && (
+          <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
             <button onClick={onToggleMute} className={gameStyles.muteButton}>
-              {isMuted ? 'Unmute' : 'Mute'}
+              {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
             </button>
-            <h2>ENB Pop</h2>
-            <p>Drag your avatar to collect.<br/>Avoid the bombs!<br/><br/>Click to Start</p>
+          </div>
+        )}
+        {gameState === 'idle' && (
+          <div className={gameStyles.overlay}>
+        <h2>blast ENBS</h2>
+            <p>Drag your avatar to collect.<br/>Avoid the Wormhole ENBs!<br/><br/>Click to Start</p>
           </div>
         )}
         {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}

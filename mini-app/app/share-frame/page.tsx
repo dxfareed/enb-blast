@@ -11,18 +11,18 @@ export async function generateMetadata({ params, searchParams }: any): Promise<M
   const pfpUrl = getParam(searchParams.pfpUrl) || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg';
   const streak = getParam(searchParams.streak) || '0';
   const claimed = getParam(searchParams.claimed) || '0';
-  const points = getParam(searchParams.points) || '0';
+  const weeklyPoints = getParam(searchParams.weeklyPoints) || '0';
   const rank = getParam(searchParams.rank) || 'N/A';
 
   const appUrl = process.env.NEXT_PUBLIC_URL || '';
-  const frameImageUrl = `${appUrl}/api/frame-image?score=${score}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&points=${points}&rank=${rank}`;
+  const frameImageUrl = `${appUrl}/api/frame-image?score=${score}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}`;
 
   console.log("Generated frameImageUrl:", frameImageUrl);
   const fcFrameContent = JSON.stringify({
     version: minikitConfig.frame.version,
     imageUrl: frameImageUrl,
     button: {
-      title: `pop ENBs`,
+      title: `blast ENBs`,
       action: {
         name: `Launch ${minikitConfig.frame.name}`,
         type: "launch_frame",
