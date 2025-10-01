@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef, createRef } from 'react';
-import { RotateCcw,Volume2, VolumeX } from 'lucide-react';
+import { RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import gameStyles from '@/app/dashboard/game/game.module.css';
 import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
+import { useTour } from '@/app/context/TourContext';
+import HighlightTooltip from './HighlightTooltip';
 
 const GAME_DURATION = 30;
 
@@ -64,6 +66,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 300 });
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
+  //const [showTooltip, setShowTooltip] = useState(false);
 
   // --- REFS ---
   const gameAreaRef = useRef<HTMLDivElement>(null);
@@ -83,6 +86,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   });
 
   const { userProfile } = useUser();
+  const { activeTourStep, tourSteps } = useTour();
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
 
   useEffect(() => { scoreRef.current = score; }, [score]);
@@ -114,7 +118,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     setFloatingScores([]);
     setIsDragging(false);
     setIsGameOverSoundPlayed(false);
-    
+
     // Explicitly reset game parameters to their initial values.
     gameParamsRef.current = {
       bombSpeed: INITIAL_BOMB_SPEED,
@@ -132,19 +136,19 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
 
     // Unlock audio on first user gesture
     if (coinSoundRef.current && coinSoundRef.current.paused) {
-      coinSoundRef.current.play().catch(() => {});
+      coinSoundRef.current.play().catch(() => { });
       coinSoundRef.current.pause();
     }
     if (bombSoundRef.current && bombSoundRef.current.paused) {
-      bombSoundRef.current.play().catch(() => {});
+      bombSoundRef.current.play().catch(() => { });
       bombSoundRef.current.pause();
     }
     if (backgroundSoundRef.current && backgroundSoundRef.current.paused) {
-      backgroundSoundRef.current.play().catch(() => {});
+      backgroundSoundRef.current.play().catch(() => { });
       backgroundSoundRef.current.pause();
     }
     if (gameOverSoundRef.current && gameOverSoundRef.current.paused) {
-      gameOverSoundRef.current.play().catch(() => {});
+      gameOverSoundRef.current.play().catch(() => { });
       gameOverSoundRef.current.pause();
     }
   };
@@ -197,7 +201,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     }
 
     console.log(`%c--- NEW GAME STARTED ---`, "color: green; font-weight: bold;");
-    
+
     const timerInterval = setInterval(() => {
       setTimeLeft(prevTime => {
         const newTime = prevTime - 1;
@@ -206,22 +210,22 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
           setGameState('won'); // Changing state triggers effect cleanup.
           return 0;
         }
-        
+
         const timeElapsed = GAME_DURATION - newTime;
         const progress = Math.min(timeElapsed / (GAME_DURATION - 10), 1);
 
         const newBombSpeed = INITIAL_BOMB_SPEED + (FINAL_BOMB_SPEED - INITIAL_BOMB_SPEED) * progress;
         const newSpawnRate = INITIAL_SPAWN_RATE - (INITIAL_SPAWN_RATE - FINAL_SPAWN_RATE) * progress;
         const newBombChance = INITIAL_BOMB_CHANCE + (FINAL_BOMB_CHANCE - INITIAL_BOMB_CHANCE) * progress;
-        
+
         gameParamsRef.current = {
-            ...gameParamsRef.current,
-            bombSpeed: newBombSpeed,
-            pictureSpeed: INITIAL_PICTURE_SPEED + (FINAL_PICTURE_SPEED - INITIAL_PICTURE_SPEED) * progress,
-            spawnRate: newSpawnRate,
-            bombChance: newBombChance,
+          ...gameParamsRef.current,
+          bombSpeed: newBombSpeed,
+          pictureSpeed: INITIAL_PICTURE_SPEED + (FINAL_PICTURE_SPEED - INITIAL_PICTURE_SPEED) * progress,
+          spawnRate: newSpawnRate,
+          bombChance: newBombChance,
         };
-        
+
         return newTime;
       });
     }, 1000);
@@ -240,7 +244,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
         else if (rand < bombChance + POWER_UP_POINT_10_CHANCE) { itemType = 'powerup_point_10'; }
         else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) { itemType = 'powerup_point_5'; }
         else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) { itemType = 'powerup_point_2'; }
-        
+
         const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
         const newItem: Item = { id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef<HTMLDivElement>() };
         setItems(prev => [...prev, newItem]);
@@ -248,7 +252,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
 
       setItems(prevItems =>
         prevItems
-          .map(item => ({...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed)}))
+          .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
           .filter(item => item.y < 450)
       );
 
@@ -258,7 +262,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
           let hitBomb = false;
           const remainingItems = currentItems.filter(item => {
             if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
-            
+
             if (item.type === 'bomb') {
               hitBomb = true;
             } else {
@@ -295,10 +299,10 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
           return remainingItems;
         });
       }
-      
+
       animationFrameId = requestAnimationFrame(gameLoop);
     };
-    
+
     // Start the unified loop
     animationFrameId = requestAnimationFrame(gameLoop);
 
@@ -330,15 +334,18 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     }
   };
 
+    const isSoundButtonTourActive = tourSteps[activeTourStep]?.id === 'sound-toggle';
+  const soundButtonTourStep = tourSteps.find(step => step.id === 'sound-toggle');
+
   return (
     <>
       <div className={gameStyles.gameStats}>
         <span onClick={() => { setScore(0); setItems([]); }} style={{ cursor: 'pointer' }}>Score: <strong>{score}</strong></span>
         <span>Time Left: <strong>{timeLeft}s</strong></span>
       </div>
-      <div 
-        ref={gameAreaRef} 
-        className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`} 
+      <div
+        ref={gameAreaRef}
+        className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`}
         onClick={gameState === 'idle' ? startGame : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -346,25 +353,37 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
         onPointerLeave={handlePointerUp}
       >
         {gameState === 'idle' && (
-          <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
-            <button onClick={onToggleMute} className={gameStyles.muteButton}>
-              {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-            </button>
-          </div>
+          <HighlightTooltip
+            text={soundButtonTourStep?.text || ''}
+            show={isSoundButtonTourActive}
+            position="bottom"
+            alignment="right"
+            className={`${gameStyles.muteButtonContainer} ${gameStyles.soundButtonTooltipWrapper}`}
+          >
+            <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
+              <button onClick={(e) => {
+                e.stopPropagation();
+                onToggleMute();
+              }} className={gameStyles.muteButton}>
+                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+              </button>
+            </div>
+          </HighlightTooltip>
+
         )}
         {gameState === 'idle' && (
           <div className={gameStyles.overlay}>
-        <h2>blast ENBS</h2>
-            <p>Drag your avatar to collect.<br/>Avoid the Wormhole ENBs!<br/><br/>Click to Start</p>
+            <h2>blast ENBS</h2>
+            <p>Drag your avatar to collect.<br />Avoid the Wormhole ENBs!<br /><br />Click to Start</p>
           </div>
         )}
         {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}
-        {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {displayScore}<br/>Claim is unlocked below.</p></div>}
-        
+        {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {displayScore}<br />Claim is unlocked below.</p></div>}
+
         {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} />}
-        
+
         {items.map(item => (
-          <div 
+          <div
             key={item.id}
             ref={item.ref}
             className={gameStyles.item}

@@ -57,8 +57,8 @@ export default function LeaderboardPage() {
         if (!response.ok) {
           throw new Error('Failed to fetch leaderboard data');
         }
-        const data: LeaderboardUser[] = await response.json();
-        const rankedData = data.map((user, index) => ({ ...user, rank: index + 1 }));
+        const data = await response.json();
+        const rankedData = data.topUsers.map((user, index) => ({ ...user, rank: index + 1 }));
         setLeaderboardData(rankedData);
       } catch (error) {
         console.error(error);
