@@ -14,7 +14,9 @@ export function RootProvider({ children }: { children: ReactNode }) {
     setMounted(true)
     sdk.actions.ready({disableNativeGestures: true});
   }, []);
-
+  
+  // sdk.actions.addMiniApp()
+  
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
