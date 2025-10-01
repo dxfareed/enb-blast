@@ -10,6 +10,7 @@ import styles from './layout.module.css';
 import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 import HighlightTooltip from '@/app/components/HighlightTooltip';
 import { TourProvider } from '@/app/context/TourContext';
+import GameInfoModal from '@/app/components/GameInfoModal'; 
 
 const TOOLTIP_STORAGE_KEY = 'hasSeenDashboardTooltip';
 
@@ -38,6 +39,7 @@ export default function DashboardLayout({
   const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
   const pathname = usePathname();
   const [activeTourStep, setActiveTourStep] = useState(-1);
+  const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
 
   useEffect(() => {
     if (!isLoading && userProfile) {
@@ -54,6 +56,7 @@ export default function DashboardLayout({
       return () => clearTimeout(timer);
     } else if (activeTourStep >= tourSteps.length) {
       handleDismissTour();
+      setIsInfoModalVisible(true);
     }
   }, [activeTourStep]);
 
@@ -82,6 +85,10 @@ export default function DashboardLayout({
     setActiveTourStep(-1);
   };
 
+  const handleCloseModal = () => {
+    setIsInfoModalVisible(false);
+  };
+
   const tourContextValue = useMemo(() => ({
     activeTourStep,
     tourSteps
@@ -89,6 +96,7 @@ export default function DashboardLayout({
 
   return (
     <TourProvider value={tourContextValue}>
+       <GameInfoModal show={isInfoModalVisible} onClose={handleCloseModal} />
       <div className={styles.container}>
         {activeTourStep > -1 && (
           <button onClick={handleDismissTour} className={styles.skipButton}>
