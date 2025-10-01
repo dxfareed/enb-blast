@@ -1,0 +1,100 @@
+.tooltipContainer {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+}
+
+.highlightCircle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 75px;
+  height: 75px;
+  border: 2px dashed #0070f3;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+  pointer-events: none;
+  z-index: 11;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.7;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+.tooltipBox {
+  visibility: visible;
+  opacity: 1;
+  min-width: 150px;
+  max-width: 200px;
+  background-color: #2c2c2c;
+  color: #fff;
+  text-align: center;
+  border-radius: 8px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.alignLeft {
+  left: 0;
+  transform: translateX(0);
+}
+
+.alignRight {
+  left: auto;
+  right: 0;
+  transform: translateX(0);
+}
+
+.tooltipTop {
+  bottom: 120%;
+}
+
+.tooltipBottom {
+  top: 120%;
+}
+
+.tooltipBox::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+}
+
+.tooltipTop::after {
+  top: 100%;
+  border-color: #2c2c2c transparent transparent transparent;
+}
+
+.tooltipBottom::after {
+  bottom: 100%;
+  border-color: transparent transparent #2c2c2c transparent;
+}
+
+.alignLeft.tooltipBox::after {
+  left: 25px;
+}
+
+.alignRight.tooltipBox::after {
+  left: auto;
+  right: 25px;
+}

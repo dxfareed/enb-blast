@@ -10,6 +10,7 @@ generator scripts {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -54,6 +55,7 @@ model UserEvent {
 enum TaskType {
   DEFAULT
   DAILY
+  PARTNER
 }
 
 model Task {
@@ -64,6 +66,7 @@ model Task {
   type            TaskType
   actionUrl       String?
   checkKey        String    @unique
+  expiresAt       DateTime?
   completions     UserTaskCompletion[]
 }
 

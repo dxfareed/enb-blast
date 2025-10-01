@@ -5,13 +5,13 @@ import styles from './Toast.module.css';
 
 type ToastProps = {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
   onClose: () => void;
 };
 
 export default function Toast({ message, type, onClose }: ToastProps) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000); // Auto-dismiss after 3 seconds
+    const timer = setTimeout(onClose, 3000);
     return () => clearTimeout(timer);
   }, [onClose]);
 

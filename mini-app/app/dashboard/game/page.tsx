@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useUser } from '@/app/context/UserContext';
 import { ethers } from 'ethers';
-import { RefreshCw } from 'lucide-react';
 import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
 import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
@@ -27,8 +26,13 @@ export default function GamePage() {
     const [isClaimFinalized, setIsClaimFinalized] = useState(false);
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
+    const [isMuted, setIsMuted] = useState(false);
 
     const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
+
+    const toggleMute = () => {
+        setIsMuted(prevState => !prevState);
+    };
     const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
     const handleClaim = async () => {
@@ -46,7 +50,7 @@ export default function GamePage() {
                 if (signatureResponse.status === 401) throw new Error('Authentication error. Please reconnect.');
                 if (signatureResponse.status === 404) throw new Error('User not found. Please register first.');
                 if (signatureResponse.status === 429) throw new Error('Daily claim limit reached.');
-                
+
                 const errorBody = await signatureResponse.json();
                 throw new Error(errorBody.message || 'Could not get signature.');
             }
@@ -64,37 +68,61 @@ export default function GamePage() {
         }
     };
 
-    const handleMultiplier = async () => {
+    const handleShareScoreFrame = async () => {
         sdk.haptics.impactOccurred('heavy');
-        setIsMultiplierLoading(true);
+        setIsMultiplierLoading(true); // Reusing this state for sharing loading
         try {
-            const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score?`;
+            await refetchUserProfile(); // Refetch to get the latest user data
+
             const appUrl = process.env.NEXT_PUBLIC_URL || '';
-            const result = await sdk.actions.composeCast({ text: castText, embeds: [appUrl] });
+            const username = userProfile?.username || '@johndoe';
+            const pfpUrl = userProfile?.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg';
+            const streak = userProfile?.streak || 0;
+            const claimed = userProfile?.totalClaimed || 0;
+            const weeklyPoints = userProfile?.weeklyPoints || 0;
+            const fid = userProfile?.fid;
+
+            let rank = 'N/A';
+            if (fid) {
+                try {
+                    const response = await fetch(`/api/leaderboard?fid=${fid}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.rank) {
+                            rank = data.rank.toString();
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error fetching rank:", error);
+                }
+            }
+
+            const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}`;
+            const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score? Play now!`;
+            
+            const result = await sdk.actions.composeCast({
+                text: castText,
+                embeds: [frameUrl], // Embed our dynamic frame page
+            });
 
             if (result.cast) {
-                const newScore = finalScore * 2;
-                const newClaimAmount = (newScore / 10).toFixed(1);
-                setFinalScore(newScore);
-                setClaimButtonText(`Claim ${newClaimAmount} $ENB`);
-                setIsMultiplierUsed(true);
-                setToast({ message: `Success! Claim doubled to ${newClaimAmount} $ENB.`, type: 'success' });
+                setToast({ message: "Score shared successfully!", type: 'success' });
             } else {
-                setToast({ message: "Cast was cancelled.", type: 'error' });
+                setToast({ message: "Sharing was cancelled.", type: 'error' });
             }
         } catch (error) {
-            console.error("Cast failed:", error);
-            setToast({ message: "An error occurred while casting.", type: 'error' });
+            console.error("Sharing failed:", error);
+            setToast({ message: "An error occurred while sharing your score.", type: 'error' });
         } finally {
             setIsMultiplierLoading(false);
         }
     };
 
-    const handleGameWin = (scoreFromGame: number) => {
+    const handleGameWin = useCallback((scoreFromGame: number) => {
         setIsClaimUnlocked(true);
         setFinalScore(scoreFromGame);
         setClaimButtonText(`Claim ${(scoreFromGame / 10).toFixed(1)} $ENB`);
-    };
+    }, []);
 
     const handleTryAgain = () => {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
@@ -129,7 +157,7 @@ export default function GamePage() {
     return (
         <div className={styles.gameContainer}>
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} />
+            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
             <div className={styles.actionContainer}>
                 {isClaimUnlocked ? (
                     <div className={styles.actionButtonsContainer}>
@@ -143,19 +171,18 @@ export default function GamePage() {
                                             className={`${styles.claimButton} ${styles.claimButtonGreen}`}
                                         >
                                             {isSignatureLoading ? 'Preparing...' :
-                                             isWritePending ? 'Check Wallet...' :
-                                             isConfirming ? 'Confirming on-chain...' :
-                                             claimButtonText}
+                                                isWritePending ? 'Check Wallet...' :
+                                                    isConfirming ? 'Confirming on-chain...' :
+                                                        claimButtonText}
                                         </button>
-                                        {//!isMultiplierUsed && !isConfirmed && (
-                                            <button
-                                                onClick={handleMultiplier}
-                                                disabled={true/* isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading */}
-                                                className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
-                                            >
-                                                {isMultiplierLoading ? 'Preparing...' : '2x'}
-                                            </button>
-                                        /* ) */}
+                                        {/* Multiplier button replaced with Share Score button */}
+                                        <button
+                                            onClick={handleShareScoreFrame}
+                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading}
+                                            className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
+                                        >
+                                            {isMultiplierLoading ? 'Sharing...' : 'Share Score'}
+                                        </button>
                                     </div>
                                 </>
                             ) : (

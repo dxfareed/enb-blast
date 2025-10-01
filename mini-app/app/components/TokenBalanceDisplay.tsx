@@ -33,7 +33,7 @@ export default function TokenBalanceDisplay() {
     return <div className={styles.tokenBadge}>Loading...</div>;
   }
 
-  const formattedBalance = balanceData ? Number(balanceData.formatted).toFixed(2) : '0.00';
+  const formattedBalance = balanceData ? Number(balanceData.formatted).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
 
   return (
     <div className={styles.tokenBadge}>

@@ -105,3 +105,23 @@
   border-radius: 50%;
   border: 2px solid white;
 }
+
+.skipButton {
+  position: fixed;
+  top: 20px;
+  /* MODIFIED: Changed from 'right' to 'left' */
+  left: 20px;
+  z-index: 1000;
+  padding: 8px 16px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 1px solid #555;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.skipButton:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+}

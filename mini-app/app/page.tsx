@@ -2,7 +2,7 @@
 import Image from "next/image";
 import styles from "./page.module.css";
 import { useAccount, useConnect } from 'wagmi'
-import { useEffect } from "react";
+//import { useEffect } from "react";
 
 export default function Home() {
   const { isConnected, address } = useAccount()

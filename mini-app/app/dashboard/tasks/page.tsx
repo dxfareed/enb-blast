@@ -15,23 +15,18 @@ type Task = {
   title: string;
   description: string;
   rewardPoints: number;
-  type: 'DEFAULT' | 'DAILY';
+  type: 'DEFAULT' | 'DAILY' | 'PARTNER';
   actionUrl?: string;
   checkKey: string;
   completed: boolean;
 };
 
-type ToastState = {
+export type ToastState = {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
 } | null;
 
-const DISABLED_TASKS = [
-  'WARPCAST_FOLLOW',
-  'FARCASTER_FOLLOW_ENB_CHANNEL',
-  'FARCASTER_FOLLOW_DXFAREED',
-  'FARCASTER_FOLLOW_KOKOCODES'
-];
+const DISABLED_TASKS: string[] = [];
 
 type TaskItemProps = {
   task: Task;
@@ -45,11 +40,20 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
   const isButtonDisabled = task.completed || isChecking || isTaskDisabled;
   const hasActionUrl = !!task.actionUrl;
 
-  const handleGoClick = () => {
+  const handleGoClick = async () => {
     if (task.actionUrl) {
       const url = task.actionUrl;
       if (url.startsWith('/')) {
         router.push(url);
+        return;
+      }
+      if (url.startsWith('https://farcaster.xyz/miniapps/')) {
+        try {
+          await sdk.actions.openMiniApp({ url });
+        } catch (error) {
+          console.error('Failed to open Mini App:', error);
+          window.open(url, '_blank');
+        }
         return;
       }
       if (url.startsWith('https://farcaster.xyz/') && !url.includes('/~/channel/')) {
@@ -58,8 +62,10 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
           fid = 849768;
         } else if (url.includes('kokocodes')) {
           fid = 738574;
+        } else if (url.includes('enb')) {
+          fid = 1089736;
         }
-        
+
         if (fid) {
           console.log('Viewing profile for fid:', fid);
           sdk.actions.viewProfile({ fid });
@@ -83,17 +89,17 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
       </div>
       <div className={styles.buttonContainer}>
         {hasActionUrl && !task.completed && (
-          <button 
-            onClick={handleGoClick} 
+          <button
+            onClick={handleGoClick}
             className={`${styles.goButton} ${isTaskDisabled ? styles.disabledButton : ''}`}
             disabled={isTaskDisabled}
           >
             <ExternalLink size={16} /> Go
           </button>
         )}
-        <button 
-          onClick={() => onVerify(task)} 
-          disabled={isButtonDisabled} 
+        <button
+          onClick={() => onVerify(task)}
+          disabled={isButtonDisabled}
           className={`${styles.verifyButton} ${task.type === 'DEFAULT' ? styles.defaultVerifyButton : ''} ${isTaskDisabled ? styles.disabledButton : ''}`}
         >
           {isChecking ? <VerifyLoader /> : (task.completed ? <Check size={16} /> : 'Verify')}
@@ -102,6 +108,12 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
     </div>
   );
 }
+
+const fakeVerificationTasks = [
+  'YOUTUBE_SUBSCRIBE_ENBMINIAPPS',
+  'PARAGRAPH_SUBSCRIBE_ENB',
+  'ZORA_FOLLOW_ENB',
+];
 
 export default function TasksPage() {
   const { fid } = useUser();
@@ -122,10 +134,10 @@ export default function TasksPage() {
         throw new Error("Failed to fetch tasks");
       }
       setTasks(await response.json());
-    } catch (error) { 
+    } catch (error) {
       console.error(error);
       setToast({ message: (error as Error).message, type: 'error' });
-    } 
+    }
     finally { setIsLoading(false); }
   };
 
@@ -136,47 +148,98 @@ export default function TasksPage() {
   const handleVerifyTask = async (task: Task) => {
     sdk.haptics.impactOccurred('medium');
     setCheckingTaskId(task.id);
-    try {
-      const response = await sdk.quickAuth.fetch('/api/tasks/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkKey: task.checkKey }),
-      });
 
-      if (!response.ok) {
-        if (response.status === 500) throw new Error('Server timeout, please try again.');
-        if (response.status === 401) throw new Error('Authentication error. Please reconnect.');
-        if (response.status === 404) throw new Error('User or task not found.');
-        if (response.status === 429) throw new Error('Please wait before verifying again.');
-        if (response.status === 400) {
+    if (fakeVerificationTasks.includes(task.checkKey)) {
+      setTimeout(async () => {
+        try {
+          const response = await sdk.quickAuth.fetch('/api/tasks/force-complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checkKey: task.checkKey }),
+          });
+
+          if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Verification condition not met.');
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Verification failed');
-      }
-      
-      sdk.haptics.notificationOccurred('success');
-      setToast({ message: 'Task verified successfully!', type: 'success' });
-      await fetchTasks();
+            throw new Error(errorData.message || 'Completion failed');
+          }
 
-    } catch (error) {
-      sdk.haptics.notificationOccurred('error');
-      setToast({ message: `Error: ${(error as Error).message}`, type: 'error' });
-    } finally {
-      setCheckingTaskId(null);
+          sdk.haptics.notificationOccurred('success');
+          setToast({ message: 'Task completed!', type: 'success' });
+          await fetchTasks();
+        } catch (error) {
+          sdk.haptics.notificationOccurred('error');
+          setToast({ message: `Error: ${(error as Error).message}`, type: 'error' });
+        } finally {
+          setCheckingTaskId(null);
+        }
+      }, 7000);
+    } else {
+      try {
+        const response = await sdk.quickAuth.fetch('/api/tasks/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ checkKey: task.checkKey }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          if (response.status === 418) {
+            setToast({ message: errorData.message, type: 'info' });
+            setCheckingTaskId(null);
+            return;
+          }
+          if (response.status === 500) throw new Error('Server timeout, please try again.');
+          if (response.status === 401) throw new Error('Authentication error. Please reconnect.');
+          if (response.status === 404) throw new Error('User or task not found.');
+          if (response.status === 429) throw new Error('Please wait before verifying again.');
+          if (response.status === 400) {
+            throw new Error(errorData.message || 'Verification condition not met.');
+          }
+          throw new Error(errorData.message || 'Verification failed');
+        }
+
+        sdk.haptics.notificationOccurred('success');
+        setToast({ message: 'Task verified successfully!', type: 'success' });
+        await fetchTasks();
+
+      } catch (error) {
+        sdk.haptics.notificationOccurred('error');
+        setToast({ message: `Error: ${(error as Error).message}`, type: 'error' });
+      } finally {
+        setCheckingTaskId(null);
+      }
     }
   };
-  
+
   const dailyTasks = tasks.filter(t => t.type === 'DAILY');
   const defaultTasks = tasks.filter(t => t.type === 'DEFAULT');
+  const partnerTasks = tasks.filter(t => t.type === 'PARTNER');
 
   if (isLoading) return <Loader />;
+
+  if (dailyTasks.length === 0 && defaultTasks.length === 0 && partnerTasks.length === 0) {
+    return (
+      <div className={styles.tasksContainer}>
+        <h1 className={styles.title}>Tasks</h1>
+        <div className={styles.noTasksMessage}>No tasks available right now</div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.tasksContainer}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <h1 className={styles.title}>Tasks</h1>
+
+      {partnerTasks.length > 0 && (
+        <section className={styles.taskSection}>
+          <h2 className={`${styles.sectionTitle} ${styles.partnerTasksTitle}`}>Partner Tasks</h2>
+          <div className={styles.taskList}>
+            {partnerTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
+          </div>
+        </section>
+      )}
+
       <section className={styles.taskSection}>
         <h2 className={`${styles.sectionTitle} ${styles.dailyTasksTitle}`}>Daily Tasks</h2>
         <div className={styles.taskList}>
