@@ -7,12 +7,6 @@ const GAME_CONTRACT_ABI = [
   "function userNonces(address owner) view returns (uint256)"
 ];
 
-function isSameDay(date1: Date, date2: Date): boolean {
-  if (!date1 || !date2) return false;
-  return date1.getUTCFullYear() === date2.getUTCFullYear() &&
-         date1.getUTCMonth() === date2.getUTCMonth() &&
-         date1.getUTCDate() === date2.getUTCDate();
-}
 
 async function getCurrentNonce(walletAddress: string): Promise<bigint> {
   const provider = new ethers.JsonRpcProvider(process.env.BASE_MAINNET_RPC_URL);
@@ -54,18 +48,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'walletAddress and amount are required' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { fid } });
-    if (!user) {
-        return NextResponse.json({ message: 'User not found' }, { status: 404 });
-    }
-
     const now = new Date();
-    const isNewDay = !user.lastClaimDate || !isSameDay(user.lastClaimDate, now);
-    const claimsToday = isNewDay ? 0 : user.claimsToday;
 
-    if (claimsToday >= 5) {
-        return NextResponse.json({ message: 'Daily claim limit reached' }, { status: 429 });
+    try {
+      await prisma.$transaction(async (tx) => {
+        const userForUpdate = await tx.user.findUnique({
+          where: { fid },
+        });
+
+        if (!userForUpdate) {
+          throw new Error('User not found');
+        }
+
+        const { claimWindowStart, claimsToday } = userForUpdate;
+
+        if (!claimWindowStart || now.getTime() - claimWindowStart.getTime() > 24 * 60 * 60 * 1000) {
+          // New window
+          await tx.user.update({
+            where: { fid },
+            data: { claimsToday: 1, claimWindowStart: now },
+          });
+        } else {
+          // Same window
+          if (claimsToday >= 5) {
+            throw new Error('Claim limit of 5 per 24 hours reached');
+          }
+          await tx.user.update({
+            where: { fid },
+            data: { claimsToday: { increment: 1 } },
+          });
+        }
+      });
+    } catch (error: any) {
+      if (error.message.includes('Claim limit')) {
+        return NextResponse.json({ message: error.message }, { status: 429 });
+      }
+      throw error; // Re-throw other transaction errors
     }
+
+
 
     const serverWallet = new ethers.Wallet(process.env.SERVER_SIGNER_PRIVATE_KEY!);
     const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS!;

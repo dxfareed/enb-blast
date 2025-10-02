@@ -26,6 +26,7 @@ model User {
   weeklyPoints  BigInt    @default(0)
   claimsToday   Int       @default(0)
   lastClaimDate DateTime?
+  claimWindowStart DateTime?
   lastClaimedAt DateTime?
   createdAt     DateTime  @default(now())
   claims        Claim[]

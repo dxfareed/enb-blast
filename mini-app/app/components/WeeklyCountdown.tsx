@@ -2,19 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-function getNextTuesday5PM(): Date {
+function getNextThursday4PMUTC(): Date {
   const now = new Date();
-  const target = new Date(now.getTime());
-  const targetDay = 2;
-  const targetHour = 17;
+  const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 16, 0, 0, 0));
+  const targetDay = 4; // Thursday
 
-  const daysUntilTarget = (targetDay - now.getDay() + 7) % 7;
+  const daysUntilTarget = (targetDay - now.getUTCDay() + 7) % 7;
   
-  target.setDate(now.getDate() + daysUntilTarget);
-  target.setHours(targetHour, 0, 0, 0);
+  target.setUTCDate(now.getUTCDate() + daysUntilTarget);
 
-  if (now.getDay() === targetDay && now.getTime() > target.getTime()) {
-    target.setDate(target.getDate() + 7);
+  if (now.getUTCDay() === targetDay && now.getTime() > target.getTime()) {
+    target.setUTCDate(target.getUTCDate() + 7);
   }
 
   return target;
@@ -24,7 +22,7 @@ export default function WeeklyCountdown() {
   const [timeLeft, setTimeLeft] = useState('');
 
   const updateCountdown = useCallback(() => {
-    const targetDate = getNextTuesday5PM();
+    const targetDate = getNextThursday4PMUTC();
     const now = new Date();
     const difference = targetDate.getTime() - now.getTime();
 
@@ -38,7 +36,7 @@ export default function WeeklyCountdown() {
     
     if (totalHours < 1) {
       const minutes = totalMinutes % 60;
-      setTimeLeft(`Resets in ${minutes} minute${minutes !== 1 ? 's' : ''}`);
+      setTimeLeft(`${minutes} min${minutes !== 1 ? 's' : ''}`);
     } else {
       const days = Math.floor(totalHours / 24);
       const hours = totalHours % 24;

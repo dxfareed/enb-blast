@@ -16,13 +16,13 @@
   border-radius: 50%;
   animation: pulse 2s infinite;
   pointer-events: none;
-  z-index: 11;
+  z-index: 14;
 }
 
 @keyframes pulse {
   0% {
     transform: translate(-50%, -50%) scale(0.95);
-    opacity: 0.7;
+    opacity: 0.;
   }
   70% {
     transform: translate(-50%, -50%) scale(1.2);
@@ -39,13 +39,13 @@
   opacity: 1;
   min-width: 150px;
   max-width: 200px;
-  background-color: #2c2c2c;
+  background-color: #0e0e0e;
   color: #fff;
   text-align: center;
   border-radius: 8px;
   padding: 8px 12px;
   position: absolute;
-  z-index: 12;
+  z-index: 15;
   left: 50%;
   transform: translateX(-50%);
   font-size: 14px;
@@ -97,4 +97,33 @@
 .alignRight.tooltipBox::after {
   left: auto;
   right: 25px;
+}
+
+
+/* app/components/HighlightTooltip.module.css */
+
+/* ... (keep all your existing styles like .modalOverlay, .tooltipBox, etc.) ... */
+
+/* ADD THESE NEW STYLES AT THE END */
+
+.tooltipActions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end; /* Pushes button to the right */
+}
+
+.nextButton {
+  background-color: #7c3aed; /* A purple color to match the theme */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.nextButton:hover {
+  background-color: #6d28d9;
 }

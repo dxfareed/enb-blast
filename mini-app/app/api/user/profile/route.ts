@@ -140,6 +140,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // NEW: Adjust claimsToday for display purposes if the window has expired
+    const now = new Date();
+    if (!user.claimWindowStart || now.getTime() - user.claimWindowStart.getTime() > 24 * 60 * 60 * 1000) {
+        user.claimsToday = 0;
+    }
+
     const userProfile = convertBigIntsToStrings(user);
     (userProfile as any).weeklyRank = userRank;
 

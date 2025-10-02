@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    await prisma.user.update({
+    await prisma.$transaction([
+      prisma.user.update({
         where: { id: user.id },
         data: {
             totalPoints: { increment: points },
@@ -82,7 +83,15 @@ export async function POST(req: NextRequest) {
             streak: newStreak,
             lastClaimedAt: now,
         },
-    });
+      }),
+      prisma.claim.create({
+        data: {
+          txHash: txHash as string,
+          amount: points,
+          userId: user.id,
+        },
+      }),
+    ]);
 
     return NextResponse.json({ message: 'Claim confirmed successfully' }, { status: 200 });
 

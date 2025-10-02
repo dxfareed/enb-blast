@@ -12,10 +12,16 @@ const GAME_CONTRACT_ABI = [
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000; 
-const KEEP_ALIVE_INTERVAL = 60 * 1000; // 1 minute
+const KEEP_ALIVE_INTERVAL = 60 * 1000; 
 
 const RETRYABLE_ERROR_CODES = new Set(['P1001', 'P2028']);
 
+function isSameDay(date1, date2) {
+  if (!date1 || !date2) return false;
+  return date1.getUTCFullYear() === date2.getUTCFullYear() &&
+         date1.getUTCMonth() === date2.getUTCMonth() &&
+         date1.getUTCDate() === date2.getUTCDate();
+}
 
 async function processEvent(user, amount, nonce, event, retryCount = 0) {
   console.log(`✅ Event received! Processing Nonce: ${nonce}...`);
@@ -37,37 +43,21 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
       return;
     }
 
-    const { claimWindowStart, claimsToday, streak, lastClaimedAt } = dbUser;
-
-    let newClaimsToday;
-    let newClaimWindowStart;
-
-    if (!claimWindowStart || timestamp.getTime() - claimWindowStart.getTime() > 24 * 60 * 60 * 1000) {
-      newClaimsToday = 1;
-      newClaimWindowStart = timestamp;
-    } else {
-      newClaimsToday = claimsToday + 1;
-      newClaimWindowStart = claimWindowStart;
-    }
-
     let newStreak = 1;
-    if (lastClaimedAt) {
-        const yesterday = new Date(timestamp);
-        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-        const isLastClaimYesterday = lastClaimedAt.getUTCFullYear() === yesterday.getUTCFullYear() &&
-                                   lastClaimedAt.getUTCMonth() === yesterday.getUTCMonth() &&
-                                   lastClaimedAt.getUTCDate() === yesterday.getUTCDate();
-
-        const isLastClaimToday = lastClaimedAt.getUTCFullYear() === timestamp.getUTCFullYear() &&
-                                 lastClaimedAt.getUTCMonth() === timestamp.getUTCMonth() &&
-                                 lastClaimedAt.getUTCDate() === timestamp.getUTCDate();
-
-        if (isLastClaimYesterday) {
-            newStreak = streak + 1;
-        } else if (isLastClaimToday) {
-            newStreak = streak;
+    if (dbUser.lastClaimedAt) {
+        if (!isSameDay(dbUser.lastClaimedAt, timestamp)) {
+            const yesterday = new Date(timestamp);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            if (isSameDay(dbUser.lastClaimedAt, yesterday)) {
+                newStreak = dbUser.streak + 1;
+            }
+        } else {
+            newStreak = dbUser.streak; 
         }
     }
+
+    const isNewDay = !dbUser.lastClaimDate || !isSameDay(dbUser.lastClaimDate, timestamp);
+    const newClaimsToday = isNewDay ? 1 : dbUser.claimsToday + 1;
 
     await prisma.$transaction(async (tx) => {
       await tx.claim.create({
@@ -88,7 +78,7 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
           streak: newStreak,
           lastClaimedAt: timestamp,
           claimsToday: newClaimsToday,
-          claimWindowStart: newClaimWindowStart,
+          lastClaimDate: timestamp,
         },
       });
     });
@@ -111,7 +101,7 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
 async function connectAndListen() {
   console.log("... 🔌 Attempting to connect to WebSocket provider...");
   const provider = new ethers.WebSocketProvider(process.env.TESTNET_RPC_WSS_URL);
-  const contractAddress = "0x854cec65437d6420316b2eb94fecaaf417690227";
+  const contractAddress = "0xb1d6f75234aaed66a758fcd3722ae843696ee938";
 
   if (!contractAddress) { throw new Error("Contract address not found."); }
 

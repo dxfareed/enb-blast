@@ -1,4 +1,3 @@
-// app/components/HighlightTooltip.tsx
 'use client';
 
 import React from 'react';
@@ -11,6 +10,8 @@ interface HighlightTooltipProps {
   position?: 'top' | 'bottom';
   alignment?: 'center' | 'left' | 'right';
   className?: string;
+  onNext?: () => void;
+  isLastStep?: boolean;
 }
 
 const HighlightTooltip = ({
@@ -20,11 +21,11 @@ const HighlightTooltip = ({
   position = 'top',
   alignment = 'center',
   className = '',
+  onNext,
+  isLastStep = false,
 }: HighlightTooltipProps) => {
   if (!show) {
-    if (className) {
-      return <div className={className}>{children}</div>;
-    }
+    if (className) { return <div className={className}>{children}</div>; }
     return <>{children}</>;
   }
 
@@ -35,7 +36,7 @@ const HighlightTooltip = ({
   }[alignment];
 
   return (
-     <div className={`${styles.tooltipContainer} ${className}`}>
+    <div className={`${styles.tooltipContainer} ${className}`}>
       {children}
       <div className={styles.highlightCircle}></div>
       <div
@@ -44,6 +45,11 @@ const HighlightTooltip = ({
         } ${alignmentClass}`}
       >
         {text}
+        <div className={styles.tooltipActions}>
+          <button onClick={onNext} className={styles.nextButton}>
+            {isLastStep ? 'Finish' : 'Next'}
+          </button>
+        </div>
       </div>
     </div>
   );
