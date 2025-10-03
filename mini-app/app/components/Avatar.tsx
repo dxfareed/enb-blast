@@ -6,15 +6,15 @@ import styles from './Avatar.module.css';
 type AvatarProps = {
   position: { x: number; y: number; };
   pfpUrl: string;
+  isInvincible?: boolean;
 };
 
-const Avatar = forwardRef<HTMLDivElement, AvatarProps>(({ position, pfpUrl }, ref) => {
+const Avatar = forwardRef<HTMLDivElement, AvatarProps>(({ position, pfpUrl, isInvincible }, ref) => {
   return (
     <div 
       ref={ref}
-      className={styles.avatar} 
-      style={{ 
-        // Using transform for smoother GPU-accelerated movement
+      className={`${styles.avatar} ${isInvincible ? styles.invincibleEffect : ''}`} 
+      style={{
         transform: `translate(${position.x}px, ${position.y}px) translate(-50%, -50%)`,
       }}
     >

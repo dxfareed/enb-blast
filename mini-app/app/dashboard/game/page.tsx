@@ -9,6 +9,8 @@ import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
 import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
+import { useMiniApp } from '@neynar/react';
+import AddAppBanner from '@/app/components/AddAppBanner';
 
 const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
 const GAME_CONTRACT_ABI = [{ "inputs": [{ "internalType": "uint256", "name": "_amount", "type": "uint256" }, { "internalType": "bytes", "name": "_signature", "type": "bytes" }], "name": "claimTokens", "outputs": [], "stateMutability": "nonpayable", "type": "function" }];
@@ -27,7 +29,8 @@ export default function GamePage() {
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
     const [isMuted, setIsMuted] = useState(false);
-
+    const { context } = useMiniApp();
+    const isMiniAppAdded = (context as any)?.added;
     const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
 
     const toggleMute = () => {
@@ -164,6 +167,7 @@ export default function GamePage() {
 
     return (
         <div className={styles.gameContainer}>
+            {isMiniAppAdded === false && <AddAppBanner />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
             <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
             <div className={styles.actionContainer}>
@@ -206,6 +210,10 @@ export default function GamePage() {
                 ) : (
                     <button disabled className={styles.claimButton}>Survive to Unlock Claim</button>
                 )}
+                    {/* <button onClick={addMiniApp} className={styles.notificationButton}>
+                    <Bell size={20} color="white" />
+                    <span>Enable Notifications</span>
+                </button> */}
                 <div className={styles.statusMessage}>
                     {userProfile && typeof userProfile.claimsToday === 'number' && (<p>Claims left: {5 - userProfile.claimsToday}</p>)}
                 </div>

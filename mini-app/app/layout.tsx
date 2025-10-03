@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
         version: minikitConfig.frame.version,
         imageUrl: minikitConfig.frame.heroImageUrl,
         button: {
-          title: `blast ENBs`,
+          title: `Launch ENB Blast`,
           action: {
             name: `Launch ${minikitConfig.frame.name}`,
             type: "launch_frame",
@@ -52,7 +52,7 @@ export default function RootLayout({
     <html lang="en" className={spaceMono.variable}>
       <body>
         <RootProvider>{children}</RootProvider>
-        <Analytics /> {/* Add Analytics component */}
+        <Analytics />
       </body>
     </html>
   );

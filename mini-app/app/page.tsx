@@ -26,9 +26,9 @@ export default function Home() {
           width={200}
           height={200}
         />
-        <h1 className={styles.title}>ENB Pop</h1>
+        <h1 className={styles.title}>ENB Blast</h1>
         <p>
-          A mini-app for ENB Pop
+          A mini-app for ENB Blast
         </p>
       </div>
     </div>

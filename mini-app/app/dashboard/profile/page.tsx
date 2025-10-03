@@ -61,7 +61,7 @@ export default function ProfilePage() {
     }
 
     const finalShareUrl = shareUrl.toString();
-    const castText = `Check out @${userProfile.username}'s ENB POP Stats!`; // Generic text for profile share
+    const castText = `Check out my ENB Blast Stats!`; // Generic text for profile share
 
     try {
       await sdk.actions.composeCast({
@@ -90,8 +90,11 @@ export default function ProfilePage() {
           style={{ borderRadius: '9999px', objectFit: 'cover' }}
         />
       </div>
-      <h2 className={styles.username}>@{userProfile.username}</h2>
-
+      <h2 className={styles.username}>@{userProfile.username}
+        <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px' }} title="Share Profile">
+        <Share size={19} color="rgba(31, 105, 241, 1)" />
+        </button>
+      </h2>
       <div className={styles.statsGrid}>
         <div className={`${styles.statCard} ${styles.streakCard}`}>
           <p className={styles.statLabel}>Streak</p>
@@ -117,12 +120,7 @@ export default function ProfilePage() {
         </div>
         <div>
           <p className={styles.levelLabel}>Membership Level</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '150px' }}>
             <p className={styles.levelValue}>{membershipLevelName}</p>
-            <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
-              <Share size={20} color="rgb(116, 51, 235)" />
-            </button>
-          </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { ethers } from 'ethers';
+import { createPublicClient, webSocket, formatUnits } from 'viem';
+import { base } from 'viem/chains';
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
 
@@ -6,58 +7,69 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-const GAME_CONTRACT_ABI = [
-  "event TokensClaimed(address indexed user, uint256 amount, uint256 nonce)"
-];
+// ABI item for the event we are interested in
+const tokensClaimedAbi = {
+  type: 'event',
+  name: 'TokensClaimed',
+  inputs: [
+    { name: 'user', type: 'address', indexed: true },
+    { name: 'amount', type: 'uint256', indexed: false },
+    { name: 'nonce', type: 'uint256', indexed: false },
+  ],
+};
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 5000; 
-const KEEP_ALIVE_INTERVAL = 60 * 1000; 
+const RETRY_DELAY = 5000;
+const KEEP_ALIVE_INTERVAL = 60 * 1000; // 1 minute
 
 const RETRYABLE_ERROR_CODES = new Set(['P1001', 'P2028']);
 
-function isSameDay(date1, date2) {
-  if (!date1 || !date2) return false;
-  return date1.getUTCFullYear() === date2.getUTCFullYear() &&
-         date1.getUTCMonth() === date2.getUTCMonth() &&
-         date1.getUTCDate() === date2.getUTCDate();
-}
+async function processEvent(log, retryCount = 0) {
+  const { user, amount, nonce } = log.args;
+  const txHash = log.transactionHash;
 
-async function processEvent(user, amount, nonce, event, retryCount = 0) {
-  console.log(`✅ Event received! Processing Nonce: ${nonce}...`);
-  
-  const txHash = event.log.transactionHash;
+  console.log(`✅ Event received! Processing Nonce: ${nonce} for user ${user}...`);
 
   try {
-    const block = await event.log.getBlock();
-    const timestamp = new Date(block.timestamp * 1000);
-    const amountDecimal = ethers.formatUnits(amount, 18);
+    const block = await client.getBlock({ blockHash: log.blockHash });
+    const timestamp = new Date(Number(block.timestamp) * 1000);
+    const amountDecimal = formatUnits(amount, 18);
     const points = parseFloat(amountDecimal) * 10;
 
     const dbUser = await prisma.user.findUnique({
       where: { walletAddress: user.toLowerCase() },
     });
 
-    if (!dbUser) { 
+    if (!dbUser) {
       console.warn(`   - User ${user} not found in DB. Claim will not be indexed.`);
       return;
     }
 
-    let newStreak = 1;
-    if (dbUser.lastClaimedAt) {
-        if (!isSameDay(dbUser.lastClaimedAt, timestamp)) {
-            const yesterday = new Date(timestamp);
-            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-            if (isSameDay(dbUser.lastClaimedAt, yesterday)) {
-                newStreak = dbUser.streak + 1;
-            }
-        } else {
-            newStreak = dbUser.streak; 
-        }
-    }
+    const { streak, lastClaimedAt, claimsToday } = dbUser;
 
-    const isNewDay = !dbUser.lastClaimDate || !isSameDay(dbUser.lastClaimDate, timestamp);
-    const newClaimsToday = isNewDay ? 1 : dbUser.claimsToday + 1;
+    const isSameDay = lastClaimedAt
+      ? timestamp.getUTCFullYear() === lastClaimedAt.getUTCFullYear() &&
+        timestamp.getUTCMonth() === lastClaimedAt.getUTCMonth() &&
+        timestamp.getUTCDate() === lastClaimedAt.getUTCDate()
+      : false;
+
+    const newClaimsToday = isSameDay ? claimsToday + 1 : 1;
+
+    let newStreak = 1;
+    if (lastClaimedAt) {
+      const yesterday = new Date(timestamp);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const isLastClaimYesterday =
+        lastClaimedAt.getUTCFullYear() === yesterday.getUTCFullYear() &&
+        lastClaimedAt.getUTCMonth() === yesterday.getUTCMonth() &&
+        lastClaimedAt.getUTCDate() === yesterday.getUTCDate();
+
+      if (isLastClaimYesterday) {
+        newStreak = streak + 1;
+      } else if (isSameDay) {
+        newStreak = streak;
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.claim.create({
@@ -71,68 +83,74 @@ async function processEvent(user, amount, nonce, event, retryCount = 0) {
 
       await tx.user.update({
         where: { id: dbUser.id },
-        data: { 
+        data: {
           totalClaimed: { increment: parseFloat(amountDecimal) },
           totalPoints: { increment: points },
           weeklyPoints: { increment: points },
           streak: newStreak,
           lastClaimedAt: timestamp,
           claimsToday: newClaimsToday,
-          lastClaimDate: timestamp,
         },
       });
     });
 
     console.log(`   - ✅ Successfully indexed claim with txHash: ${txHash}`);
-
   } catch (error) {
     if (error.code === 'P2002') {
       console.warn(`   - ℹ️  Claim with txHash ${txHash} already exists. Skipping.`);
     } else if (RETRYABLE_ERROR_CODES.has(error.code) && retryCount < MAX_RETRIES) {
       console.warn(`   - ⚠️  A transient database error occurred (${error.code}). Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-      await new Promise(res => setTimeout(res, RETRY_DELAY));
-      await processEvent(user, amount, nonce, event, retryCount + 1);
+      await new Promise((res) => setTimeout(res, RETRY_DELAY));
+      await processEvent(log, retryCount + 1);
     } else {
       console.error(`   - ❌ Error processing event for txHash ${txHash} after ${retryCount} retries:`, error);
     }
   }
 }
 
-async function connectAndListen() {
-  console.log("... 🔌 Attempting to connect to WebSocket provider...");
-  const provider = new ethers.WebSocketProvider(process.env.TESTNET_RPC_WSS_URL);
+// Use a WebSocket transport for real-time events.
+const transport = webSocket(process.env.TESTNET_RPC_WSS_URL, {
+  // These retry parameters are for the WebSocket connection itself.
+  retryCount: 5,
+  retryDelay: 5000,
+  async onConnect() {
+    console.log("... ✅ WebSocket connection established. Listening for events... 👂");
+  },
+  onDisconnect() {
+    console.log("... 🔌 WebSocket connection lost. Attempting to reconnect...");
+  },
+});
+
+const client = createPublicClient({
+  chain: base,
+  transport,
+});
+
+async function main() {
+  console.log("🚀 Starting viem-based indexer...");
+
   const contractAddress = "0xb1d6f75234aaed66a758fcd3722ae843696ee938";
+  if (!contractAddress) {
+    throw new Error("Contract address not found.");
+  }
 
-  if (!contractAddress) { throw new Error("Contract address not found."); }
-
-  const contract = new ethers.Contract(contractAddress, GAME_CONTRACT_ABI, provider);
-
-  let heartbeatInterval;
-  let dbKeepAliveInterval;
-
-  const cleanup = () => {
-    console.log("🧹 Cleaning up old listeners and timers.");
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-    if (dbKeepAliveInterval) clearInterval(dbKeepAliveInterval);
-    contract.removeAllListeners();
-  };
-
-  const reconnect = () => {
-    console.log("💔 Connection lost. Reconnecting in 10 seconds...");
-    cleanup();
-    setTimeout(connectAndListen, 10000);
-  };
-
-  heartbeatInterval = setInterval(async () => {
-    try {
-      await provider.getBlockNumber();
-    } catch (error) {
-      console.error("   - 💔 Heartbeat failed, connection likely lost. Triggering reconnect.");
-      reconnect();
+  // This will watch for the event and automatically handle reconnections.
+  client.watchContractEvent({
+    address: contractAddress,
+    abi: [tokensClaimedAbi],
+    eventName: 'TokensClaimed',
+    onLogs: (logs) => {
+      for (const log of logs) {
+        processEvent(log);
+      }
+    },
+    onError: (error) => {
+        console.error("❗️ Error in event watcher:", error);
     }
-  }, 15000);
+  });
 
-  dbKeepAliveInterval = setInterval(async () => {
+  // Keep the database connection alive
+  setInterval(async () => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       console.log("   - 핑 (Ping) DB connection is alive. ✅");
@@ -140,24 +158,6 @@ async function connectAndListen() {
       console.error("   - 핑 (Ping) DB connection keep-alive failed:", error);
     }
   }, KEEP_ALIVE_INTERVAL);
-
-  if (provider._websocket) {
-    provider._websocket.on('close', () => {
-        console.log('❗️ WebSocket connection closed by provider. Reconnecting...');
-        reconnect();
-    });
-  }
-
-  contract.on("TokensClaimed", (user, amount, nonce, event) => {
-    processEvent(user, amount, nonce, event);
-  });
-
-  console.log("... ✅ Indexer is running. Waiting for events... 👂");
-}
-
-async function main() {
-  console.log("🚀 Starting resilient indexer...");
-  connectAndListen();
 }
 
 main().catch(async (error) => {

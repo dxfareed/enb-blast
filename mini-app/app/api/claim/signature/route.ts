@@ -60,22 +60,34 @@ export async function POST(req: NextRequest) {
           throw new Error('User not found');
         }
 
-        const { claimWindowStart, claimsToday } = userForUpdate;
+        const { lastClaimedAt, claimsToday } = userForUpdate;
 
-        if (!claimWindowStart || now.getTime() - claimWindowStart.getTime() > 24 * 60 * 60 * 1000) {
-          // New window
-          await tx.user.update({
-            where: { fid },
-            data: { claimsToday: 1, claimWindowStart: now },
-          });
-        } else {
-          // Same window
+        const lastClaimDate = lastClaimedAt ? new Date(lastClaimedAt) : null;
+        const isSameDay = lastClaimDate ? now.getUTCFullYear() === lastClaimDate.getUTCFullYear() &&
+                                           now.getUTCMonth() === lastClaimDate.getUTCMonth() &&
+                                           now.getUTCDate() === lastClaimDate.getUTCDate()
+                                        : false;
+
+        if (isSameDay) {
+          // Same day: check limit and increment
           if (claimsToday >= 5) {
             throw new Error('Claim limit of 5 per 24 hours reached');
           }
           await tx.user.update({
             where: { fid },
-            data: { claimsToday: { increment: 1 } },
+            data: { 
+              claimsToday: { increment: 1 },
+              lastClaimedAt: now,
+            },
+          });
+        } else {
+          // New day: reset counter
+          await tx.user.update({
+            where: { fid },
+            data: { 
+              claimsToday: 1, 
+              lastClaimedAt: now 
+            },
           });
         }
       });
@@ -83,7 +95,11 @@ export async function POST(req: NextRequest) {
       if (error.message.includes('Claim limit')) {
         return NextResponse.json({ message: error.message }, { status: 429 });
       }
-      throw error; // Re-throw other transaction errors
+      // Re-throw other transaction errors to be caught by the outer catch block
+      if (error.message.includes('User not found')) {
+        return NextResponse.json({ message: error.message }, { status: 404 });
+      }
+      throw error; 
     }
 
 
