@@ -23,9 +23,9 @@ export default function AddAppBanner({ onAppAdded }: { onAppAdded: () => void })
 
   return (
     <div className={styles.banner}>
-      <p className={styles.bannerText}>Add this app to what's next!</p>
+      <p className={styles.bannerText}>Install ENB Blast &nbsp;&nbsp;&nbsp;</p>
       <button onClick={handleAddApp} disabled={isAdding} className={styles.addButton}>
-        {isAdding ? 'Adding...' : 'Add App'}
+        {isAdding ? 'Installing...' : 'Install'}
       </button>
     </div>
   );

@@ -13,6 +13,7 @@ import GameInfoModal from '@/app/components/GameInfoModal';
 import Marquee from '@/app/components/Marquee';
 import { getTokenMarqueeData, TokenMarqueeRawData } from '@/lib/dexscreener';
 import { TOKEN_ADDRESS } from '../utils/constants';
+import {sdk} from '@farcaster/miniapp-sdk'
 
 const TOOLTIP_STORAGE_KEY = 'hasSeenDashboardTooltip';
 
@@ -119,6 +120,23 @@ export default function DashboardLayout({
 
   const isLastStep = activeTourStep === tourSteps.length - 1;
 
+  const buyFunction = async () => {
+      try {
+        const buyToken = `eip155:8453/erc20:${TOKEN_ADDRESS}`;
+        const result = await sdk.actions.swapToken({
+          buyToken,
+        });
+  
+        if (result.success) {
+          console.log('Swap successful:', result.swap);
+        } else {
+          console.error('Swap failed:', result.reason, result.error);
+        }
+      } catch (error) {
+        console.error('An error occurred while trying to swap tokens:', error);
+  }
+}
+
   return (
     <TourProvider value={tourContextValue}>
       <GameInfoModal show={isInfoModalVisible} onClose={handleCloseModal} />
@@ -131,18 +149,29 @@ export default function DashboardLayout({
 
         <div className={styles.appWrapper}>
           <header className={styles.header}>
-            <HighlightTooltip
-              text={tourSteps.find(step => step.id === 'token-balance')?.text || ''}
-              show={tourSteps[activeTourStep]?.id === 'token-balance'}
-              position="bottom"
-              alignment="left"
-              onNext={handleNextStep}
-              isLastStep={false}
-            >
-              <TokenBalanceDisplay />
-            </HighlightTooltip>
+            {/* START: Added Buy Button */}
+            <div className={styles.headerLeft}>
+              <div onClick={buyFunction}
+                className={styles.buyButton}
+              >
+                BUY $ENB
+              </div>
+            </div>
+            {/* END: Added Buy Button */}
 
-            <div aria-hidden className={styles.spacer} />
+            {/* The existing TokenBalanceDisplay is now wrapped in a right-aligned container */}
+            <div className={styles.headerRight}>
+              <HighlightTooltip
+                text={tourSteps.find(step => step.id === 'token-balance')?.text || ''}
+                show={tourSteps[activeTourStep]?.id === 'token-balance'}
+                position="bottom"
+                alignment="left"
+                onNext={handleNextStep}
+                isLastStep={false}
+              >
+                <TokenBalanceDisplay />
+              </HighlightTooltip>
+            </div>
           </header>
 
           <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS}/>

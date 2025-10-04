@@ -18,7 +18,7 @@
 
 .header {
   display: flex;
-  justify-content: flex-end;
+  justify-content:space-between;
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
@@ -124,4 +124,30 @@
 
 .skipButton:hover {
   background-color: rgba(0, 0, 0, 0.9);
+}
+
+.headerRight {
+  /* This container holds the Token Balance display */
+  display: flex;
+}
+
+.buyButton {
+  background-color: rgb(116, 51, 235); /* Using your exact purple color */
+  color: white;
+  border-radius: 9999px; /* Matches your .tokenBadge */
+  padding: 0.6rem 1.5rem;   /* Similar padding to .tokenBadge but wider */
+  font-size: 0.875rem;      /* Matches your .tokenBadge */
+  font-weight: bold;        /* Matches your .tokenBadge */
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+}
+
+.buyButton:hover {
+  background-color: rgb(99, 44, 205); /* A slightly darker shade for hover */
+}
+
+.buyButton:active {
+  transform: scale(0.98); /* Adds a subtle press effect */
 }

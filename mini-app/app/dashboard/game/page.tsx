@@ -62,6 +62,10 @@ export default function GamePage() {
 
     const handleClaim = async () => {
         if (!address || finalScore <= 0) return;
+        if (userProfile && userProfile.claimsToday >= 5) {
+            setToast({ message: 'Daily claim limit reached.', type: 'error' });
+            return;
+        }
         const claimAmount = finalScore / 10;
         setIsSignatureLoading(true);
         try {
@@ -74,7 +78,6 @@ export default function GamePage() {
                 if (signatureResponse.status === 500) throw new Error('Server timeout, please try again.');
                 if (signatureResponse.status === 401) throw new Error('Authentication error. Please reconnect.');
                 if (signatureResponse.status === 404) throw new Error('User not found. Please register first.');
-                if (signatureResponse.status === 429) throw new Error('Daily claim limit reached.');
 
                 const errorBody = await signatureResponse.json();
                 throw new Error(errorBody.message || 'Could not get signature.');
@@ -185,17 +188,43 @@ export default function GamePage() {
             return;
         }
 
-        if (isConfirmed && !isClaimFinalized) {
-            setToast({ message: 'Claim successful!', type: 'success' });
-            setIsClaimFinalized(true);
+        // This function is declared inside the hook to capture the current state.
+        const confirmClaim = async () => {
+            if (!hash || isClaimFinalized) return;
+            setIsClaimFinalized(true); // Prevent re-entry
 
-            setTimeout(() => {
-                refetchUserProfile();
+            try {
+                const response = await sdk.quickAuth.fetch('/api/claim/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // The backend endpoint expects `points`, which is the raw score.
+                    body: JSON.stringify({ txHash: hash, points: finalScore }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to confirm claim on the server.');
+                }
+                
+                setToast({ message: 'Claim successful!', type: 'success' });
+
+                // On successful confirmation, refetch the user's data.
+                await refetchUserProfile();
+                
+                // Invalidate other queries to refresh related data.
                 queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
                 queryClient.invalidateQueries({ queryKey: ['userHistory'] });
-            }, 5000);
+
+            } catch (err) {
+                setToast({ message: (err as Error).message, type: 'error' });
+            }
+        };
+
+        if (isConfirmed) {
+            confirmClaim();
         }
-    }, [writeError, confirmationError, resetWriteContract, isConfirmed, isClaimFinalized, refetchUserProfile, queryClient]);
+    // The dependency array is crucial for correctness.
+    }, [isConfirmed, isClaimFinalized, hash, finalScore, refetchUserProfile, queryClient, writeError, confirmationError, resetWriteContract]);
 
     return (
         <div className={styles.gameContainer}>
@@ -209,17 +238,18 @@ export default function GamePage() {
                             !isConfirmed ? (
                                 <>
                                     <div className={styles.topButtonsWrapper}>
-                                        <button
-                                            onClick={handleClaim}
-                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmed}
-                                            className={`${styles.claimButton} ${styles.claimButtonGreen}`}
-                                        >
-                                            {isSignatureLoading ? 'Preparing...' :
-                                                isWritePending ? 'Check Wallet...' :
-                                                    isConfirming ? 'Confirming...' :
-                                                        claimButtonText}
-                                        </button>
-                                        <button
+                                                                                 <button
+                                                                                    onClick={handleClaim}
+                                                                                    //@ts-ignore
+                                                                                    disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmed || (userProfile && userProfile.claimsToday >= 5)}
+                                                                                    className={`${styles.claimButton} ${styles.claimButtonGreen}`}
+                                                                                >
+                                                                                    {userProfile && userProfile.claimsToday >= 5 ? 'Limit Reached' :
+                                                                                        isSignatureLoading ? 'Preparing...' :
+                                                                                            isWritePending ? 'Check Wallet...' :
+                                                                                                isConfirming ? 'Confirming...' :
+                                                                                                    claimButtonText}
+                                                                                </button>                                        <button
                                             onClick={handleShareScoreFrame}
                                             disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isMultiplierUsed}
                                             className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}

@@ -24,8 +24,16 @@ type UserProfile = {
 };
 
 export default function ProfilePage() {
-  const { userProfile, isLoading: isUserLoading } = useUser();
+  const { userProfile, isLoading: isUserLoading, refetchUserProfile } = useUser();
   const { address } = useAccount();
+
+  useEffect(() => {
+    // If the user profile is not loaded and we are not currently loading,
+    // it might be a new user who just navigated here. Let's try fetching.
+    if (!userProfile && !isUserLoading) {
+      refetchUserProfile();
+    }
+  }, [userProfile, isUserLoading, refetchUserProfile]);
 
   const { data: membershipData, isLoading: isContractLoading } = useReadContract({
     address: TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,

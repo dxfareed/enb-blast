@@ -108,7 +108,7 @@ async function processEvent(log, retryCount = 0) {
 }
 
 // Use a WebSocket transport for real-time events.
-const transport = webSocket(process.env.TESTNET_RPC_WSS_URL, {
+const transport = webSocket("wss://base-rpc.publicnode.com", {
   // These retry parameters are for the WebSocket connection itself.
   retryCount: 5,
   retryDelay: 5000,
