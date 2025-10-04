@@ -7,7 +7,6 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-// ABI item for the event we are interested in
 const tokensClaimedAbi = {
   type: 'event',
   name: 'TokensClaimed',
@@ -129,7 +128,7 @@ const client = createPublicClient({
 async function main() {
   console.log("🚀 Starting viem-based indexer...");
 
-  const contractAddress = "0xb1d6f75234aaed66a758fcd3722ae843696ee938";
+  const contractAddress = "0x03b922ee0573e52e09e6c8033c012500487a2384";
   if (!contractAddress) {
     throw new Error("Contract address not found.");
   }

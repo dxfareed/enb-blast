@@ -1,4 +1,3 @@
-// app/dashboard/layout.tsx
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -11,6 +10,9 @@ import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 import HighlightTooltip from '@/app/components/HighlightTooltip';
 import { TourProvider } from '@/app/context/TourContext';
 import GameInfoModal from '@/app/components/GameInfoModal';
+import Marquee from '@/app/components/Marquee';
+import { getTokenMarqueeData, TokenMarqueeRawData } from '@/lib/dexscreener';
+import { TOKEN_ADDRESS } from '../utils/constants';
 
 const TOOLTIP_STORAGE_KEY = 'hasSeenDashboardTooltip';
 
@@ -39,8 +41,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [activeTourStep, setActiveTourStep] = useState(-1);
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
+  
+  const [tokenData, setTokenData] = useState<TokenMarqueeRawData | null>(null);
+  const [isLoadingTokenData, setIsLoadingTokenData] = useState(true);
 
-  // This effect starts the tour when the component loads for a new user
   useEffect(() => {
     if (!isLoading && userProfile) {
       const hasSeenTooltip = localStorage.getItem(TOOLTIP_STORAGE_KEY);
@@ -50,9 +54,24 @@ export default function DashboardLayout({
     }
   }, [userProfile, isLoading]);
 
-  // REMOVED: The automatic timer-based useEffect is gone.
+  useEffect(() => {
+    const loadTokenData = async () => {
+      const data = await getTokenMarqueeData(TOKEN_ADDRESS);
 
-  // This effect checks for the user's task status
+      if (data) {
+        setTokenData(data);
+      }
+      setIsLoadingTokenData(false);
+    };
+
+    loadTokenData();
+
+    const fiveMinutesInMs = 5 * 60 * 1000;
+    const intervalId = setInterval(loadTokenData, fiveMinutesInMs);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   useEffect(() => {
     if (!userProfile?.fid) return;
 
@@ -73,37 +92,31 @@ export default function DashboardLayout({
     return () => clearInterval(interval);
   }, [userProfile?.fid]);
 
-  // This function hides the tour and sets the local storage flag
   const handleDismissTour = () => {
     localStorage.setItem(TOOLTIP_STORAGE_KEY, 'true');
     setActiveTourStep(-1);
   };
 
-  // NEW: This function advances the tour to the next step
   const handleNextStep = () => {
     if (activeTourStep < tourSteps.length - 1) {
       setActiveTourStep(prev => prev + 1);
     }
   };
 
-  // NEW: This function is called on the last step to end the tour and show the modal
   const handleFinishTour = () => {
     handleDismissTour();
     setIsInfoModalVisible(true);
   };
 
-  // This function closes the information modal
   const handleCloseModal = () => {
     setIsInfoModalVisible(false);
   };
 
-  // This provides the tour context value to child components
   const tourContextValue = useMemo(() => ({
     activeTourStep,
     tourSteps
   }), [activeTourStep]);
 
-  // This determines if the currently active step is the last one in the sequence
   const isLastStep = activeTourStep === tourSteps.length - 1;
 
   return (
@@ -124,13 +137,15 @@ export default function DashboardLayout({
               position="bottom"
               alignment="left"
               onNext={handleNextStep}
-              isLastStep={false} // This step is not the last one
+              isLastStep={false}
             >
               <TokenBalanceDisplay />
             </HighlightTooltip>
 
             <div aria-hidden className={styles.spacer} />
           </header>
+
+          <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS}/>
 
           <main className={styles.main}>
             {children}
@@ -140,7 +155,6 @@ export default function DashboardLayout({
             {navItems.map((item) => {
               const Icon = item.icon;
               const tourStep = tourSteps.find(step => step.id === item.id);
-              // Check if THIS specific navigation item is the last step of the tour
               const isThisItemTheLastStep = tourStep?.id === tourSteps[tourSteps.length - 1].id;
 
               return (
@@ -150,7 +164,6 @@ export default function DashboardLayout({
                   show={tourSteps[activeTourStep]?.id === item.id}
                   position="top"
                   alignment={tourStep?.alignment as any}
-                  // Pass the correct function and flag for user control
                   onNext={isThisItemTheLastStep ? handleFinishTour : handleNextStep}
                   isLastStep={isThisItemTheLastStep}
                 >

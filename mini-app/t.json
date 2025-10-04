@@ -1,0 +1,31 @@
+{
+    "accountAssociation": {
+        "header": "eyJmaWQiOjg0OTc2OCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweEU1OURGMzgxNjg0YTdjZjREM0UxMTc3ZTY4NTY5YjVEMTNGOTU4NWEifQ",
+        "payload": "eyJkb21haW4iOiJibGFzdC5lbmIuZnVuIn0",
+        "signature": "MHgxMThmYjE0NTFhYTBkZjBlZjU0ZjI2OTAyMDVlMjJkZDdiMjg2MTk2NjI4YTg0MDMyYjI5M2ZmYWM0Y2I4M2QyNDMzMGFmNjU3MGRkNzAxMWM4ZjFjOTdlZTI1YWQyMWM2ZjViODM2MzI0YTg4NTkxMTk1ZjQyYWYyMWVjNjk5OTFj"
+    },
+    "baseBuilder": {
+        "allowedAddresses": "0x68E11220a2229e8D135e758Fb1EA1D843a1C3855"
+    },
+    "frame": {
+        "version": "1",
+        "name": "ENB Blast",
+        "subtitle": "Collect ENBs, avoid the bomb!",
+        "description": "Drag your avatar to collect ENBs and avoid bombs. Earn points and climb the leaderboard!",
+        "screenshotUrls": ["https://blast.enb.fun/screenshot.png"],
+        "iconUrl": "https://blast.enb.fun/icon.png",
+        "splashImageUrl": "https://blast.enb.fun/icon.png",
+        "splashBackgroundColor": "#000000",
+        "homeUrl": "https://blast.enb.fun",
+        "imageUrl": "https://blast.enb.fun/hero.png",
+        "webhookUrl": "https://blast.enb.fun/api/webhook",
+        "primaryCategory": "games",
+        "tags": ["games", "social", "fun"],
+        "heroImageUrl": "https://blast.enb.fun/hero.png",
+        "ogTitle": "Collect ENBs, avoid the bomb!",
+        "ogDescription": "Drag your avatar to collect ENBs and avoid bombs. Earn points and climb the leaderboard!",
+        "ogImageUrl": "https://blast.enb.fun/hero.png",
+        "tagline": "Collect ENBs, avoid the bomb!",
+        "noindex": "true"
+    }
+}

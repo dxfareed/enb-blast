@@ -161,38 +161,16 @@ const client = createClient();
 
 function getUrlHost(request: NextRequest) {
     const origin = request.headers.get("origin");
-    if (origin) {
-      try {
-        const url = new URL(origin);
-        return url.host;
-      } catch (error) {
-        console.warn("Invalid origin header:", origin, error);
-      }
-    }
-  
-    // Fallback to Host header
+    if (origin) { try { return new URL(origin).host; } catch (e) { console.warn("Invalid origin:", e); } }
     const host = request.headers.get("host");
-    if (host) {
-      return host;
-    }
-  
-    // Final fallback to environment variables
-    let urlValue: string;
-    if (process.env.VERCEL_ENV === "production") {
-      urlValue = process.env.NEXT_PUBLIC_URL!;
-    } else if (process.env.VERCEL_URL) {
-      urlValue = `https://${process.env.VERCEL_URL}`;
-    } else {
-      urlValue = "http://localhost:3000";
-    }
-  
-    const url = new URL(urlValue);
-    return url.host;
-  }
+    if (host) { return host; }
+    const vercelUrl = process.env.VERCEL_URL;
+    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
+    return new URL(urlValue).host;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('Starting POST /api/user/profile handler');
     const authorization = req.headers.get("Authorization");
     if (!authorization || !authorization.startsWith("Bearer ")) {
         return NextResponse.json({ message: "Missing token" }, { status: 401 });
@@ -206,7 +184,6 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { fid, walletAddress } = body;
-    console.log('Received registration request:', { fid, walletAddress });
 
     if (authenticatedFid !== fid) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -220,21 +197,12 @@ export async function POST(req: NextRequest) {
 
     const existingUser = await prisma.user.findUnique({ where: { fid: userFid } });
     if (existingUser) {
-      console.log('User already exists:', existingUser);
-
-     const serializableExistingUser = convertBigIntsToStrings(existingUser);
+      // If user exists and is active, it's a normal login. If pending, it's a retry.
+      const serializableExistingUser = convertBigIntsToStrings(existingUser);
       return NextResponse.json(serializableExistingUser, { status: 200 });
     }
 
-    console.log(`Fetching Farcaster profile for FID: ${fid}...`);
     const farcasterProfile = await fetchFarcasterProfile(fid);
-
-    console.log('Attempting to create user in database with real Farcaster data:', {
-      fid: userFid,
-      walletAddress: walletAddress.toLowerCase(),
-      username: farcasterProfile.username,
-      pfpUrl: farcasterProfile.pfpUrl,
-    });
 
     const newUser = await prisma.user.create({
       data: {
@@ -242,10 +210,10 @@ export async function POST(req: NextRequest) {
         walletAddress: walletAddress.toLowerCase(),
         username: farcasterProfile.username,
         pfpUrl: farcasterProfile.pfpUrl,
+        registrationStatus: 'PENDING', // Explicitly set status
       },
     });
 
-    console.log('User created successfully:', newUser);
     const serializableNewUser = convertBigIntsToStrings(newUser);
     return NextResponse.json(serializableNewUser, { status: 201 });
 
@@ -256,7 +224,5 @@ export async function POST(req: NextRequest) {
     console.error("Failed to create user:", error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json({ message: errorMessage }, { status: 500 });
-  } finally {
-    await prisma.$disconnect().catch(e => console.error('Error disconnecting from database:', e));
   }
 }

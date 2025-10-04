@@ -3,16 +3,17 @@
 import { useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import styles from './AddAppBanner.module.css';
-import { useUser } from '@/app/context/UserContext';
 
-export default function AddAppBanner() {
+export default function AddAppBanner({ onAppAdded }: { onAppAdded: () => void }) {
   const [isAdding, setIsAdding] = useState(false);
-  const { userProfile } = useUser();
 
   const handleAddApp = async () => {
     setIsAdding(true);
     try {
       const result = await sdk.actions.addFrame();
+      if (result) {
+        onAppAdded();
+      }
     } catch (error) {
       console.error("Error attempting to add app:", error);
     } finally {

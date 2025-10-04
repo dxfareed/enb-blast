@@ -30,12 +30,34 @@ export default function GamePage() {
     const [claimButtonText, setClaimButtonText] = useState('');
     const [isMuted, setIsMuted] = useState(false);
     const { context } = useMiniApp();
-    const isMiniAppAdded = (context as any)?.added;
+    const [showAddAppBanner, setShowAddAppBanner] = useState(false);
+
+    useEffect(() => {
+        // Show banner only if the context is loaded and the app is not added.
+        if (context && context.client?.added === false) {
+            setShowAddAppBanner(true);
+        }
+    }, [context]);
+
     const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
 
     const toggleMute = () => {
         setIsMuted(prevState => !prevState);
     };
+    useEffect(() => {
+        if (userProfile?.lastMultiplierUsedAt) {
+            const lastUsedDate = new Date(userProfile.lastMultiplierUsedAt);
+            const now = new Date();
+            if (
+                lastUsedDate.getUTCFullYear() === now.getUTCFullYear() &&
+                lastUsedDate.getUTCMonth() === now.getUTCMonth() &&
+                lastUsedDate.getUTCDate() === now.getUTCDate()
+            ) {
+                setIsMultiplierUsed(true);
+            }
+        }
+    }, [userProfile]);
+
     const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
     const handleClaim = async () => {
@@ -78,9 +100,18 @@ export default function GamePage() {
     sdk.haptics.impactOccurred('heavy');
     setIsMultiplierLoading(true);
 
-    const multipliedScore = finalScore * 2;
-
     try {
+        const multiplierResponse = await sdk.quickAuth.fetch('/api/game/use-multiplier', {
+            method: 'POST',
+        });
+
+        if (!multiplierResponse.ok) {
+            const errorData = await multiplierResponse.json();
+            throw new Error(errorData.message || 'Could not activate multiplier.');
+        }
+
+        const multipliedScore = finalScore * 2;
+
         if (!userProfile?.fid) {
             await refetchUserProfile();
             if (!userProfile?.fid) throw new Error("User profile could not be loaded.");
@@ -119,11 +150,12 @@ export default function GamePage() {
             setClaimButtonText(`Claim ${(multipliedScore / 10).toFixed(1)} $ENB`);
             setToast({ message: "Success! Score shared & doubled!", type: 'success' });
         } else {
-            setToast({ message: "Sharing cancelled. Multiplier not applied.", type: 'error' });
+            // Note: We don't revert the multiplier usage here. Once activated, it's considered used for the day.
+            setToast({ message: "Sharing cancelled. Multiplier is active for your next claim today.", type: 'error' });
         }
     } catch (error) {
         console.error("Sharing failed:", error);
-        setToast({ message: `An error occurred. Multiplier not applied.`, type: 'error' });
+        setToast({ message: (error as Error).message || `An error occurred. Multiplier not applied.`, type: 'error' });
     } finally {
         setIsMultiplierLoading(false);
     }
@@ -167,7 +199,7 @@ export default function GamePage() {
 
     return (
         <div className={styles.gameContainer}>
-            {isMiniAppAdded === false && <AddAppBanner />}
+            {!showAddAppBanner && <AddAppBanner onAppAdded={() => setShowAddAppBanner(false)} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
             <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
             <div className={styles.actionContainer}>
@@ -184,7 +216,7 @@ export default function GamePage() {
                                         >
                                             {isSignatureLoading ? 'Preparing...' :
                                                 isWritePending ? 'Check Wallet...' :
-                                                    isConfirming ? 'Confirming on-chain...' :
+                                                    isConfirming ? 'Confirming...' :
                                                         claimButtonText}
                                         </button>
                                         <button

@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import "dotenv/config";
 
 const prisma = new PrismaClient();
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY || "";
+const NEYNAR_API_KEY =process.env.NEYNAR_API_KEY || "";
 
 if (!NEYNAR_API_KEY) {
   console.error("NEYNAR_API_KEY is not set in the environment variables.");
@@ -27,7 +27,7 @@ async function sendNotification() {
     const users = await prisma.user.findMany({
       where: {
         fid: {
-          not: null,
+          gt: 0,
         },
       },
       select: {
@@ -43,13 +43,13 @@ async function sendNotification() {
       console.log("No users to notify.");
       return;
     }
-
+/* 
     console.log(`Sending notification to ${fids.length} users...`);
     console.log(`Title: ${notificationMessage.title}`);
-    console.log(`Body: ${notificationMessage.body}`);
+    console.log(`Body: ${notificationMessage.body}`); */
 
     const result = await client.publishFrameNotifications({
-      targetFids: fids,
+      targetFids: [849768],
       notification: {
         ...notificationMessage,
         target_url: process.env.NEXT_PUBLIC_URL || "https://example.com",

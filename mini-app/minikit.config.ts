@@ -7,9 +7,9 @@ const ROOT_URL = process.env.NEXT_PUBLIC_URL || process.env.VERCEL_URL;
  */
 export const minikitConfig = {
   accountAssociation: {
-    header: "",
-    payload: "",
-    signature: "",
+    header: process.env.NEXT_PUBLIC_HEADER,
+    payload: process.env.NEXT_PUBLIC_PAYLOAD,
+    signature: process.env.NEXT_PUBLIC_SIGNATURE,
   },
   "baseBuilder": {
     "allowedAddresses": [process.env.NEXT_PUBLIC_BASEBUILDER_ALLOWED_ADDRESS || ''],
@@ -19,7 +19,7 @@ export const minikitConfig = {
     name: "ENB Blast",
     subtitle: "Collect ENBs, avoid the bomb!",
     description: "Drag your avatar to collect ENBs and avoid bombs. Earn points and climb the leaderboard!",
-    screenshotUrls: [],
+    screenshotUrls: [`${ROOT_URL}/screenshot.png`],
     iconUrl: `${ROOT_URL}/icon.png`,
     splashImageUrl: `${ROOT_URL}/icon.png`,
     splashBackgroundColor: "#000000",

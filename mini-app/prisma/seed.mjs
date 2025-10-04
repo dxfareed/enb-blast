@@ -16,7 +16,7 @@ const tasks = [
   { title: 'SuperBased Membership', description: 'Achieve the SuperBased membership level.', rewardPoints: 100, type: TaskType.DEFAULT, checkKey: 'MEMBERSHIP_SUPERBASED' },
   { title: 'Legendary Membership', description: 'Achieve the Legendary membership level.', rewardPoints: 200, type: TaskType.DEFAULT, checkKey: 'MEMBERSHIP_LEGENDARY' },
   { title: 'Play the Game', description: 'Play at least one round of ENB Blast.', rewardPoints: 10, type: TaskType.DAILY, checkKey: 'GAME_PLAYED' },
-  { title: 'Claim Your Tokens', description: 'Make a successful on-chain claim.', rewardPoints: 10, type: TaskType.DAILY, checkKey: 'TOKEN_CLAIMED' },
+  { title: 'Claim Your Tokens', description: 'Make a successful claim.', rewardPoints: 10, type: TaskType.DAILY, checkKey: 'TOKEN_CLAIMED' },
   { title: 'Visit the Leaderboard', description: 'Check out the competition.', rewardPoints: 10, type: TaskType.DAILY, actionUrl: '/dashboard/leaderboard', checkKey: 'LEADERBOARD_VISIT' },
   { title: 'Use the ENB Mining App', description: 'Engage with the ENB ecosystem by using the ENB Mining App.', rewardPoints: 100, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/4uqcueQifUYV/enb-mining', checkKey: 'MINI_APP_OPEN_MINING' },
   { title: 'Use the ENB Bounty App', description: 'Explore bounties and opportunities within the ENB ecosystem through the Bounty App.', rewardPoints: 100, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/0GzdUkFK2f7A/enb-bounty', checkKey: 'MINI_APP_OPEN_BOUNTY' },

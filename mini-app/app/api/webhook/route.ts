@@ -16,6 +16,7 @@ const neynarClient = new NeynarAPIClient(config);
 
 export async function POST(req: NextRequest) {
   if (!NEYNAR_API_KEY) {
+    console.error("Neynar API key is not configured.");
     return NextResponse.json({ message: "Neynar API key is not configured." }, { status: 500 });
   }
 
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
       const { fid, username } = body.data.user;
 
       if (!fid) {
+        console.error("FID not found in webhook payload.");
         return NextResponse.json({ message: "FID not found in webhook payload." }, { status: 400 });
       }
 

@@ -6,7 +6,7 @@ const ws = process.env.NEXT_PUBLIC_WS
 export const config = createConfig({
   chains: [base],
   transports: {
-    [base.id]: webSocket(ws),
+    [base.id]: webSocket("wss://base-rpc.publicnode.com"), // limit on private 
   },
   connectors: [
     farcasterMiniApp()

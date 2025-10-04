@@ -129,7 +129,7 @@ const client = createPublicClient({
 async function main() {
   console.log("🚀 Starting viem-based indexer...");
 
-  const contractAddress = "0x854cec65437d6420316b2eb94fecaaf417690227";
+  const contractAddress = "0x03b922ee0573e52e09e6c8033c012500487a2384";
   if (!contractAddress) {
     throw new Error("Contract address not found.");
   }

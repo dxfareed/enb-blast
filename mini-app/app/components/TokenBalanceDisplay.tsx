@@ -1,35 +1,44 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { TOKEN_ADDRESS } from '@/app/utils/constants';
 import styles from './TokenBalanceDisplay.module.css';
 
 export default function TokenBalanceDisplay() {
-  const [hasMounted, setHasMounted] = useState(false);
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, isConnecting } = useAccount();
 
-  const { data: balanceData, isLoading } = useBalance({
+  const { data: balanceData, isLoading, isError, refetch } = useBalance({
     address: address,
     token: TOKEN_ADDRESS,
     query: {
       refetchInterval: 5000,
+      enabled: isConnected, // Only fetch if connected
     },
   });
 
+  // Effect to auto-retry on error
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
+    if (isError) {
+      console.log("Balance fetch error, retrying in 3 seconds...");
+      const timer = setTimeout(() => {
+        refetch();
+      }, 3000); // 3-second delay
 
-  if (!hasMounted) {
-    return <div className={styles.tokenBadge}>...</div>;
+      return () => clearTimeout(timer); // Cleanup timer
+    }
+  }, [isError, refetch]);
+
+  if (isConnecting) {
+    return <div className={styles.tokenBadge}>Connecting...</div>;
   }
 
   if (!isConnected) {
     return <div className={styles.tokenBadge}>Not Connected</div>;
   }
 
-  if (isLoading) {
+  // Show loading state while fetching or retrying after an error
+  if (isLoading || isError) {
     return <div className={styles.tokenBadge}>Loading...</div>;
   }
 
@@ -37,7 +46,7 @@ export default function TokenBalanceDisplay() {
 
   return (
     <div className={styles.tokenBadge}>
-      {formattedBalance} ${balanceData?.symbol || 'USDC'}
+      {formattedBalance} ${balanceData?.symbol || 'ENB'}
     </div>
   );
 }
