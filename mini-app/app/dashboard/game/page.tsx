@@ -9,8 +9,10 @@ import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
 import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
+import { useMiniApp } from '@neynar/react';
+import AddAppBanner from '@/app/components/AddAppBanner';
 
-const GAME_CONTRACT_ADDRESS = '0x854cec65437d6420316b2eb94fecaaf417690227';
+const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
 const GAME_CONTRACT_ABI = [{ "inputs": [{ "internalType": "uint256", "name": "_amount", "type": "uint256" }, { "internalType": "bytes", "name": "_signature", "type": "bytes" }], "name": "claimTokens", "outputs": [], "stateMutability": "nonpayable", "type": "function" }];
 
 export default function GamePage() {
@@ -27,12 +29,35 @@ export default function GamePage() {
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
     const [isMuted, setIsMuted] = useState(false);
+    const { context } = useMiniApp();
+    const [showAddAppBanner, setShowAddAppBanner] = useState(false);
+
+    useEffect(() => {
+        // Show banner only if the context is loaded and the app is not added.
+        if (context && context.client?.added === false) {
+            setShowAddAppBanner(true);
+        }
+    }, [context]);
 
     const { data: hash, writeContract, isPending: isWritePending, error: writeError, reset: resetWriteContract } = useWriteContract();
 
     const toggleMute = () => {
         setIsMuted(prevState => !prevState);
     };
+    useEffect(() => {
+        if (userProfile?.lastMultiplierUsedAt) {
+            const lastUsedDate = new Date(userProfile.lastMultiplierUsedAt);
+            const now = new Date();
+            if (
+                lastUsedDate.getUTCFullYear() === now.getUTCFullYear() &&
+                lastUsedDate.getUTCMonth() === now.getUTCMonth() &&
+                lastUsedDate.getUTCDate() === now.getUTCDate()
+            ) {
+                setIsMultiplierUsed(true);
+            }
+        }
+    }, [userProfile]);
+
     const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
     const handleClaim = async () => {
@@ -56,6 +81,7 @@ export default function GamePage() {
             }
             const { signature } = await signatureResponse.json();
             writeContract({
+                //@ts-ignore
                 address: GAME_CONTRACT_ADDRESS,
                 abi: GAME_CONTRACT_ABI,
                 functionName: 'claimTokens',
@@ -69,54 +95,71 @@ export default function GamePage() {
     };
 
     const handleShareScoreFrame = async () => {
-        sdk.haptics.impactOccurred('heavy');
-        setIsMultiplierLoading(true); // Reusing this state for sharing loading
-        try {
-            await refetchUserProfile(); // Refetch to get the latest user data
+    if (isMultiplierUsed || isMultiplierLoading) return;
 
-            const appUrl = process.env.NEXT_PUBLIC_URL || '';
-            const username = userProfile?.username || '@johndoe';
-            const pfpUrl = userProfile?.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg';
-            const streak = userProfile?.streak || 0;
-            const claimed = userProfile?.totalClaimed || 0;
-            const weeklyPoints = userProfile?.weeklyPoints || 0;
-            const fid = userProfile?.fid;
+    sdk.haptics.impactOccurred('heavy');
+    setIsMultiplierLoading(true);
 
-            let rank = 'N/A';
-            if (fid) {
-                try {
-                    const response = await fetch(`/api/leaderboard?fid=${fid}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.rank) {
-                            rank = data.rank.toString();
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error fetching rank:", error);
-                }
-            }
+    try {
+        const multiplierResponse = await sdk.quickAuth.fetch('/api/game/use-multiplier', {
+            method: 'POST',
+        });
 
-            const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}`;
-            const castText = `I just scored ${finalScore} in ENB Pop! Can you beat my score? Play now!`;
-            
-            const result = await sdk.actions.composeCast({
-                text: castText,
-                embeds: [frameUrl], // Embed our dynamic frame page
-            });
-
-            if (result.cast) {
-                setToast({ message: "Score shared successfully!", type: 'success' });
-            } else {
-                setToast({ message: "Sharing was cancelled.", type: 'error' });
-            }
-        } catch (error) {
-            console.error("Sharing failed:", error);
-            setToast({ message: "An error occurred while sharing your score.", type: 'error' });
-        } finally {
-            setIsMultiplierLoading(false);
+        if (!multiplierResponse.ok) {
+            const errorData = await multiplierResponse.json();
+            throw new Error(errorData.message || 'Could not activate multiplier.');
         }
-    };
+
+        const multipliedScore = finalScore * 2;
+
+        if (!userProfile?.fid) {
+            await refetchUserProfile();
+            if (!userProfile?.fid) throw new Error("User profile could not be loaded.");
+        }
+
+        const [leaderboardData] = await Promise.all([
+            fetch(`/api/leaderboard?fid=${userProfile.fid}`)
+                .then(res => res.ok ? res.json() : null)
+                .catch(error => {
+                    console.error("Leaderboard fetch failed:", error);
+                    return null;
+                }),
+            refetchUserProfile()
+        ]);
+
+        const appUrl = process.env.NEXT_PUBLIC_URL || '';
+        const username = userProfile.username || '@johndoe';
+        const pfpUrl = userProfile.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU-C9_400x400.jpg';
+        const streak = userProfile.streak || 0;
+        const claimed = userProfile.totalClaimed || 0;
+        const weeklyPoints = userProfile.weeklyPoints || 0;
+        const fid = userProfile.fid;
+        const rank = leaderboardData?.rank?.toString() || 'N/A';
+
+        const frameUrl = `${appUrl}/share-frame?score=${multipliedScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}`;
+        const castText = `I just scored ${multipliedScore} points and earned ${multipliedScore/10} $ENB from the ENB BLAST mini app.\nGo claim yours now!`;
+
+        const result = await sdk.actions.composeCast({
+            text: castText,
+            embeds: [frameUrl],
+        });
+
+        if (result.cast) {
+            setFinalScore(multipliedScore);
+            setIsMultiplierUsed(true);
+            setClaimButtonText(`Claim ${(multipliedScore / 10).toFixed(1)} $ENB`);
+            setToast({ message: "Success! Score shared & doubled!", type: 'success' });
+        } else {
+            // Note: We don't revert the multiplier usage here. Once activated, it's considered used for the day.
+            setToast({ message: "Sharing cancelled. Multiplier is active for your next claim today.", type: 'error' });
+        }
+    } catch (error) {
+        console.error("Sharing failed:", error);
+        setToast({ message: (error as Error).message || `An error occurred. Multiplier not applied.`, type: 'error' });
+    } finally {
+        setIsMultiplierLoading(false);
+    }
+};
 
     const handleGameWin = useCallback((scoreFromGame: number) => {
         setIsClaimUnlocked(true);
@@ -156,6 +199,7 @@ export default function GamePage() {
 
     return (
         <div className={styles.gameContainer}>
+            {!showAddAppBanner && <AddAppBanner onAppAdded={() => setShowAddAppBanner(false)} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
             <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
             <div className={styles.actionContainer}>
@@ -172,16 +216,15 @@ export default function GamePage() {
                                         >
                                             {isSignatureLoading ? 'Preparing...' :
                                                 isWritePending ? 'Check Wallet...' :
-                                                    isConfirming ? 'Confirming on-chain...' :
+                                                    isConfirming ? 'Confirming...' :
                                                         claimButtonText}
                                         </button>
-                                        {/* Multiplier button replaced with Share Score button */}
                                         <button
                                             onClick={handleShareScoreFrame}
-                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading}
+                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isMultiplierUsed}
                                             className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
                                         >
-                                            {isMultiplierLoading ? 'Sharing...' : 'Share Score'}
+                                            {isMultiplierLoading ? '2xing' : isMultiplierUsed ? '2x\'\ed!' : '2x'}
                                         </button>
                                     </div>
                                 </>
@@ -199,6 +242,10 @@ export default function GamePage() {
                 ) : (
                     <button disabled className={styles.claimButton}>Survive to Unlock Claim</button>
                 )}
+                    {/* <button onClick={addMiniApp} className={styles.notificationButton}>
+                    <Bell size={20} color="white" />
+                    <span>Enable Notifications</span>
+                </button> */}
                 <div className={styles.statusMessage}>
                     {userProfile && typeof userProfile.claimsToday === 'number' && (<p>Claims left: {5 - userProfile.claimsToday}</p>)}
                 </div>

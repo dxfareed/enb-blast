@@ -5,11 +5,11 @@
   width: 50px;
   height: 50px;
   border-radius: 9999px;
-  background-color: #93c5fd; /* Fallback color */
+  background-color: #93c5fd;
   border: 3px solid white;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   user-select: none;
-  pointer-events: none; /* Allows pointer events to pass through to the game area */
+  pointer-events: none;
   z-index: 100;
 }
 
@@ -18,4 +18,13 @@
   height: 100%;
   border-radius: 9999px;
   object-fit: cover;
+}
+
+@keyframes flashAnimation {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+.invincibleEffect {
+  animation: flashAnimation 250ms linear infinite;
 }

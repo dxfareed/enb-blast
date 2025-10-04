@@ -1,12 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useConnect } from 'wagmi';
+import { useState, useEffect} from 'react';
+import { useAccount, useWriteContract, useConnect, useWaitForTransactionReceipt } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Toast from '@/app/components/Toast';
 import styles from './register.module.css';
 import animationStyles from '../../animations.module.css';
+import { useUser } from '@/app/context/UserContext';
 
 const ParticleBackground = dynamic(() => import('./particles'), {
   ssr: false,
@@ -28,94 +29,100 @@ export default function RegisterPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { address, isConnected } = useAccount();
-  const [user_fid, setUserFid] = useState<number | null>(null);
   const router = useRouter();
   const { connect, connectors } = useConnect();
+  const { userProfile, fid } = useUser();
+
+  console.log('UserProfile:', userProfile?.fid);
+  
+  useEffect(() => {
+    if (userProfile && userProfile.registrationStatus === 'ACTIVE') {
+      router.replace('/dashboard/game');
+    }
+  }, [userProfile, router]);
   
   const { 
+    data: hash,
     writeContract, 
     isPending: isSendingTransaction, 
-    isSuccess: isTransactionSent, 
     error: writeContractError 
   } = useWriteContract();
 
+  const { 
+    isLoading: isConfirming, 
+    isSuccess: isConfirmed, 
+    error: confirmationError 
+  } = useWaitForTransactionReceipt({ hash });
+
   useEffect(() => {
-    console.log('Attempting to get Farcaster user context...');
-    async function getFarcasterUser() {
-      try {
-        const { user } = await sdk.context;
-        if (user) {
-          console.log('Farcaster user found:', user);
-          setUserFid(user.fid);
-        } else {
-          console.log('No Farcaster user found in context.');
+    async function activateUser() {
+      if (isConfirmed && hash) {
+        setLoadingMessage('VERIFYING ON BASESCAN...');
+        try {
+          const activateResponse = await sdk.quickAuth.fetch('/api/user/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ txHash: hash }),
+          });
+
+          if (!activateResponse.ok) {
+            const errorData = await activateResponse.json();
+            throw new Error(errorData.message || 'Failed to activate user.');
+          }
+
+          setLoadingMessage('SUCCESS! REDIRECTING...');
+          setTimeout(() => {
+            router.push('/dashboard/game');
+          }, 1000);
+
+        } catch (error) {
+          setToast({ message: `Activation failed: ${(error as Error).message}`, type: 'error' });
+          setLoadingMessage('');
         }
-      } catch (err) {
-        console.error('Error getting Farcaster user:', err);
       }
     }
-    getFarcasterUser();
-  }, []);
+    activateUser();
+  }, [isConfirmed, hash, router]);
 
   useEffect(() => {
-    if (isTransactionSent) {
-      setLoadingMessage('SUCCESS! REDIRECTING...');
-      // Add a small delay so user can see the success message
-      setTimeout(() => {
-        router.push('/dashboard/game');
-      }, 1000);
-    }
-  }, [isTransactionSent, router]);
-
-  useEffect(() => {
-    if (writeContractError) {
-      console.error('Error from useWriteContract:', writeContractError);
-      const message = 'shortMessage' in writeContractError ? writeContractError.shortMessage : writeContractError.message;
-      setToast({ message: `On-chain registration failed: ${message}`, type: 'error' });
+    const error = writeContractError || confirmationError;
+    if (error) {
+      const message = 'shortMessage' in error ? error.shortMessage : error.message;
+      setToast({ message: `registration failed: ${message}`, type: 'error' });
       setLoadingMessage('');
     }
-  }, [writeContractError]);
+  }, [writeContractError, confirmationError]);
 
   async function handleClick() {
     setIsPopping(true);
     setTimeout(() => setIsPopping(false), 500);
 
-    console.log('[REGISTRATION] Button clicked.');
     if (!isConnected || !address) {
       setToast({ message: 'Please connect your wallet first.', type: 'error' });
       return;
     }
-    if (!user_fid) {
+    if (!fid) {
       setToast({ message: 'Farcaster user not found. Please open this in a Farcaster client.', type: 'error' });
       return;
     }
 
-    if (loadingMessage) return; // Prevent multiple clicks
+    if (isLoading) return;
 
     try {
-      // Step 1: Create profile in the database
       setLoadingMessage('CREATING PROFILE...');
       
       const profileResponse = await sdk.quickAuth.fetch('/api/user/profile', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ fid: user_fid, walletAddress: address }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid: fid, walletAddress: address }),
       });
 
       if (!profileResponse.ok) {
-        if (profileResponse.status === 500) throw new Error('Server timeout, please try again.');
-        if (profileResponse.status === 401) throw new Error('Authentication error. Are you in a Farcaster client?');
-        if (profileResponse.status === 400) throw new Error('Invalid data. Please try again.');
-
         const errorData = await profileResponse.json();
         throw new Error(errorData.message || 'Failed to create profile.');
       }
-      console.log('[REGISTRATION] Profile created successfully.');
 
-      // Step 2: Register on-chain
-      setLoadingMessage('PLEASE CONFIRM IN WALLET...');
+      setLoadingMessage('WAITING...');
       writeContract({
         address: GAME_CONTRACT_ADDRESS,
         abi: GAME_ABI,
@@ -123,7 +130,6 @@ export default function RegisterPage() {
       });
 
     } catch (error) {
-      console.error('[REGISTRATION] Failed:', error);
       setToast({ message: `Registration failed: ${(error as Error).message}`, type: 'error' });
       setLoadingMessage('');
     }
@@ -138,11 +144,12 @@ export default function RegisterPage() {
   }
   
   const getLoadingState = () => {
-    if (isSendingTransaction) return 'SENDING TRANSACTION...';
+    if (isSendingTransaction) return 'CHECK WALLET...';
+    if (isConfirming) return 'CONFIRMING...';
     return loadingMessage || 'REGISTER';
   }
 
-  const isLoading = !!loadingMessage;
+  const isLoading = !!loadingMessage || isSendingTransaction || isConfirming;
 
   return (
     <div className={styles.container}>

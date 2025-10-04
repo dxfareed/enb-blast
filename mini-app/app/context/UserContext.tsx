@@ -18,6 +18,8 @@ type UserProfile = {
   claimsToday: number;
   lastClaimDate: string | null; // DateTime is stringified
   lastClaimedAt: string | null; // DateTime is stringified
+  lastMultiplierUsedAt: string | null; // DateTime is stringified
+  registrationStatus: 'PENDING' | 'ACTIVE';
   createdAt: string;     // DateTime is stringified
   weeklyRank: number;
 };

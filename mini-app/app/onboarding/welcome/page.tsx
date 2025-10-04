@@ -30,8 +30,14 @@ export default function WelcomePage() {
 
       const response = await fetch(`/api/user/profile?fid=${fid}`);
       if (response.ok) {
-        console.log('User is registered, go to game');
-        router.push('/dashboard/game');
+        const user = await response.json();
+        if (user.registrationStatus === 'ACTIVE') {
+          console.log('User is registered and active, go to game');
+          router.push('/dashboard/game');
+        } else {
+          console.log('User is pending, go to register');
+          router.push('/onboarding/register');
+        }
       } else if (response.status === 500) {
         setToast({ message: 'Server timeout. Please try again in a moment.', type: 'error' });
         setTimeout(() => {

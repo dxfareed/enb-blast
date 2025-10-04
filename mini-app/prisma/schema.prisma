@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../app/generated/prisma"
 }
 
 generator scripts {
@@ -26,11 +25,19 @@ model User {
   weeklyPoints  BigInt    @default(0)
   claimsToday   Int       @default(0)
   lastClaimDate DateTime?
+  claimWindowStart DateTime?
   lastClaimedAt DateTime?
+  lastMultiplierUsedAt DateTime?
+  registrationStatus RegistrationStatus @default(PENDING)
   createdAt     DateTime  @default(now())
   claims        Claim[]
   taskCompletions UserTaskCompletion[]
   events        UserEvent[]
+}
+
+enum RegistrationStatus {
+  PENDING
+  ACTIVE
 }
 
 model Claim {

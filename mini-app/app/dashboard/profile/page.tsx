@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, BarChart2, Droplets } from 'lucide-react';
+import { Star, BarChart2, Droplets, Share } from 'lucide-react';
 import styles from './page.module.css';
 import { useUser } from '@/app/context/UserContext';
 import { useAccount, useReadContract } from 'wagmi';
+import { sdk } from '@farcaster/miniapp-sdk'; // Added sdk import
 import {
   TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
   TOKEN_MEMBERSHIP_CONTRACT_ABI,
@@ -19,6 +20,7 @@ type UserProfile = {
   totalPoints: string;
   totalClaimed: string;
   weeklyRank?: number; 
+  fid: number;
 };
 
 export default function ProfilePage() {
@@ -39,6 +41,41 @@ export default function ProfilePage() {
 
   const isLoading = isUserLoading || (!!address && isContractLoading);
 
+  const handleShare = async () => {
+    if (!userProfile){
+      console.error("User profile is not loaded yet.");  
+      return
+    };
+
+    const appUrl = process.env.NEXT_PUBLIC_URL || '';
+    const shareUrl = new URL(`${appUrl}/share-frame`);
+
+    shareUrl.searchParams.append('fid', String(userProfile.fid));
+    shareUrl.searchParams.append('username', userProfile.username || '');
+    shareUrl.searchParams.append('pfpUrl', userProfile.pfpUrl || '');
+    shareUrl.searchParams.append('streak', String(userProfile.streak));
+    shareUrl.searchParams.append('claimed', userProfile.totalClaimed);
+    shareUrl.searchParams.append('weeklyPoints', userProfile.totalPoints); // Use totalPoints for weeklyPoints in frame
+    if (userProfile.weeklyRank !== undefined) {
+      shareUrl.searchParams.append('rank', String(userProfile.weeklyRank));
+    }
+
+    const finalShareUrl = shareUrl.toString();
+    const castText = `Check out my ENB Blast Stats!`; // Generic text for profile share
+
+    try {
+      await sdk.actions.composeCast({
+        text: castText,
+        embeds: [finalShareUrl],
+      });
+      console.log('Profile frame shared successfully!');
+      // Optionally, add a toast notification here
+    } catch (error) {
+      console.error('Error sharing profile frame:', error);
+      // Optionally, add an error toast notification here
+    }
+  };
+
   if (isLoading) return <Loader />;
   if (!userProfile) return <div>Could not find user profile.</div>;
 
@@ -53,8 +90,11 @@ export default function ProfilePage() {
           style={{ borderRadius: '9999px', objectFit: 'cover' }}
         />
       </div>
-      <h2 className={styles.username}>@{userProfile.username}</h2>
-
+      <h2 className={styles.username}>@{userProfile.username}
+        <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px' }} title="Share Profile">
+        <Share size={19} color="rgba(31, 105, 241, 1)" />
+        </button>
+      </h2>
       <div className={styles.statsGrid}>
         <div className={`${styles.statCard} ${styles.streakCard}`}>
           <p className={styles.statLabel}>Streak</p>
@@ -80,7 +120,7 @@ export default function ProfilePage() {
         </div>
         <div>
           <p className={styles.levelLabel}>Membership Level</p>
-          <p className={styles.levelValue}>{membershipLevelName}</p>
+            <p className={styles.levelValue}>{membershipLevelName}</p>
         </div>
       </div>
     </div>

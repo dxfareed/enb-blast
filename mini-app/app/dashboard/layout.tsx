@@ -1,4 +1,3 @@
-// app/dashboard/layout.tsx
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,13 +9,15 @@ import styles from './layout.module.css';
 import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 import HighlightTooltip from '@/app/components/HighlightTooltip';
 import { TourProvider } from '@/app/context/TourContext';
-import GameInfoModal from '@/app/components/GameInfoModal'; 
+import GameInfoModal from '@/app/components/GameInfoModal';
+import Marquee from '@/app/components/Marquee';
+import { getTokenMarqueeData, TokenMarqueeRawData } from '@/lib/dexscreener';
+import { TOKEN_ADDRESS } from '../utils/constants';
 
 const TOOLTIP_STORAGE_KEY = 'hasSeenDashboardTooltip';
 
 const tourSteps = [
   { id: 'token-balance', text: 'This is your current token balance. Keep an eye on it!', position: 'bottom', alignment: 'left' },
-  { id: 'sound-toggle', text: 'You can mute or unmute game sounds here.', position: 'bottom', alignment: 'right' },
   { id: 'home', text: 'Play the game and earn points from the home page.', alignment: 'left' },
   { id: 'tasks', text: 'Complete daily tasks to boost your earnings!', alignment: 'center' },
   { id: 'leaderboard', text: 'See how you rank against other players.', alignment: 'center' },
@@ -40,6 +41,9 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [activeTourStep, setActiveTourStep] = useState(-1);
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
+  
+  const [tokenData, setTokenData] = useState<TokenMarqueeRawData | null>(null);
+  const [isLoadingTokenData, setIsLoadingTokenData] = useState(true);
 
   useEffect(() => {
     if (!isLoading && userProfile) {
@@ -51,16 +55,24 @@ export default function DashboardLayout({
   }, [userProfile, isLoading]);
 
   useEffect(() => {
-    if (activeTourStep >= 0 && activeTourStep < tourSteps.length) {
-      const timer = setTimeout(() => { setActiveTourStep(p => p + 1); }, 2500);
-      return () => clearTimeout(timer);
-    } else if (activeTourStep >= tourSteps.length) {
-      handleDismissTour();
-      setIsInfoModalVisible(true);
-    }
-  }, [activeTourStep]);
+    const loadTokenData = async () => {
+      const data = await getTokenMarqueeData(TOKEN_ADDRESS);
 
-    useEffect(() => {
+      if (data) {
+        setTokenData(data);
+      }
+      setIsLoadingTokenData(false);
+    };
+
+    loadTokenData();
+
+    const fiveMinutesInMs = 5 * 60 * 1000;
+    const intervalId = setInterval(loadTokenData, fiveMinutesInMs);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
     if (!userProfile?.fid) return;
 
     const checkTaskStatus = async () => {
@@ -85,6 +97,17 @@ export default function DashboardLayout({
     setActiveTourStep(-1);
   };
 
+  const handleNextStep = () => {
+    if (activeTourStep < tourSteps.length - 1) {
+      setActiveTourStep(prev => prev + 1);
+    }
+  };
+
+  const handleFinishTour = () => {
+    handleDismissTour();
+    setIsInfoModalVisible(true);
+  };
+
   const handleCloseModal = () => {
     setIsInfoModalVisible(false);
   };
@@ -94,9 +117,11 @@ export default function DashboardLayout({
     tourSteps
   }), [activeTourStep]);
 
+  const isLastStep = activeTourStep === tourSteps.length - 1;
+
   return (
     <TourProvider value={tourContextValue}>
-       <GameInfoModal show={isInfoModalVisible} onClose={handleCloseModal} />
+      <GameInfoModal show={isInfoModalVisible} onClose={handleCloseModal} />
       <div className={styles.container}>
         {activeTourStep > -1 && (
           <button onClick={handleDismissTour} className={styles.skipButton}>
@@ -111,13 +136,16 @@ export default function DashboardLayout({
               show={tourSteps[activeTourStep]?.id === 'token-balance'}
               position="bottom"
               alignment="left"
+              onNext={handleNextStep}
+              isLastStep={false}
             >
               <TokenBalanceDisplay />
             </HighlightTooltip>
 
             <div aria-hidden className={styles.spacer} />
-
           </header>
+
+          <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS}/>
 
           <main className={styles.main}>
             {children}
@@ -127,6 +155,8 @@ export default function DashboardLayout({
             {navItems.map((item) => {
               const Icon = item.icon;
               const tourStep = tourSteps.find(step => step.id === item.id);
+              const isThisItemTheLastStep = tourStep?.id === tourSteps[tourSteps.length - 1].id;
+
               return (
                 <HighlightTooltip
                   key={item.id}
@@ -134,8 +164,8 @@ export default function DashboardLayout({
                   show={tourSteps[activeTourStep]?.id === item.id}
                   position="top"
                   alignment={tourStep?.alignment as any}
-                  
-                  // The incorrect 'className' prop has been removed from here
+                  onNext={isThisItemTheLastStep ? handleFinishTour : handleNextStep}
+                  isLastStep={isThisItemTheLastStep}
                 >
                   <Link href={item.href} className={`${styles.navLink} ${pathname === item.href ? styles.navLinkActive : ''}`}>
                     {item.id === 'tasks' ? (

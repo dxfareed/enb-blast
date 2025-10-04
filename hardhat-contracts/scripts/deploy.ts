@@ -4,7 +4,7 @@ async function main() {
   console.log("Preparing to deploy the Game contract to Base Sepolia...");
 
   const tokenAddress = "0xf73978b3a7d1d4974abae11f696c1b4408c027a0";
-  const initialOwner = "0xE59DF381684a7cf4D3E1177e68569b5D13F9585a";
+  const initialOwner = "0xe59df381684a7cf4d3e1177e68569b5d13f9585a";
   const signerAddress = "0x52c043C7120d7DA35fFdDF6C5c2359d503ceE5F8";
   const constructorArgs = [tokenAddress, initialOwner, signerAddress];
 
@@ -19,7 +19,7 @@ async function main() {
 
   console.log("Deploying contract...");
 
-  const contractArtifact = await hre.artifacts.readArtifact("Game");
+  const contractArtifact = await hre.artifacts.readArtifact("contracts/gamev2.sol:Game");
 
   const deployTxHash = await deployer.deployContract({
     abi: contractArtifact.abi,

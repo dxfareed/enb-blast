@@ -24,13 +24,13 @@ const FINAL_BOMB_CHANCE = 0.25; // 40% chance
 
 // Power-up configuration
 const PICTURE_URL = "/Enb_000.png";
-const POWER_UP_POINT_5_URL = "https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg";
+const POWER_UP_POINT_5_URL = "/powerup_5.jpg";
 const POWER_UP_POINT_5_VALUE = 5;
 const POWER_UP_POINT_5_CHANCE = 0.01;
-const POWER_UP_POINT_10_URL = "https://pbs.twimg.com/profile_images/1945608199500910592/rnk6ixxH_400x400.jpg";
+const POWER_UP_POINT_10_URL = "/powerup_10.jpg";
 const POWER_UP_POINT_10_VALUE = 10;
 const POWER_UP_POINT_10_CHANCE = 0.005;
-const POWER_UP_POINT_2_URL = "https://pbs.twimg.com/profile_images/1878738447067652096/tXQbWfpf_400x400.jpg";
+const POWER_UP_POINT_2_URL = "/powerup_2.jpg";
 const POWER_UP_POINT_2_VALUE = 2;
 const POWER_UP_POINT_2_CHANCE = 0.03;
 
@@ -66,6 +66,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 300 });
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
+  const [isInvincible, setIsInvincible] = useState(false);
   //const [showTooltip, setShowTooltip] = useState(false);
 
   // --- REFS ---
@@ -77,6 +78,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const bombSoundRef = useRef<HTMLAudioElement | null>(null);
   const backgroundSoundRef = useRef<HTMLAudioElement | null>(null);
   const gameOverSoundRef = useRef<HTMLAudioElement | null>(null);
+  const heartbeatSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const gameParamsRef = useRef({
     bombSpeed: INITIAL_BOMB_SPEED,
@@ -89,7 +91,27 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const { activeTourStep, tourSteps } = useTour();
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
 
+  useEffect(() => {
+    const imageUrls = [
+      '/bomb.png',
+      PICTURE_URL,
+      POWER_UP_POINT_5_URL,
+      POWER_UP_POINT_10_URL,
+      POWER_UP_POINT_2_URL,
+      avatarPfp
+    ];
+    imageUrls.forEach(url => {
+      if (url) {
+        const img = new Image();
+        img.src = url;
+      }
+    });
+  }, [avatarPfp]);
+
+  const isInvincibleRef = useRef(isInvincible);
+
   useEffect(() => { scoreRef.current = score; }, [score]);
+  useEffect(() => { isInvincibleRef.current = isInvincible; }, [isInvincible]);
 
   useEffect(() => {
     coinSoundRef.current = new Audio('/sounds/coin.wav');
@@ -105,6 +127,9 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     gameOverSoundRef.current = new Audio('/sounds/game-over.wav');
     gameOverSoundRef.current.load();
     gameOverSoundRef.current.volume = 1.0;
+    heartbeatSoundRef.current = new Audio('/sounds/heartbeat.wav');
+    heartbeatSoundRef.current.load();
+    heartbeatSoundRef.current.volume = 1.0;
   }, []);
 
   // --- GAME CONTROL FUNCTIONS ---
@@ -183,6 +208,23 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   };
 
   useEffect(() => {
+    // This effect manages the audio mix during invincibility
+    if (isInvincible && !isMuted) {
+      heartbeatSoundRef.current?.play().catch(e => console.error("Heartbeat audio play failed:", e));
+      if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.08; // 5%
+      if (coinSoundRef.current) coinSoundRef.current.volume = 0.7;
+    } else {
+      if (heartbeatSoundRef.current) {
+        heartbeatSoundRef.current.pause();
+        heartbeatSoundRef.current.currentTime = 0;
+      }
+      if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.3;
+      if (coinSoundRef.current) coinSoundRef.current.volume = 1.0;
+    }
+  }, [isInvincible, isMuted]);
+
+  useEffect(() => {
+    // This effect manages the background music playback based on game state
     if (gameState === 'playing' && !isMuted) {
       backgroundSoundRef.current?.play().catch(e => console.error("Background audio play failed:", e));
     } else {
@@ -234,44 +276,57 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     const gameLoop = (timestamp: number) => {
       if (!lastSpawnTimeRef.current) lastSpawnTimeRef.current = timestamp;
 
-      if (timestamp - lastSpawnTimeRef.current > gameParamsRef.current.spawnRate) {
+      const shouldSpawn = timestamp - lastSpawnTimeRef.current > gameParamsRef.current.spawnRate;
+      if (shouldSpawn) {
         lastSpawnTimeRef.current = timestamp;
-        const rand = Math.random();
-        let itemType: ItemType = 'picture';
-        const { bombChance } = gameParamsRef.current;
-
-        if (rand < bombChance) { itemType = 'bomb'; }
-        else if (rand < bombChance + POWER_UP_POINT_10_CHANCE) { itemType = 'powerup_point_10'; }
-        else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) { itemType = 'powerup_point_5'; }
-        else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) { itemType = 'powerup_point_2'; }
-
-        const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
-        const newItem: Item = { id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef<HTMLDivElement>() };
-        setItems(prev => [...prev, newItem]);
       }
 
-      setItems(prevItems =>
-        prevItems
-          .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
-          .filter(item => item.y < 450)
-      );
+      setItems(prevItems => {
+        let currentItems = [...prevItems];
 
-      if (avatarRef.current) {
-        const avatarRect = avatarRef.current.getBoundingClientRect();
-        setItems(currentItems => {
+        // 1. Spawn new items
+        if (shouldSpawn) {
+          const rand = Math.random();
+          let itemType: ItemType = 'picture';
+          const { bombChance } = gameParamsRef.current;
+
+          if (rand < bombChance) { itemType = 'bomb'; }
+          else if (rand < bombChance + POWER_UP_POINT_10_CHANCE) { itemType = 'powerup_point_10'; }
+          else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) { itemType = 'powerup_point_5'; }
+          else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) { itemType = 'powerup_point_2'; }
+
+          const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
+          const newItem: Item = { id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef<HTMLDivElement>() };
+          currentItems.push(newItem);
+        }
+
+        // 2. Move items and filter those out of bounds
+        let processedItems = currentItems
+          .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
+          .filter(item => item.y < 450);
+
+
+        // 3. Collision detection
+        if (avatarRef.current) {
+          const avatarRect = avatarRef.current.getBoundingClientRect();
           let hitBomb = false;
-          const remainingItems = currentItems.filter(item => {
+
+          const remainingItems = processedItems.filter(item => {
             if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
 
             if (item.type === 'bomb') {
-              hitBomb = true;
+              if (!isInvincibleRef.current) {
+                hitBomb = true;
+              }
+              // Bomb is removed even if invincible, but doesn't trigger the penalty.
             } else {
               if (!isMuted && coinSoundRef.current) {
-                console.log("Playing coin sound");
                 coinSoundRef.current.currentTime = 0;
                 coinSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
               }
-              sdk.haptics.impactOccurred('soft');
+              if (!isInvincibleRef.current) {
+                sdk.haptics.impactOccurred('soft');
+              }
               let points = 1;
               if (item.type === 'powerup_point_2') points = POWER_UP_POINT_2_VALUE;
               if (item.type === 'powerup_point_5') points = POWER_UP_POINT_5_VALUE;
@@ -286,19 +341,24 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
 
           if (hitBomb) {
             if (!isMuted && bombSoundRef.current) {
-              console.log("Playing bomb sound");
               bombSoundRef.current.currentTime = 0;
               bombSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
             }
             sdk.haptics.impactOccurred('heavy');
             setIsBombHit(true);
-            setTimeout(() => setIsBombHit(false), 2000);
+            setTimeout(() => setIsBombHit(false), 500); // Short red flash
+
             setScore(0);
+            setIsInvincible(true);
+            setTimeout(() => setIsInvincible(false), 3000); // 3s invincibility
+
             return []; // Clear all items on hit
           }
           return remainingItems;
-        });
-      }
+        }
+
+        return processedItems;
+      });
 
       animationFrameId = requestAnimationFrame(gameLoop);
     };
@@ -380,7 +440,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
         {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}
         {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {displayScore}<br />Claim is unlocked below.</p></div>}
 
-        {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} />}
+        {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />}
 
         {items.map(item => (
           <div

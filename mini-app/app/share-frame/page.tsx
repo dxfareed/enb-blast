@@ -1,35 +1,45 @@
 import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { minikitConfig } from '@/minikit.config';
 
-export const runtime = 'edge'; // Add runtime declaration
+export const runtime = 'edge';
 
-export async function generateMetadata({ params, searchParams }: any): Promise<Metadata> {
+export async function generateMetadata({ searchParams }: any): Promise<Metadata> {
   const getParam = (param: string | string[] | undefined) => Array.isArray(param) ? param[0] : param;
 
-  const score = getParam(searchParams.score) || '0';
-  const username = getParam(searchParams.username) || '@johndoe';
-  const pfpUrl = getParam(searchParams.pfpUrl) || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg';
-  const streak = getParam(searchParams.streak) || '0';
-  const claimed = getParam(searchParams.claimed) || '0';
-  const weeklyPoints = getParam(searchParams.weeklyPoints) || '0';
-  const rank = getParam(searchParams.rank) || 'N/A';
+  const fid = getParam(searchParams.fid);
+
+  if (!fid) {
+    console.warn("Warning: FID is missing from the share frame URL.");
+  }
 
   const appUrl = process.env.NEXT_PUBLIC_URL || '';
-  const frameImageUrl = `${appUrl}/api/frame-image?score=${score}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}`;
+  
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    //@ts-ignore
+    const paramValue = getParam(value);
+    if (paramValue) {
+      params.append(key, paramValue);
+    }
+  }
+
+  const frameImageUrl = `${appUrl}/api/frame-image?${params.toString()}`;
 
   console.log("Generated frameImageUrl:", frameImageUrl);
+
   const fcFrameContent = JSON.stringify({
     version: minikitConfig.frame.version,
     imageUrl: frameImageUrl,
     button: {
-      title: `blast ENBs`,
+      title: `let's gooo blast ENBs`,
       action: {
         name: `Launch ${minikitConfig.frame.name}`,
         type: "launch_frame",
       },
     },
   });
-  console.log("Generated fc:frame content:", fcFrameContent);
+  //console.log("Generated fc:frame content:", fcFrameContent);
 
   return {
     title: minikitConfig.frame.name,
@@ -38,15 +48,9 @@ export async function generateMetadata({ params, searchParams }: any): Promise<M
       "fc:frame": fcFrameContent,
     },
   };
-} // Closing brace for generateMetadata function
-
-export default function ShareFramePage() {
-  return (
-    <div>
-      <h1>Share this frame on Farcaster!</h1>
-      <p>This page generates the Farcaster Frame dynamically.</p>
-    </div>
-  );
 }
 
-
+export default function ShareFramePage() {
+  <div>goon if you see this message HEHEHEHE</div>
+  redirect('/onboarding/welcome');
+}

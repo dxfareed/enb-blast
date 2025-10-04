@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const receipt = await publicClient.getTransactionReceipt({ hash: txHash as Hash });
 
     if (receipt.status !== 'success') {
-      throw new Error('Transaction failed on-chain.');
+      throw new Error('Transaction failed.');
     }
     if (receipt.to?.toLowerCase() !== process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase()) {
       throw new Error('Transaction was not sent to the game contract.');
@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    await prisma.user.update({
+    await prisma.$transaction([
+      prisma.user.update({
         where: { id: user.id },
         data: {
             totalPoints: { increment: points },
@@ -82,7 +83,15 @@ export async function POST(req: NextRequest) {
             streak: newStreak,
             lastClaimedAt: now,
         },
-    });
+      }),
+      prisma.claim.create({
+        data: {
+          txHash: txHash as string,
+          amount: points,
+          userId: user.id,
+        },
+      }),
+    ]);
 
     return NextResponse.json({ message: 'Claim confirmed successfully' }, { status: 200 });
 

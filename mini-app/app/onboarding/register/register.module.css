@@ -12,15 +12,19 @@
 .buttonContainer {
   background: white;
   padding: 0.8rem 2.5rem;
-  border-radius: 1rem;
+  border-radius: 0.8rem;
   min-width: 200px;
   text-align: center;
   position: relative;
   z-index: 10;
 }
 
+.buttonContainer:hover{
+  background-color:rgba(255, 255, 255, 0.5);
+}
+
 .button {
-  font-size: 2rem;
+  font-size: 1.3rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: #000;
@@ -31,6 +35,10 @@
   text-transform: uppercase;
   position: relative;
   z-index: 20;
+}
+
+.button:hover{
+  font-size: 1.7rem;
 }
 
 .button:disabled {
