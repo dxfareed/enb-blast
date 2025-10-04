@@ -59,21 +59,35 @@ export async function POST(req: NextRequest) {
     }
     
     const now = new Date();
-    let newStreak = 1; // Default to 1 for a new streak
+    const lastClaimedAt = user.lastClaimedAt;
+    const claimsToday = user.claimsToday;
+    const currentStreak = user.streak;
 
-    if (user.lastClaimedAt) {
-        if (isSameDay(user.lastClaimedAt, now)) {
-            newStreak = user.streak; // Same day, no change
+    // 1. Check claim limit
+    const isSameDayClaim = lastClaimedAt ? isSameDay(lastClaimedAt, now) : false;
+    if (isSameDayClaim && claimsToday >= 5) {
+      return NextResponse.json({ message: 'Claim limit of 5 per 24 hours reached' }, { status: 429 });
+    }
+
+    // 2. Calculate new claimsToday
+    const newClaimsToday = isSameDayClaim ? claimsToday + 1 : 1;
+
+    // 3. Calculate new streak
+    let newStreak = 1; // Default for new user or broken streak
+    if (lastClaimedAt) {
+        if (isSameDayClaim) {
+            newStreak = currentStreak; // Streak doesn't change on same day
         } else {
             const yesterday = new Date(now);
             yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-            if (isSameDay(user.lastClaimedAt, yesterday)) {
-                newStreak = user.streak + 1; // Consecutive day
+            if (isSameDay(lastClaimedAt, yesterday)) {
+                newStreak = currentStreak + 1; // Consecutive day, increment streak
             }
-            // If it's not the same day and not yesterday, it defaults to 1 (streak reset)
+            // else: it's not the same day and not yesterday, so streak resets to 1 (the default)
         }
     }
 
+    // 4. Perform transaction
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
@@ -82,6 +96,7 @@ export async function POST(req: NextRequest) {
             weeklyPoints: { increment: points },
             streak: newStreak,
             lastClaimedAt: now,
+            claimsToday: newClaimsToday,
         },
       }),
       prisma.claim.create({

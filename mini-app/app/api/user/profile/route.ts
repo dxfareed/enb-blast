@@ -112,6 +112,27 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
+
+    // --- Streak Reset Logic ---
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setUTCDate(now.getUTCDate() - 1);
+
+    if (user.streak > 0 && user.lastClaimedAt) {
+      const lastClaimWasToday = isSameDay(user.lastClaimedAt, now);
+      const lastClaimWasYesterday = isSameDay(user.lastClaimedAt, yesterday);
+
+      // If the last claim was not today AND not yesterday, reset the streak.
+      if (!lastClaimWasToday && !lastClaimWasYesterday) {
+        console.log(`User ${user.username}'s streak broken. Last claim: ${user.lastClaimedAt}. Resetting to 0.`);
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { streak: 0 },
+        });
+      }
+    }
+    // --- End Streak Reset Logic ---
+
     const userId = user.id;
 
     const allUsers = await prisma.user.findMany({
@@ -121,30 +142,6 @@ export async function GET(req: NextRequest) {
     });
 
     const userRank = allUsers.findIndex((u) => u.id === userId) + 1;
-
-    // Lazily reset streak if a day was missed
-    if (user.streak > 0 && user.lastClaimedAt) {
-      const now = new Date();
-      const yesterday = new Date(now);
-      yesterday.setUTCDate(now.getUTCDate() - 1);
-
-      const lastClaimWasToday = isSameDay(user.lastClaimedAt, now);
-      const lastClaimWasYesterday = isSameDay(user.lastClaimedAt, yesterday);
-
-      if (!lastClaimWasToday && !lastClaimWasYesterday) {
-        console.log(`User ${user.username}'s streak broken. Last claim: ${user.lastClaimedAt}. Resetting to 0.`);
-        user = await prisma.user.update({
-          where: { id: userId },
-          data: { streak: 0 },
-        });
-      }
-    }
-
-    // NEW: Adjust claimsToday for display purposes if the window has expired
-    const now = new Date();
-    if (!user.claimWindowStart || now.getTime() - user.claimWindowStart.getTime() > 24 * 60 * 60 * 1000) {
-        user.claimsToday = 0;
-    }
 
     const userProfile = convertBigIntsToStrings(user);
     (userProfile as any).weeklyRank = userRank;
