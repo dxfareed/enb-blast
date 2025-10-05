@@ -1,51 +1,121 @@
+import { sendFrameNotification } from "@/lib/notification-client";
+import {
+  deleteUserNotificationDetails,
+  setUserNotificationDetails,
+} from "@/lib/notification";
+import { createPublicClient, http } from "viem";
+import { optimism } from "viem/chains";
 
-import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
-import { NextRequest, NextResponse } from "next/server";
+const KEY_REGISTRY_ADDRESS = "0x00000000Fc1237824fb747aBDE0FF18990E59b7e";
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+const KEY_REGISTRY_ABI = [
+  {
+    inputs: [
+      { name: "fid", type: "uint256" },
+      { name: "key", type: "bytes" },
+    ],
+    name: "keyDataOf",
+    outputs: [
+      {
+        components: [
+          { name: "state", type: "uint8" },
+          { name: "keyType", type: "uint32" },
+        ],
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
 
-if (!NEYNAR_API_KEY) {
-  console.error("NEYNAR_API_KEY is not set in the environment variables.");
-}
-
-const config = new Configuration({
-  apiKey: NEYNAR_API_KEY || '',
-});
-
-const neynarClient = new NeynarAPIClient(config);
-
-export async function POST(req: NextRequest) {
-  if (!NEYNAR_API_KEY) {
-    console.error("Neynar API key is not configured.");
-    return NextResponse.json({ message: "Neynar API key is not configured." }, { status: 500 });
-  }
+async function verifyFidOwnership(fid: number, appKey: `0x${string}`) {
+  const client = createPublicClient({
+    chain: optimism,
+    transport: http(),
+  });
 
   try {
-    const body = await req.json();
+    const result = await client.readContract({
+      address: KEY_REGISTRY_ADDRESS,
+      abi: KEY_REGISTRY_ABI,
+      functionName: "keyDataOf",
+      args: [BigInt(fid), appKey],
+    });
 
-    if (body.type === 'mini_app.added') {
-      const { fid, username } = body.data.user;
+    return result.state === 1 && result.keyType === 1;
+  } catch (error) {
+    console.error("Key Registry verification failed:", error);
+    return false;
+  }
+}
 
-      if (!fid) {
-        console.error("FID not found in webhook payload.");
-        return NextResponse.json({ message: "FID not found in webhook payload." }, { status: 400 });
+function decode(encoded: string) {
+  return JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
+}
+
+export async function POST(request: Request) {
+  const requestJson = await request.json();
+
+  const { header: encodedHeader, payload: encodedPayload } = requestJson;
+
+  const headerData = decode(encodedHeader);
+  const event = decode(encodedPayload);
+
+  const { fid, key } = headerData;
+
+  const valid = await verifyFidOwnership(fid, key);
+
+  if (!valid) {
+    return Response.json(
+      { success: false, error: "Invalid FID ownership" },
+      { status: 401 }
+    );
+  }
+
+  switch (event.event) {
+    case "frame_added":
+      console.log(
+        "frame_added",
+        "event.notificationDetails",
+        event.notificationDetails
+      );
+      if (event.notificationDetails) {
+        await setUserNotificationDetails(fid, event.notificationDetails);
+        await sendFrameNotification({
+          fid,
+          title: `Welcome to ENB Blast`,
+          body: `Get ready to blast $ENB and earn $ENB`,
+        });
+      } else {
+        await deleteUserNotificationDetails(fid);
       }
 
-      await neynarClient.publishFrameNotifications({
-        targetFids: [fid],
-        notification: {
-          title: "Welcome to ENB Blast!",
-          body: `heyy @${username}! Tap here to start playing.`,
-          target_url: process.env.NEXT_PUBLIC_URL || "https://example.com",
-        },
+      break;
+    case "frame_removed": {
+      console.log(`user fid ${fid} frame_removed`);
+      await deleteUserNotificationDetails(fid);
+      break;
+    }
+    case "notifications_enabled": {
+      console.log("notifications_enabled", event.notificationDetails);
+      await setUserNotificationDetails(fid, event.notificationDetails);
+      await sendFrameNotification({
+        fid,
+        title: `Welcome to Farcaster Mini App Template`,
+        body: `Thank you for enabling notifications for Farcaster Mini App Template`,
       });
 
-      console.log(`Sent welcome notification to user FID: ${fid}`);
+      break;
     }
+    case "notifications_disabled": {
+      console.log("notifications_disabled");
+      await deleteUserNotificationDetails(fid);
 
-    return NextResponse.json({ message: "Webhook received and processed." }, { status: 200 });
-  } catch (error) {
-    console.error("Error processing Neynar webhook:", error);
-    return NextResponse.json({ message: "An error occurred." }, { status: 500 });
+      break;
+    }
   }
+
+  return Response.json({ success: true });
 }

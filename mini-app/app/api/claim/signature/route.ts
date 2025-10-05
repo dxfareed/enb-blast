@@ -52,6 +52,27 @@ export async function POST(req: NextRequest) {
 
 
 
+    const user = await prisma.user.findUnique({ where: { fid } });
+    if (!user) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    const now = new Date();
+    const lastClaimedAt = user.lastClaimedAt;
+    const claimsToday = user.claimsToday;
+
+    function isSameDay(date1: Date, date2: Date): boolean {
+        if (!date1 || !date2) return false;
+        return date1.getUTCFullYear() === date2.getUTCFullYear() &&
+               date1.getUTCMonth() === date2.getUTCMonth() &&
+               date1.getUTCDate() === date2.getUTCDate();
+    }
+
+    const isSameDayClaim = lastClaimedAt ? isSameDay(lastClaimedAt, now) : false;
+    if (isSameDayClaim && claimsToday >= 5) {
+      return NextResponse.json({ message: 'Claim limit of 5 per 24 hours reached' }, { status: 429 });
+    }
+
     const serverWallet = new ethers.Wallet(process.env.SERVER_SIGNER_PRIVATE_KEY!);
     const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS!;
     const amountToClaim = ethers.parseUnits(amount.toString(), 18);

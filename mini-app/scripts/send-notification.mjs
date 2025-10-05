@@ -1,4 +1,4 @@
-import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
+/* import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 import { PrismaClient } from '@prisma/client';
 import "dotenv/config";
 
@@ -23,33 +23,31 @@ const notificationMessage = {
 
 async function sendNotification() {
   try {
-    console.log("Fetching users to notify...");
+    console.log("Fetching users with notification tokens...");
     const users = await prisma.user.findMany({
       where: {
-        fid: {
-          gt: 0,
+        notificationToken: {
+          not: null,
         },
       },
       select: {
-        fid: true,
+        notificationToken: true,
       },
     });
 
-    const fids = users
-      .map(user => user.fid ? Number(user.fid) : null)
-      .filter(fid => fid !== null);
+    const tokens = users
+      .map(user => user.notificationToken)
+      .filter((token): token is string => token !== null);
 
-    if (fids.length === 0) {
-      console.log("No users to notify.");
+    if (tokens.length === 0) {
+      console.log("No users with notification tokens to notify.");
       return;
     }
-/* 
-    console.log(`Sending notification to ${fids.length} users...`);
-    console.log(`Title: ${notificationMessage.title}`);
-    console.log(`Body: ${notificationMessage.body}`); */
+
+    console.log(`Sending notification to ${tokens.length} users...`);
 
     const result = await client.publishFrameNotifications({
-      targetFids: [849768],
+      notification_tokens: tokens,
       notification: {
         ...notificationMessage,
         target_url: process.env.NEXT_PUBLIC_URL || "https://example.com",
@@ -66,3 +64,4 @@ async function sendNotification() {
 }
 
 sendNotification();
+ */

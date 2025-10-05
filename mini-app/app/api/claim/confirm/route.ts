@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'txHash and points are required' }, { status: 400 });
     }
 
-    const receipt = await publicClient.getTransactionReceipt({ hash: txHash as Hash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as Hash, timeout: 60_000 });
 
     if (receipt.status !== 'success') {
       throw new Error('Transaction failed.');
@@ -52,62 +52,22 @@ export async function POST(req: NextRequest) {
       throw new Error('Transaction was not sent to the game contract.');
     }
 
+    const existingClaim = await prisma.claim.findUnique({
+      where: { txHash: txHash as string },
+    });
+
+    if (existingClaim) {
+      return NextResponse.json({ message: 'Transaction already processed' }, { status: 200 });
+    }
+
     const user = await prisma.user.findUnique({ where: { fid } });
     if (!user) throw new Error('User not found');
     if (receipt.from.toLowerCase() !== user.walletAddress.toLowerCase()){
       throw new Error('Transaction was sent from an incorrect wallet.');
     }
     
-    const now = new Date();
-    const lastClaimedAt = user.lastClaimedAt;
-    const claimsToday = user.claimsToday;
-    const currentStreak = user.streak;
-
-    // 1. Check claim limit
-    const isSameDayClaim = lastClaimedAt ? isSameDay(lastClaimedAt, now) : false;
-    if (isSameDayClaim && claimsToday >= 5) {
-      return NextResponse.json({ message: 'Claim limit of 5 per 24 hours reached' }, { status: 429 });
-    }
-
-    // 2. Calculate new claimsToday
-    const newClaimsToday = isSameDayClaim ? claimsToday + 1 : 1;
-
-    // 3. Calculate new streak
-    let newStreak = 1; // Default for new user or broken streak
-    if (lastClaimedAt) {
-        if (isSameDayClaim) {
-            newStreak = currentStreak; // Streak doesn't change on same day
-        } else {
-            const yesterday = new Date(now);
-            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-            if (isSameDay(lastClaimedAt, yesterday)) {
-                newStreak = currentStreak + 1; // Consecutive day, increment streak
-            }
-            // else: it's not the same day and not yesterday, so streak resets to 1 (the default)
-        }
-    }
-
-    // 4. Perform transaction
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: {
-            totalPoints: { increment: points },
-            weeklyPoints: { increment: points },
-            streak: newStreak,
-            lastClaimedAt: now,
-            claimsToday: newClaimsToday,
-        },
-      }),
-      prisma.claim.create({
-        data: {
-          txHash: txHash as string,
-          amount: points,
-          userId: user.id,
-        },
-      }),
-    ]);
-
+    // The indexer will handle the database transaction.
+    // This endpoint just confirms the transaction was successful.
     return NextResponse.json({ message: 'Claim confirmed successfully' }, { status: 200 });
 
   } catch (error) {
