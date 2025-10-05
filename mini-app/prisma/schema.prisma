@@ -18,6 +18,7 @@ model User {
   fid           BigInt      @unique 
   username      String?   @unique
   pfpUrl        String?
+  notificationToken String?
   streak        Int       @default(0)
   level         Int       @default(1)
   totalClaimed  Decimal   @default(0)

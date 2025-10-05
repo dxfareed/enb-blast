@@ -1,10 +1,11 @@
 'use client';
-import { useState, useEffect} from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useConnect, useWaitForTransactionReceipt } from 'wagmi';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Toast from '@/app/components/Toast';
+import Loader from '@/app/components/Loader'; // Import the new Loader component
 import styles from './register.module.css';
 import animationStyles from '../../animations.module.css';
 import { useUser } from '@/app/context/UserContext';
@@ -24,16 +25,13 @@ const GAME_ABI = [{
 const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`;
 
 export default function RegisterPage() {
-  console.log('RegisterPage mounted');
   const [isPopping, setIsPopping] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // Simplified loading state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { address, isConnected } = useAccount();
   const router = useRouter();
   const { connect, connectors } = useConnect();
   const { userProfile, fid } = useUser();
-
-  console.log('UserProfile:', userProfile?.fid);
   
   useEffect(() => {
     if (userProfile && userProfile.registrationStatus === 'ACTIVE') {
@@ -54,10 +52,19 @@ export default function RegisterPage() {
     error: confirmationError 
   } = useWaitForTransactionReceipt({ hash });
 
+  // Centralized loading effect
+  useEffect(() => {
+    if (isSendingTransaction || isConfirming) {
+      setIsLoading(true);
+    } else {
+      setIsLoading(false);
+    }
+  }, [isSendingTransaction, isConfirming]);
+
   useEffect(() => {
     async function activateUser() {
       if (isConfirmed && hash) {
-        setLoadingMessage('VERIFYING ON BASESCAN...');
+        setIsLoading(true); // Keep loader active during activation
         try {
           const activateResponse = await sdk.quickAuth.fetch('/api/user/activate', {
             method: 'POST',
@@ -70,14 +77,16 @@ export default function RegisterPage() {
             throw new Error(errorData.message || 'Failed to activate user.');
           }
 
-          setLoadingMessage('SUCCESS! REDIRECTING...');
+          // Optionally show a success toast before redirecting
+          setToast({ message: 'Success! Redirecting...', type: 'success' });
           setTimeout(() => {
             router.push('/dashboard/game');
           }, 1000);
 
         } catch (error) {
           setToast({ message: `Activation failed: ${(error as Error).message}`, type: 'error' });
-          setLoadingMessage('');
+        } finally {
+          setIsLoading(false); // Stop loading
         }
       }
     }
@@ -88,8 +97,8 @@ export default function RegisterPage() {
     const error = writeContractError || confirmationError;
     if (error) {
       const message = 'shortMessage' in error ? error.shortMessage : error.message;
-      setToast({ message: `registration failed: ${message}`, type: 'error' });
-      setLoadingMessage('');
+      setToast({ message: `Registration failed: ${message}`, type: 'error' });
+      setIsLoading(false); // Stop loading on error
     }
   }, [writeContractError, confirmationError]);
 
@@ -108,9 +117,9 @@ export default function RegisterPage() {
 
     if (isLoading) return;
 
+    setIsLoading(true); // Start loading immediately
+
     try {
-      setLoadingMessage('CREATING PROFILE...');
-      
       const profileResponse = await sdk.quickAuth.fetch('/api/user/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,7 +131,6 @@ export default function RegisterPage() {
         throw new Error(errorData.message || 'Failed to create profile.');
       }
 
-      setLoadingMessage('WAITING...');
       writeContract({
         address: GAME_CONTRACT_ADDRESS,
         abi: GAME_ABI,
@@ -131,7 +139,7 @@ export default function RegisterPage() {
 
     } catch (error) {
       setToast({ message: `Registration failed: ${(error as Error).message}`, type: 'error' });
-      setLoadingMessage('');
+      setIsLoading(false); // Stop loading on error
     }
   }
 
@@ -142,14 +150,6 @@ export default function RegisterPage() {
       console.error('No wagmi connectors found.');
     }
   }
-  
-  const getLoadingState = () => {
-    if (isSendingTransaction) return 'CHECK WALLET...';
-    if (isConfirming) return 'CONFIRMING...';
-    return loadingMessage || 'REGISTER';
-  }
-
-  const isLoading = !!loadingMessage || isSendingTransaction || isConfirming;
 
   return (
     <div className={styles.container}>
@@ -171,7 +171,7 @@ export default function RegisterPage() {
             onClick={handleClick}
             disabled={isLoading}
           >
-            {getLoadingState()}
+            {isLoading ? <Loader /> : 'REGISTER'}
           </button>
         )}
       </div>

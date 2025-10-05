@@ -128,10 +128,29 @@ export async function GET(req: NextRequest) {
         user = await prisma.user.update({
           where: { id: user.id },
           data: { streak: 0 },
+          select: {
+            id: true,
+            walletAddress: true,
+            fid: true,
+            username: true,
+            pfpUrl: true,
+            notificationToken: true,
+            streak: true,
+            level: true,
+            totalClaimed: true,
+            totalPoints: true,
+            weeklyPoints: true,
+            claimsToday: true,
+            lastClaimDate: true,
+            claimWindowStart: true,
+            lastClaimedAt: true,
+            lastMultiplierUsedAt: true,
+            registrationStatus: true,
+            createdAt: true,
+          }
         });
       }
     }
-    // --- End Streak Reset Logic ---
 
     const userId = user.id;
 

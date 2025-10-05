@@ -7,7 +7,6 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-// ABI item for the event we are interested in
 const tokensClaimedAbi = {
   type: 'event',
   name: 'TokensClaimed',
@@ -34,6 +33,7 @@ async function processEvent(log, retryCount = 0) {
     const block = await client.getBlock({ blockHash: log.blockHash });
     const timestamp = new Date(Number(block.timestamp) * 1000);
     const amountDecimal = formatUnits(amount, 18);
+    const points = parseFloat(amountDecimal) * 10;
 
     const dbUser = await prisma.user.findUnique({
       where: { walletAddress: user.toLowerCase() },
@@ -44,13 +44,53 @@ async function processEvent(log, retryCount = 0) {
       return;
     }
 
-    await prisma.claim.create({
-      data: {
-        txHash: txHash,
-        amount: amountDecimal,
-        timestamp: timestamp,
-        userId: dbUser.id,
-      },
+    const { streak, lastClaimedAt, claimsToday } = dbUser;
+
+    const isSameDay = lastClaimedAt
+      ? timestamp.getUTCFullYear() === lastClaimedAt.getUTCFullYear() &&
+        timestamp.getUTCMonth() === lastClaimedAt.getUTCMonth() &&
+        timestamp.getUTCDate() === lastClaimedAt.getUTCDate()
+      : false;
+
+    const newClaimsToday = isSameDay ? claimsToday + 1 : 1;
+
+    let newStreak = 1;
+    if (lastClaimedAt) {
+      const yesterday = new Date(timestamp);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const isLastClaimYesterday =
+        lastClaimedAt.getUTCFullYear() === yesterday.getUTCFullYear() &&
+        lastClaimedAt.getUTCMonth() === yesterday.getUTCMonth() &&
+        lastClaimedAt.getUTCDate() === yesterday.getUTCDate();
+
+      if (isLastClaimYesterday) {
+        newStreak = streak + 1;
+      } else if (isSameDay) {
+        newStreak = streak;
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.claim.create({
+        data: {
+          txHash: txHash,
+          amount: amountDecimal,
+          timestamp: timestamp,
+          userId: dbUser.id,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: dbUser.id },
+        data: {
+          totalClaimed: { increment: parseFloat(amountDecimal) },
+          totalPoints: { increment: points },
+          weeklyPoints: { increment: points },
+          streak: newStreak,
+          lastClaimedAt: timestamp,
+          claimsToday: newClaimsToday,
+        },
+      });
     });
 
     console.log(`   - ✅ Successfully indexed claim with txHash: ${txHash}`);
@@ -88,7 +128,7 @@ const client = createPublicClient({
 async function main() {
   console.log("🚀 Starting viem-based indexer...");
 
-  const contractAddress = "0x03b922ee0573e52e09e6c8033c012500487a2384";
+  const contractAddress = "0x854cec65437d6420316b2eb94fecaaf417690227";
   if (!contractAddress) {
     throw new Error("Contract address not found.");
   }
