@@ -25,7 +25,7 @@ const getRankStyling = (rank: number) => {
   }
 };
 
-const prizePoolAmount = 100000;
+const prizePoolAmount = 300000;
 
 export default function LeaderboardPage() {
   const { userProfile } = useUser();

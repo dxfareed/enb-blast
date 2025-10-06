@@ -108,15 +108,15 @@ async function processEvent(log, retryCount = 0) {
 }
 
 // Use a WebSocket transport for real-time events.
-const transport = webSocket("wss://base-rpc.publicnode.com", {
+const transport = webSocket(process.env.process.env.NEXT_PUBLIC_WS, {
   // These retry parameters are for the WebSocket connection itself.
   retryCount: 5,
   retryDelay: 5000,
   async onConnect() {
     console.log("... ✅ WebSocket connection established. Listening for events... 👂");
   },
-  onDisconnect() {
-    console.log("... 🔌 WebSocket connection lost. Attempting to reconnect...");
+  onDisconnect(error) {
+    console.log(`... 🔌 WebSocket connection lost. Attempting to reconnect... Error: ${error}`);
   },
 });
 
@@ -125,12 +125,14 @@ const client = createPublicClient({
   transport,
 });
 
+let lastEventTimestamp = Date.now();
+
 async function main() {
   console.log("🚀 Starting viem-based indexer...");
 
-  const contractAddress = "0x854cec65437d6420316b2eb94fecaaf417690227";
+  const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS;
   if (!contractAddress) {
-    throw new Error("Contract address not found.");
+    throw new Error("NEXT_PUBLIC_GAME_CONTRACT_ADDRESS not found in .env file.");
   }
 
   // This will watch for the event and automatically handle reconnections.
@@ -139,6 +141,7 @@ async function main() {
     abi: [tokensClaimedAbi],
     eventName: 'TokensClaimed',
     onLogs: (logs) => {
+      lastEventTimestamp = Date.now();
       for (const log of logs) {
         processEvent(log);
       }
@@ -155,6 +158,21 @@ async function main() {
       console.log("   - 핑 (Ping) DB connection is alive. ✅");
     } catch (error) {
       console.error("   - 핑 (Ping) DB connection keep-alive failed:", error);
+    }
+  }, KEEP_ALIVE_INTERVAL);
+
+  // Health check for the WebSocket connection
+  setInterval(async () => {
+    const now = Date.now();
+    if (now - lastEventTimestamp > 2 * KEEP_ALIVE_INTERVAL) { // 2 minutes
+      console.log("... 🧐 No events received recently. Checking connection...");
+      try {
+        const blockNumber = await client.getBlockNumber();
+        console.log(`... ✅ Connection is healthy. Current block number: ${blockNumber}`);
+        lastEventTimestamp = now; // Reset timestamp after successful check
+      } catch (error) {
+        console.error("... ❌ Connection check failed. The watcher should attempt to reconnect.", error);
+      }
     }
   }, KEEP_ALIVE_INTERVAL);
 }

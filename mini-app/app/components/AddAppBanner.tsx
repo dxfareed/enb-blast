@@ -2,24 +2,24 @@
 
 import { useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
-//import { useMiniApp } from '@neynar/react';
 import styles from './AddAppBanner.module.css';
+import { useUser } from '@/app/context/UserContext';
 
 export default function AddAppBanner({ onAppAdded }: { onAppAdded: () => void }) {
   const [isAdding, setIsAdding] = useState(false);
-  //const { context, added} = useMiniApp();
+  const { userProfile } = useUser();
+
   const handleAddApp = async () => {
     setIsAdding(true);
     try {
       const result = await sdk.actions.addFrame();
       if (result) {
         const newContext = await sdk.context;
-        //console.log("New context after adding app:", newContext);
         if (newContext.client.notificationDetails?.token) {
           await sdk.quickAuth.fetch('/api/user/notification-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ notificationToken: newContext.client.notificationDetails.token }),
+            body: JSON.stringify({ notificationToken: newContext.client.notificationDetails }),
           });
         }
         onAppAdded();
@@ -30,6 +30,10 @@ export default function AddAppBanner({ onAppAdded }: { onAppAdded: () => void })
       setIsAdding(false);
     }
   };
+
+  if (userProfile?.notificationToken) {
+    return null;
+  }
 
   return (
     <div className={styles.banner}>

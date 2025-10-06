@@ -123,12 +123,17 @@
   
   .userInfo {
   flex-grow: 1;
+  min-width: 0;
   }
   
   .username {
   font-weight: 700;
   font-size: 1.125rem;
   color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
   }
   
   .scoreInfo {

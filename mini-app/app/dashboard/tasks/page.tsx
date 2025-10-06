@@ -94,7 +94,7 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
             className={`${styles.goButton} ${isTaskDisabled ? styles.disabledButton : ''}`}
             disabled={isTaskDisabled}
           >
-            <ExternalLink size={16} /> Go
+            {task.checkKey === 'MINT_ENB_BOUNTY_NFT' ? 'Create' : <><ExternalLink size={16} /> Go</>}
           </button>
         )}
         <button

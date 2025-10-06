@@ -1,12 +1,13 @@
 import hre from "hardhat";
 
 async function main() {
-  console.log("Preparing to deploy the Game contract to Base Sepolia...");
+  console.log("Preparing to deploy the Game contract to Base...");
 
   const tokenAddress = "0xf73978b3a7d1d4974abae11f696c1b4408c027a0";
   const initialOwner = "0xe59df381684a7cf4d3e1177e68569b5d13f9585a";
   const signerAddress = "0x52c043C7120d7DA35fFdDF6C5c2359d503ceE5F8";
-  const constructorArgs = [tokenAddress, initialOwner, signerAddress];
+  const initialMaxClaims = 5n;
+  const constructorArgs = [tokenAddress, initialOwner, signerAddress, initialMaxClaims];
 
   const [deployer] = await hre.viem.getWalletClients();
   console.log(`Deploying contract with account: ${deployer.account.address}`);
@@ -19,7 +20,7 @@ async function main() {
 
   console.log("Deploying contract...");
 
-  const contractArtifact = await hre.artifacts.readArtifact("contracts/gamev2.sol:Game");
+  const contractArtifact = await hre.artifacts.readArtifact("contracts/gamev3.sol:Game");
 
   const deployTxHash = await deployer.deployContract({
     abi: contractArtifact.abi,

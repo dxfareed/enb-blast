@@ -1,3 +1,4 @@
+// app/api/user/activate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createPublicClient, http, Hash } from 'viem';
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
         token: authorization.split(" ")[1] as string,
         domain: getUrlHost(req),
     });
+    // The fid from the JWT payload
     const fid = payload.sub;
 
     const { txHash } = await req.json();
@@ -35,23 +37,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'txHash is required' }, { status: 400 });
     }
 
+    // Verify the transaction receipt on-chain
     const receipt = await publicClient.getTransactionReceipt({ hash: txHash as Hash });
 
     if (receipt.status !== 'success') {
-      throw new Error('Transaction failed.');
+      throw new Error('Transaction failed on-chain.');
     }
     if (receipt.to?.toLowerCase() !== process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase()) {
-      throw new Error('Transaction was not sent to the game contract.');
+      throw new Error('Transaction was not sent to the correct game contract.');
     }
 
-    const user = await prisma.user.findUnique({ where: { fid } });
+    // [CORRECTED] Convert string fid from JWT to BigInt for Prisma query
+    const user = await prisma.user.findUnique({ where: { fid: BigInt(fid) } });
     if (!user) {
-      throw new Error('User not found');
+      throw new Error('User not found in database.');
     }
     if (receipt.from.toLowerCase() !== user.walletAddress.toLowerCase()){
-      throw new Error('Transaction was sent from an incorrect wallet.');
+      throw new Error('Transaction was submitted from a different wallet than the one on record.');
     }
     
+    // If all checks pass, update the user's status to ACTIVE
     await prisma.user.update({
       where: { id: user.id },
       data: {

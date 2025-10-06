@@ -20,6 +20,7 @@ const tasks = [
   { title: 'Visit the Leaderboard', description: 'Check out the competition.', rewardPoints: 10, type: TaskType.DAILY, actionUrl: '/dashboard/leaderboard', checkKey: 'LEADERBOARD_VISIT' },
   { title: 'Use the ENB Mining App', description: 'Engage with the ENB ecosystem by using the ENB Mining App.', rewardPoints: 100, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/4uqcueQifUYV/enb-mining', checkKey: 'MINI_APP_OPEN_MINING' },
   { title: 'Use the ENB Bounty App', description: 'Explore bounties and opportunities within the ENB ecosystem through the Bounty App.', rewardPoints: 100, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/0GzdUkFK2f7A/enb-bounty', checkKey: 'MINI_APP_OPEN_BOUNTY' },
+  { title: 'Mint ENB Bounty NFT', description: 'Mint your exclusive ENB Bounty NFT to mark your participation in the ecosystem.', rewardPoints: 250, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/0GzdUkFK2f7A/enb-bounty', checkKey: 'MINT_ENB_BOUNTY_NFT' },
   /* { 
     title: 'Partner Task: Special Event', 
     description: 'Complete this special event task for a unique reward!', 

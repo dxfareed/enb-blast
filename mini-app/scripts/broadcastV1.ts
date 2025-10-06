@@ -9,7 +9,7 @@ interface NotificationDetails {
 
 const NOTIFICATION_CONFIG = {
   title: "New Logo Who dis?",
-  body: "Logo updated!",
+  body: "Rewards will be going out in 5d",
 };
 
 const API_URL = process.env.NEXT_PUBLIC_URL
@@ -60,11 +60,8 @@ async function main() {
           continue;
         }
 
-        // --- FINAL SANITIZATION LOGIC ---
-        // This removes whitespace from both ends and any null characters (\0) from anywhere in the string.
-        const sanitizedToken = rawToken.trim().replace(/\0/g, '');
-        // --- END SANITIZATION ---
-
+           const sanitizedToken = rawToken.trim().replace(/\0/g, '');
+       
         const notificationDetails = JSON.parse(sanitizedToken) as NotificationDetails;
 
         const payload = {

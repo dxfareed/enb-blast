@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/send-daily-notification",
-      "schedule": "0 16 * * *"
-    },
-    {
       "path": "/api/cron/reset-weekly-points",
       "schedule": "10 16 * * 4"
     }

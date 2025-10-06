@@ -22,6 +22,8 @@ type UserProfile = {
   registrationStatus: 'PENDING' | 'ACTIVE';
   createdAt: string;     // DateTime is stringified
   weeklyRank: number;
+  verifiedWallets: string[]; 
+  notificationToken: string | null;
 };
 
 type UserContextType = {
