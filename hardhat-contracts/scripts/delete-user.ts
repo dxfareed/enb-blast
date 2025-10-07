@@ -12,8 +12,10 @@ task("delete-user", "Completely deletes a user's data from the Game contract")
       process.exit(1);
     }
 
+    // 0x8A6472bCDF34378C81140f8122032849061a7B12
+
     // Replace with your actual deployed contract address
-    const contractAddress = "0x854cec65437d6420316b2eb94fecaaf417690227" as Address;
+    const contractAddress = "0x03b922ee0573E52e09E6c8033c012500487A2384" as Address;
 
     try {
       console.log(`\nPreparing to permanently delete user ${addressToDelete} from the Game contract...`);
@@ -43,7 +45,7 @@ task("delete-user", "Completely deletes a user's data from the Game contract")
       console.log('✅ User is registered. Proceeding with deletion transaction...');
 
       // 4. Execute the Deletion Transaction
-      const hash = await wallet.writeContract({
+      /* const hash = await wallet.writeContract({
         address: contractAddress,
         abi: Game.abi,
         functionName: 'deleteUser',
@@ -82,7 +84,7 @@ task("delete-user", "Completely deletes a user's data from the Game contract")
       console.log(`Gas used: ${receipt.gasUsed.toString()} wei`);
       // Replace with your network's explorer URL if not using Base
       console.log(`View on Basescan: https://basescan.org/tx/${hash}`);
-
+ */
     } catch (error: any) {
       // 7. Robust Error Handling
       console.error('\n❌ An error occurred:', error.message);

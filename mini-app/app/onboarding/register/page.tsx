@@ -1,71 +1,66 @@
+// app/onboarding/register/page.tsx
 'use client';
+
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useConnect, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther, parseGwei } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Toast from '@/app/components/Toast';
-import Loader from '@/app/components/Loader'; // Import the new Loader component
+import Loader from '@/app/components/Loader';
 import styles from './register.module.css';
 import animationStyles from '../../animations.module.css';
 import { useUser } from '@/app/context/UserContext';
 
-const ParticleBackground = dynamic(() => import('./particles'), {
-  ssr: false,
-});
+const ParticleBackground = dynamic(() => import('./particles'), { ssr: false });
 
+// The correct, full ABI for the register function
 const GAME_ABI = [{
-  name: 'register',
-  type: 'function',
-  stateMutability: 'nonpayable',
-  inputs: [],
-  outputs: [],
+  "inputs": [
+    { "internalType": "uint256", "name": "_fid", "type": "uint256" },
+    { "internalType": "address[]", "name": "_wallets", "type": "address[]" },
+    { "internalType": "bytes", "name": "_signature", "type": "bytes" }
+  ],
+  "name": "register",
+  "outputs": [],
+  "stateMutability": "nonpayable",
+  "type": "function"
 }] as const;
 
 const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`;
 
 export default function RegisterPage() {
   const [isPopping, setIsPopping] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Simplified loading state
+  const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { address, isConnected } = useAccount();
   const router = useRouter();
-  const { connect, connectors } = useConnect();
-  const { userProfile, fid } = useUser();
-  
+  // We now use refetchUserProfile to get the final 'ACTIVE' status
+  const { userProfile, fid, refetchUserProfile } = useUser();
+
+  // Redirect the user if their profile is already ACTIVE
   useEffect(() => {
     if (userProfile && userProfile.registrationStatus === 'ACTIVE') {
       router.replace('/dashboard/game');
     }
   }, [userProfile, router]);
-  
-  const { 
-    data: hash,
-    writeContract, 
-    isPending: isSendingTransaction, 
-    error: writeContractError 
-  } = useWriteContract();
 
-  const { 
-    isLoading: isConfirming, 
-    isSuccess: isConfirmed, 
-    error: confirmationError 
-  } = useWaitForTransactionReceipt({ hash });
+  const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
-  // Centralized loading effect
+  // This combined loading state is correct
   useEffect(() => {
-    if (isSendingTransaction || isConfirming) {
-      setIsLoading(true);
-    } else {
-      setIsLoading(false);
-    }
-  }, [isSendingTransaction, isConfirming]);
+    setIsLoading(isPending || isConfirming);
+  }, [isPending, isConfirming]);
 
+  // [CORRECTED FLOW] This effect now handles the ACTIVATION step after a successful transaction
   useEffect(() => {
-    async function activateUser() {
-      if (isConfirmed && hash) {
-        setIsLoading(true); // Keep loader active during activation
+    async function activateUserOnSuccess() {
+      if (isSuccess && hash) {
+        setIsLoading(true); // Keep the loader on for this final step
         try {
+          // Call your activate endpoint. sdk.quickAuth.fetch handles the auth token.
           const activateResponse = await sdk.quickAuth.fetch('/api/user/activate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -74,80 +69,82 @@ export default function RegisterPage() {
 
           if (!activateResponse.ok) {
             const errorData = await activateResponse.json();
-            throw new Error(errorData.message || 'Failed to activate user.');
+            throw new Error(errorData.message || 'Failed to activate user status.');
           }
 
-          // Optionally show a success toast before redirecting
-          setToast({ message: 'Success! Redirecting...', type: 'success' });
-          setTimeout(() => {
-            router.push('/dashboard/game');
-          }, 1000);
+          // After successful activation, refetch the profile to get the 'ACTIVE' status
+          await refetchUserProfile();
+          setToast({ message: 'Activation complete! Redirecting...', type: 'success' });
+          setTimeout(() => router.push('/dashboard/game'), 1500);
 
         } catch (error) {
           setToast({ message: `Activation failed: ${(error as Error).message}`, type: 'error' });
         } finally {
-          setIsLoading(false); // Stop loading
+          setIsLoading(false);
         }
       }
     }
-    activateUser();
-  }, [isConfirmed, hash, router]);
+    activateUserOnSuccess();
+  }, [isSuccess, hash, router, refetchUserProfile]);
 
   useEffect(() => {
     const error = writeContractError || confirmationError;
     if (error) {
-      const message = 'shortMessage' in error ? error.shortMessage : error.message;
-      setToast({ message: `Registration failed: ${message}`, type: 'error' });
-      setIsLoading(false); // Stop loading on error
+      const message = error.message.includes('User rejected') ? 'Transaction rejected.' : (error as any).shortMessage || error.message;
+      setToast({ message: `Error: ${message}`, type: 'error' });
     }
   }, [writeContractError, confirmationError]);
 
-  async function handleClick() {
+  async function handleRegister() {
     setIsPopping(true);
     setTimeout(() => setIsPopping(false), 500);
 
-    if (!isConnected || !address) {
-      setToast({ message: 'Please connect your wallet first.', type: 'error' });
+    if (!isConnected || !address || !fid) {
+      setToast({ message: 'Wallet or Farcaster ID not available.', type: 'error' });
       return;
     }
-    if (!fid) {
-      setToast({ message: 'Farcaster user not found. Please open this in a Farcaster client.', type: 'error' });
-      return;
-    }
-
     if (isLoading) return;
-
-    setIsLoading(true); // Start loading immediately
+    setIsLoading(true);
 
     try {
-      const profileResponse = await sdk.quickAuth.fetch('/api/user/profile', {
+      // Step 1: Call the profile endpoint to get the signature
+      const response = await sdk.quickAuth.fetch('/api/user/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fid: fid, walletAddress: address }),
+        body: JSON.stringify({ walletAddress: address }),
       });
 
-      if (!profileResponse.ok) {
-        const errorData = await profileResponse.json();
-        throw new Error(errorData.message || 'Failed to create profile.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to get registration data.');
       }
 
+      const { signature, wallets } = await response.json();
+
+      // If no signature is returned, the user is already active on-chain.
+      if (!signature) {
+        await refetchUserProfile();
+        setToast({ message: "You're already registered! Redirecting...", type: 'success' });
+        setTimeout(() => router.push('/dashboard/game'), 1000);
+        return;
+      }
+      const maxPriority = parseGwei('0.01');
+      const maxFee = parseGwei('30');
+      // Step 2: Use the signature to call the on-chain register function
       writeContract({
         address: GAME_CONTRACT_ADDRESS,
         abi: GAME_ABI,
         functionName: 'register',
+        args: [BigInt(fid), wallets, signature],
+        //maxFeePerGas: maxFee,
+        //maxPriorityFeePerGas: maxPriority,
+
+
       });
 
     } catch (error) {
-      setToast({ message: `Registration failed: ${(error as Error).message}`, type: 'error' });
-      setIsLoading(false); // Stop loading on error
-    }
-  }
-
-  const handleConnect = () => {
-    if (connectors.length > 0) {
-      connect({ connector: connectors[0] });
-    } else {
-      console.error('No wagmi connectors found.');
+      setToast({ message: `Error: ${(error as Error).message}`, type: 'error' });
+      setIsLoading(false);
     }
   }
 
@@ -156,24 +153,14 @@ export default function RegisterPage() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <ParticleBackground />
       <div className={styles.buttonContainer}>
-        {!isConnected ? (
-          <button
-            className={styles.button}
-            type="button"
-            onClick={handleConnect}
-          >
-            Connect Wallet
-          </button>
-        ) : (
-          <button
-            className={`${styles.button} ${isPopping ? animationStyles.popAnimation : ''}`}
-            type="button"
-            onClick={handleClick}
-            disabled={isLoading}
-          >
-            {isLoading ? <Loader /> : 'REGISTER'}
-          </button>
-        )}
+        <button
+          className={`${styles.button} ${isPopping ? animationStyles.popAnimation : ''}`}
+          type="button"
+          onClick={handleRegister}
+          disabled={isLoading || !isConnected}
+        >
+          {isLoading ? <Loader /> : 'REGISTER'}
+        </button>
       </div>
     </div>
   );

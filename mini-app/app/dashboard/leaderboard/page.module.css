@@ -12,9 +12,11 @@
   gap: 1rem;
   background-color: #f9fafb;
   padding: 1.5rem;
+  padding-bottom: 0.75rem;
   border-radius: 1.5rem;
   border: 2px solid #e5e7eb;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: padding-bottom 0.3s ease-in-out;
 }
 
 .title {
@@ -53,13 +55,106 @@
   font-size: 1rem;
 }
 
+.infoContainer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out, margin-top 0.4s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.infoContainer.expanded {
+  max-height: 500px;
+  margin-top: 1rem;
+}
+
+.expandTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding-top: 0.75rem;
+  cursor: pointer;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.chevronIcon {
+  transition: transform 0.3s ease-in-out;
+}
+
+.chevronIcon.rotated {
+  transform: rotate(180deg);
+}
+
+.tabSelector {
+  display: flex;
+  background-color: #e5e7eb;
+  border-radius: 1rem;
+  padding: 0.25rem;
+}
+
+.tabButton {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background-color: transparent;
+  border-radius: 0.875rem;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.activeTab {
+  background-color: #ffffff;
+  color: #1e40af;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tier {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  border: 2px solid #e5e7eb;
+}
+
+.tierRank { font-weight: 600; color: #4b5563; }
+.legendaryText { color: #FDE047; }
+.superBasedText { color: #5b21b6; }
+.basedText { color: #1e40af; }
+.tierReward { font-weight: 700; color: #16a34a; }
+
+.howToEarnItem {
+  padding: 0.75rem 1rem;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  border: 2px solid #e5e7eb;
+  color: #374151;
+  font-weight: 500;
+}
+
 .userList {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
   
-  .userRow {
+.userRow {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -68,15 +163,15 @@
   border: 2px solid #e5e7eb;
   background-color: white;
   transition: background-color 0.2s;
-  }
+}
   
-  .currentUser {
+.currentUser {
   background-color: #eff6ff;
   border-color: #60a5fa;
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
-  }
+}
   
-  .rankCircle {
+.rankCircle {
   width: 2.5rem;
   height: 2.5rem;
   flex-shrink: 0;
@@ -87,69 +182,70 @@
   font-weight: 700;
   font-size: 1.125rem;
   border: 2px solid;
-  }
-  
-  .rank1 {
-  background-color: #fef08a;
-  color: #a16207;
-  border-color: #facc15;
-  box-shadow: 0 0 10px #facc15;
-  }
-  .rank2 {
-  background-color: #e5e7eb;
-  color: #4b5563;
-  border-color: #9ca3af;
-  box-shadow: 0 0 10px #d1d5db;
-  }
-  .rank3 {
-  background-color: #fcd3a1;
-  color: #9a3412;
-  border-color: #fb923c;
-  box-shadow: 0 0 10px #fb923c;
-  }
-  .rankDefault {
+}
+.rank1, .rank2, .rank3 {
+  background-color: #FEEF8A;
+  color: #854D0E;
+  border-color: #FBBF24;
+  box-shadow: 0 0 12px #FDE047;
+}
+
+.rankSuperBased {
+  background-color: #c4b5fd;
+  color: #5b21b6;
+  border-color: #a78bfa;
+  box-shadow: 0 0 10px #a78bfa;
+}
+
+.rankBased {
+  background-color: #93c5fd;
+  color: #1e40af;
+  border-color: #60a5fa;
+  box-shadow: 0 0 10px #60a5fa;
+}
+
+.rankDefault {
   background-color: #f3f4f6;
   color: #4b5563;
   border-color: #d1d5db;
-  }
+}
   
-  .pfp {
+.pfp {
   width: 3rem;
   height: 3rem;
   border-radius: 9999px;
   object-fit: cover;
   border: 2px solid #e5e7eb;
-  }
+}
   
-  .userInfo {
-  flex-grow: 1;
-  }
+.userInfo { flex-grow: 1; min-width: 0; }
   
-  .username {
+.username {
   font-weight: 700;
   font-size: 1.125rem;
   color: #111827;
-  }
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
   
-  .scoreInfo {
-  text-align: right;
-  }
+.scoreInfo { text-align: right; }
   
-  .score {
+.score {
   font-weight: 700;
   font-size: 1.125rem;
   color: #1f2937;
-  }
+}
   
-  .scoreLabel {
+.scoreLabel {
   font-size: 0.875rem;
   color: #6b7280;
-  }
+}
   
-  .currentUser .username,
-  .currentUser .score {
+.currentUser .username,
+.currentUser .score {
   color: #1e40af;
-  }
+}
 
 .currentUserFooter {
   position: fixed;
@@ -170,23 +266,11 @@
   z-index: 100;
 }
 
-.currentUserFooter .username {
-  color: white;
-  font-weight: 700;
-}
-
-.currentUserFooter .score {
-  color: white;
-  font-weight: 700;
-}
-
-.currentUserFooter .scoreLabel {
-  color: #dbeafe;
-}
-
+.currentUserFooter .username { color: white; font-weight: 700; }
+.currentUserFooter .score { color: white; font-weight: 700; }
+.currentUserFooter .scoreLabel { color: #dbeafe; }
 .currentUserFooter .rankCircle {
   background-color: #3b82f6;
   border-color: #93c5fd;
   color: white;
 }
-

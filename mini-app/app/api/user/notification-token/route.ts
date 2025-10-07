@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     await prisma.user.update({
       where: { fid: BigInt(fid) },
       //@ts-ignore
-      data: { notificationToken: notificationToken },
+      data: { notificationToken: JSON.stringify(notificationToken) },
     });
 
     return NextResponse.json({ message: 'Notification token updated successfully' });

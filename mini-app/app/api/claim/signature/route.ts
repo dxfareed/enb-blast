@@ -1,96 +1,172 @@
-import { ethers } from 'ethers';
+// app/api/claim/signature/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { 
+  createPublicClient, 
+  http, 
+  keccak256, 
+  encodePacked, 
+  parseEther 
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { base } from 'viem/chains';
 import { Errors, createClient } from "@farcaster/quick-auth";
-import prisma from '@/lib/prisma';
 
-const GAME_CONTRACT_ABI = [
-  "function userNonces(address owner) view returns (uint256)"
-];
+// =================================================================================
+//                                  CONFIGURATION
+// =================================================================================
 
+const publicClient = createPublicClient({ chain: base, transport: http() });
 
-async function getCurrentNonce(walletAddress: string): Promise<bigint> {
-  const provider = new ethers.JsonRpcProvider(process.env.BASE_MAINNET_RPC_URL);
-  const contract = new ethers.Contract(
-    process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS!,
-    GAME_CONTRACT_ABI,
-    provider
-  );
-  return await contract.userNonces(walletAddress);
-}
+// The full ABI for the getUserProfile function, matching the contract's UserProfileView struct
+const GAME_CONTRACT_ABI = [{
+  "inputs": [{ "internalType": "uint256", "name": "_fid", "type": "uint256" }],
+  "name": "getUserProfile",
+  "outputs": [
+    {
+      "components": [
+        { "internalType": "bool", "name": "isRegistered", "type": "bool" },
+        { "internalType": "uint256", "name": "registrationDate", "type": "uint256" },
+        { "internalType": "uint256", "name": "lastClaimTimestamp", "type": "uint256" },
+        { "internalType": "uint256", "name": "claimNonce", "type": "uint256" },
+        { "internalType": "uint256", "name": "totalClaimed", "type": "uint256" },
+        { "internalType": "uint256", "name": "claimsInCurrentCycle", "type": "uint256" }
+      ],
+      "internalType": "struct Game.UserProfileView",
+      "name": "",
+      "type": "tuple"
+    }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+}] as const;
+
+// A separate ABI snippet just for getting the dynamic max claims variable
+const MAX_CLAIMS_ABI = [{
+    "inputs": [],
+    "name": "maxClaimsPerCycle",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+}] as const;
 
 const client = createClient();
 
-function getUrlHost(request: NextRequest) {
+// =================================================================================
+//                                HELPER FUNCTIONS
+// =================================================================================
+
+// [CORRECTED] This helper now fetches the entire on-chain profile object
+async function getOnChainProfile(fid: bigint) {
+  return await publicClient.readContract({
+    address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'getUserProfile',
+    args: [fid]
+  });
+}
+
+// Helper to fetch the current claim limit from the contract
+async function getMaxClaims(): Promise<bigint> {
+    return await publicClient.readContract({
+        address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+        abi: MAX_CLAIMS_ABI,
+        functionName: 'maxClaimsPerCycle',
+    });
+}
+
+
+function getUrlHost(request: NextRequest): string {
     const origin = request.headers.get("origin");
     if (origin) { try { return new URL(origin).host; } catch (e) { console.warn("Invalid origin:", e); } }
     const host = request.headers.get("host");
     if (host) { return host; }
     const vercelUrl = process.env.VERCEL_URL;
-    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
+    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://vercelUrl}` : "http://localhost:3000";
     return new URL(urlValue).host;
 }
 
+// =================================================================================
+//                                 API POST HANDLER
+// =================================================================================
+
 export async function POST(req: NextRequest) {
+  console.log("\n\n--- [API] Received POST request to /api/claim/signature ---");
   try {
     const authorization = req.headers.get("Authorization");
     if (!authorization || !authorization.startsWith("Bearer ")) {
       return NextResponse.json({ message: "Missing token" }, { status: 401 });
     }
-
     const payload = await client.verifyJwt({
         token: authorization.split(" ")[1] as string,
         domain: getUrlHost(req),
     });
-    const fid = payload.sub;
+    const userFid = BigInt(payload.sub);
+    console.log(`[API LOG] ✅ JWT Verified. Request from FID: ${userFid}`);
 
-    const { walletAddress, amount } = await req.json();
-    if (!walletAddress || amount === undefined) {
-      return NextResponse.json({ message: 'walletAddress and amount are required' }, { status: 400 });
+    const { amount } = await req.json();
+    if (amount === undefined) {
+      return NextResponse.json({ message: 'amount is required' }, { status: 400 });
     }
 
+    // [CORRECTED] Step 1: Fetch the user's full on-chain profile in one call
+    const onChainProfile = await getOnChainProfile(userFid);
 
+    // [CORRECTED] Step 2: Perform server-side pre-flight checks using the full profile data
+    if (!onChainProfile.isRegistered) {
+        return NextResponse.json({ message: "User is not registered on-chain." }, { status: 403 });
+    }
+    
+    const maxClaims = await getMaxClaims();
+    const cooldownPeriod = BigInt(24 * 60 * 60); // 24 hours in seconds
 
-
-
-    const user = await prisma.user.findUnique({ where: { fid } });
-    if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    // Check if the user is currently on cooldown
+    if (onChainProfile.claimsInCurrentCycle >= maxClaims) {
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
+        if (now < cooldownEndTime) {
+            return NextResponse.json({ 
+                message: 'Your 24-hour claim cooldown has not passed yet.',
+                resetsAt: new Date(Number(cooldownEndTime) * 1000).toISOString()
+            }, { status: 429 }); // 429 Too Many Requests
+        }
     }
 
-    const now = new Date();
-    const lastClaimedAt = user.lastClaimedAt;
-    const claimsToday = user.claimsToday;
+    // 3. Prepare for Signing
+    const serverAccount = privateKeyToAccount(process.env.SERVER_SIGNER_PRIVATE_KEY as `0x${string}`);
+    const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`;
+    const amountToClaim = parseEther(amount.toString());
+    const nonce = onChainProfile.claimNonce; // Use the nonce from the profile we fetched
 
-    function isSameDay(date1: Date, date2: Date): boolean {
-        if (!date1 || !date2) return false;
-        return date1.getUTCFullYear() === date2.getUTCFullYear() &&
-               date1.getUTCMonth() === date2.getUTCMonth() &&
-               date1.getUTCDate() === date2.getUTCDate();
-    }
+    console.log("\n--- [API DEBUG] Data for Claim Signature Generation ---");
+    console.log(`   - Contract Address:      ${contractAddress}`);
+    console.log(`   - User FID:              ${userFid.toString()}`);
+    console.log(`   - Amount (in wei):       ${amountToClaim.toString()}`);
+    console.log(`   - Nonce (from profile):  ${nonce.toString()}`);
+    console.log(`   - Server Signer Address: ${serverAccount.address}`);
+    console.log("---------------------------------------------------\n");
 
-    const isSameDayClaim = lastClaimedAt ? isSameDay(lastClaimedAt, now) : false;
-    if (isSameDayClaim && claimsToday >= 5) {
-      return NextResponse.json({ message: 'Claim limit of 5 per 24 hours reached' }, { status: 429 });
-    }
-
-    const serverWallet = new ethers.Wallet(process.env.SERVER_SIGNER_PRIVATE_KEY!);
-    const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS!;
-    const amountToClaim = ethers.parseUnits(amount.toString(), 18);
-    const nonce = await getCurrentNonce(walletAddress);
-
-    const messageHash = ethers.solidityPackedKeccak256(
-      ['address', 'address', 'uint256', 'uint256'],
-      [contractAddress, walletAddress, amountToClaim, nonce]
+    // 4. Generate Signature
+    const claimHash = keccak256(
+      encodePacked(
+        ['address', 'string', 'uint256', 'uint256', 'uint256'],
+        [contractAddress, "CLAIM", userFid, amountToClaim, nonce]
+      )
     );
+    console.log(`[API LOG]  hashing... Generated Claim Hash: ${claimHash}`);
 
-    const signature = await serverWallet.signMessage(ethers.toBeArray(messageHash));
-    return NextResponse.json({ signature }, { status: 200 });
+    const signature = await serverAccount.signMessage({ 
+      message: { raw: claimHash } 
+    });
+    console.log(`[API LOG] ✅ signing... Generated Signature: ${signature}`);
+
+    // 5. Return the signature and nonce to the frontend
+    return NextResponse.json({ signature, nonce: nonce.toString() }, { status: 200 });
 
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {
         return NextResponse.json({ message: "Invalid token" }, { status: 401 });
     }
-    console.error("Error generating signature:", error);
-    return NextResponse.json({ message: 'Try again' }, { status: 500 });
+    console.error("[API CRITICAL ERROR] An unexpected error occurred:", error);
+    return NextResponse.json({ message: 'Server error, try again' }, { status: 500 });
   }
 }

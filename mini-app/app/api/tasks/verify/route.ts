@@ -17,6 +17,8 @@ function getStartOfUTCDay() {
 import {
   TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
   TOKEN_MEMBERSHIP_CONTRACT_ABI,
+  GAME_CONTRACT_ADDRESS,
+  GAME_CONTRACT_ABI,
 } from '@/app/utils/constants';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
@@ -104,7 +106,7 @@ const taskCheckers = {
       return false;
     }
 
-    const url = `https://api.neynar.com/v2/farcaster/channel/member/list/?channel_id=${FARCASTER_CHANNEL_ID}&fid=${user.fid}`;
+    const url = `https://api.neynar.com/v2/farcaster/channel/?id=${FARCASTER_CHANNEL_ID}&viewer_fid=${user.fid}`;
 
     try {
       const response = await fetch(url, {
@@ -119,7 +121,7 @@ const taskCheckers = {
       }
 
       const data = await response.json();
-      return data.members.length > 0;
+      return data.channel.viewer_context.following;
     } catch (error) {
       console.error("Failed to verify Farcaster channel follow:", error);
       throw error;
@@ -269,6 +271,19 @@ const taskCheckers = {
     });
     return !!recentClaim;
   },
+  USE_MULTIPLIER: async (user: { id: string; }): Promise<boolean> => {
+    const todayUTC = getStartOfUTCDay();
+    const userProfile = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { lastMultiplierUsedAt: true },
+    });
+
+    if (!userProfile || !userProfile.lastMultiplierUsedAt) {
+      return false;
+    }
+
+    return userProfile.lastMultiplierUsedAt >= todayUTC;
+  },
 
   LEADERBOARD_VISIT: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying leaderboard visit for user ${user.id}...`);
@@ -283,6 +298,36 @@ const taskCheckers = {
     return !!visitEvent;
   },
 
+  MAX_OUT_DAILY_CLAIMS: async (user: { fid: bigint; }) => {
+    try {
+      const [onChainProfile, maxClaims] = await Promise.all([
+        publicClient.readContract({
+          //@ts-ignore
+            address: GAME_CONTRACT_ADDRESS,
+            abi: GAME_CONTRACT_ABI,
+            functionName: 'getUserProfile',
+            args: [user.fid]
+        }),
+        publicClient.readContract({
+          //@ts-ignore  
+          address: GAME_CONTRACT_ADDRESS,
+            abi: GAME_CONTRACT_ABI,
+            functionName: 'maxClaimsPerCycle',
+        })
+      ]);
+
+      if (!onChainProfile.isRegistered) {
+        return false;
+      }
+
+      return onChainProfile.claimsInCurrentCycle >= maxClaims;
+    } catch (error) {
+      console.error("Failed to check max daily claims:", error);
+      return false;
+    }
+  },
+
+  MINT_ENB_BOUNTY_NFT: async (user: { walletAddress: string; }) => checkNftBalance(user.walletAddress),
   HOLD_100K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 100000),
   HOLD_500K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 500000),
   HOLD_1M_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 1000000),
@@ -299,6 +344,47 @@ const taskCheckers = {
     return true;
   },
 };
+
+const ENB_BOUNTY_NFT_CONTRACT_ADDRESS = '0xf0b03a35c4fc40395fd0db8f3661240534d22a00';
+const ENB_BOUNTY_NFT_CONTRACT_ABI = [
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "_owner",
+        "type": "address"
+      }
+    ],
+    "name": "balanceOf",
+    "outputs": [
+      {
+        "name": "balance",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
+
+async function checkNftBalance(walletAddress: string): Promise<boolean> {
+    if (!walletAddress) return false;
+    try {
+        const balance = await publicClient.readContract({
+            address: ENB_BOUNTY_NFT_CONTRACT_ADDRESS,
+            abi: ENB_BOUNTY_NFT_CONTRACT_ABI,
+            functionName: 'balanceOf',
+            args: [walletAddress as `0x${string}`],
+        });
+
+        return Number(balance) > 0;
+    } catch (error) {
+        console.error("Failed to check NFT balance:", error);
+        return false;
+    }
+}
 
 async function checkTokenBalance(walletAddress: string, requiredBalance: number): Promise<boolean> {
   const TOKEN_CONTRACT_ADDRESS = '0xf73978b3a7d1d4974abae11f696c1b4408c027a0';

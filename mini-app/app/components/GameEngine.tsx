@@ -14,23 +14,23 @@ const GAME_DURATION = 30;
 const INITIAL_SPAWN_RATE = 310; // ms between spawns
 const INITIAL_BOMB_SPEED = 2.4; // pixels per frame
 const INITIAL_PICTURE_SPEED = 2.2; // pixels per frame
-const INITIAL_BOMB_CHANCE = 0.08; // 10% chance
+const INITIAL_BOMB_CHANCE = 0.196; // 10% chance
 
 // Final game parameters at the end of the timer for scaling
 const FINAL_SPAWN_RATE = 250; // ms between spawns
 const FINAL_BOMB_SPEED = 4.5; // pixels per frame
 const FINAL_PICTURE_SPEED = 5.4; // pixels per frame
-const FINAL_BOMB_CHANCE = 0.25; // 40% chance
+const FINAL_BOMB_CHANCE = 0.35; // 40% chance
 
 // Power-up configuration
 const PICTURE_URL = "/Enb_000.png";
-const POWER_UP_POINT_5_URL = "/powerup_5.jpg";
+const POWER_UP_POINT_5_URL = "/powerup_5.png";
 const POWER_UP_POINT_5_VALUE = 5;
 const POWER_UP_POINT_5_CHANCE = 0.01;
-const POWER_UP_POINT_10_URL = "/powerup_10.jpg";
+const POWER_UP_POINT_10_URL = "/powerup_10.png";
 const POWER_UP_POINT_10_VALUE = 10;
 const POWER_UP_POINT_10_CHANCE = 0.005;
-const POWER_UP_POINT_2_URL = "/powerup_2.jpg";
+const POWER_UP_POINT_2_URL = "/powerup_2.png";
 const POWER_UP_POINT_2_VALUE = 2;
 const POWER_UP_POINT_2_CHANCE = 0.03;
 
@@ -209,9 +209,9 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
 
   useEffect(() => {
     // This effect manages the audio mix during invincibility
-    if (isInvincible && !isMuted) {
+    if (isInvincible) {
       heartbeatSoundRef.current?.play().catch(e => console.error("Heartbeat audio play failed:", e));
-      if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.08; // 5%
+      if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.08;
       if (coinSoundRef.current) coinSoundRef.current.volume = 0.7;
     } else {
       if (heartbeatSoundRef.current) {
@@ -221,7 +221,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
       if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.3;
       if (coinSoundRef.current) coinSoundRef.current.volume = 1.0;
     }
-  }, [isInvincible, isMuted]);
+  }, [isInvincible]);
 
   useEffect(() => {
     // This effect manages the background music playback based on game state
@@ -320,7 +320,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
               }
               // Bomb is removed even if invincible, but doesn't trigger the penalty.
             } else {
-              if (!isMuted && coinSoundRef.current) {
+              if (coinSoundRef.current) {
                 coinSoundRef.current.currentTime = 0;
                 coinSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
               }
@@ -340,7 +340,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
           });
 
           if (hitBomb) {
-            if (!isMuted && bombSoundRef.current) {
+            if (bombSoundRef.current) {
               bombSoundRef.current.currentTime = 0;
               bombSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
             }
@@ -376,12 +376,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   useEffect(() => {
     if (gameState === 'won' && !isGameOverSoundPlayed) {
       onGameWin(scoreRef.current);
-      if (!isMuted && gameOverSoundRef.current) {
+      if (gameOverSoundRef.current) {
         gameOverSoundRef.current.play().catch(e => console.error(e));
       }
       setIsGameOverSoundPlayed(true);
     }
-  }, [gameState, onGameWin, isMuted, isGameOverSoundPlayed]);
+  }, [gameState, onGameWin, isGameOverSoundPlayed]);
 
   const renderItem = (item: Item) => {
     switch (item.type) {

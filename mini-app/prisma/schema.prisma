@@ -15,6 +15,7 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   walletAddress String    @unique
+  verifiedWallets    String[] @default([]) 
   fid           BigInt      @unique 
   username      String?   @unique
   pfpUrl        String?

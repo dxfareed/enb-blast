@@ -1,8 +1,15 @@
 // This is your user stats frame route, e.g., /app/share-frame/route.ts
-
 import { ImageResponse } from 'next/og';
+import { NextRequest } from 'next/server';
 
 export const runtime = 'edge';
+
+// --- FONT LOADING ---
+// Fetch the font file ONCE when the module is loaded.
+const spaceMonoRegularFontPromise = fetch(
+  new URL('/SpaceMono-Regular.ttf', process.env.NEXT_PUBLIC_URL as string)
+).then((res) => res.arrayBuffer());
+
 
 // --- DATA TYPES ---
 type UserProfile = {
@@ -21,7 +28,7 @@ type LeaderboardUser = {
 };
 
 // --- DATA FETCHING ---
-async function getUserProfile(fid: string): Promise<UserProfile> {
+async function getUserProfile(fid: string, revalidate = false): Promise<UserProfile> {
   const fallbackUser: UserProfile = {
     username: 'player',
     pfpUrl: 'https://i.imgur.com/gBEyS2b.jpg', // A reliable, generic fallback PFP
@@ -34,7 +41,7 @@ async function getUserProfile(fid: string): Promise<UserProfile> {
   if (!fid) return fallbackUser;
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/user/profile?fid=${fid}`);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/user/profile?fid=${fid}`, { cache: revalidate ? 'no-cache' : 'default' });
     if (!response.ok) {
         console.error(`API call for FID ${fid} failed with status ${response.status}`);
         return fallbackUser;
@@ -56,9 +63,9 @@ async function getUserProfile(fid: string): Promise<UserProfile> {
   }
 }
 
-async function getTopUsers(): Promise<LeaderboardUser[]> {
+async function getTopUsers(revalidate = false): Promise<LeaderboardUser[]> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/leaderboard`);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/leaderboard`, { cache: revalidate ? 'no-cache' : 'default' });
     if (!response.ok) return [];
     const data = await response.json();
     return data.topUsers || [];
@@ -92,13 +99,19 @@ const StatItem = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const fontResponse = await fetch(`${process.env.NEXT_PUBLIC_URL}/SpaceMono-Regular.ttf`);
-    const spaceMonoRegularFont = await fontResponse.arrayBuffer();
+    const spaceMonoRegularFont = await spaceMonoRegularFontPromise;
 
     const { searchParams } = new URL(request.url);
     const fid = searchParams.get('fid') || '';
+    const revalidate = searchParams.get('revalidate') === 'true';
+
+    // --- PARALLEL DATA FETCHING ---
+    const [fetchedUserProfile, topUsersData] = await Promise.all([
+      getUserProfile(fid, revalidate),
+      getTopUsers(revalidate)
+    ]);
 
     // Extract all potential parameters from the URL
     const urlUsername = searchParams.get('username');
@@ -107,9 +120,6 @@ export async function GET(request: Request) {
     const urlClaimed = searchParams.get('claimed');
     const urlWeeklyPoints = searchParams.get('weeklyPoints');
     const urlRank = searchParams.get('rank');
-
-    // Fetch user profile as a base/fallback
-    const fetchedUserProfile = await getUserProfile(fid);
 
     // Construct the user profile for display, prioritizing URL parameters
     const displayUserProfile: UserProfile = {
@@ -120,8 +130,6 @@ export async function GET(request: Request) {
       weeklyPoints: urlWeeklyPoints || fetchedUserProfile.weeklyPoints,
       weeklyRank: urlRank ? parseInt(urlRank) : fetchedUserProfile.weeklyRank,
     };
-
-    const topUsersData = await getTopUsers();
 
     const topUsers = topUsersData.slice(0, 5).map((user, index) => ({
       ...user,

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       },
     });
 
-    const topUsers = users.slice(0, 10);
+    const topUsers = users.slice(0, 100);
 
     let currentUserRank = null;
     if (fid) {

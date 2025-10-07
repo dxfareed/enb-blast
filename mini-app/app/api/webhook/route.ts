@@ -103,8 +103,8 @@ export async function POST(request: Request) {
       await setUserNotificationDetails(fid, event.notificationDetails);
       await sendFrameNotification({
         fid,
-        title: `Welcome to Farcaster Mini App Template`,
-        body: `Thank you for enabling notifications for Farcaster Mini App Template`,
+        title: `Welcome to ENB Blast`,
+        body: `Get ready to blast $ENB and earn $ENB`,
       });
 
       break;
