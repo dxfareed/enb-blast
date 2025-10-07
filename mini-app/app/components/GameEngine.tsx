@@ -14,13 +14,13 @@ const GAME_DURATION = 30;
 const INITIAL_SPAWN_RATE = 310; // ms between spawns
 const INITIAL_BOMB_SPEED = 2.4; // pixels per frame
 const INITIAL_PICTURE_SPEED = 2.2; // pixels per frame
-const INITIAL_BOMB_CHANCE = 0.096; // 10% chance
+const INITIAL_BOMB_CHANCE = 0.196; // 10% chance
 
 // Final game parameters at the end of the timer for scaling
 const FINAL_SPAWN_RATE = 250; // ms between spawns
 const FINAL_BOMB_SPEED = 4.5; // pixels per frame
 const FINAL_PICTURE_SPEED = 5.4; // pixels per frame
-const FINAL_BOMB_CHANCE = 0.29; // 40% chance
+const FINAL_BOMB_CHANCE = 0.35; // 40% chance
 
 // Power-up configuration
 const PICTURE_URL = "/Enb_000.png";

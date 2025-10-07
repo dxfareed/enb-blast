@@ -17,6 +17,8 @@ function getStartOfUTCDay() {
 import {
   TOKEN_MEMBERSHIP_CONTRACT_ADDRESS,
   TOKEN_MEMBERSHIP_CONTRACT_ABI,
+  GAME_CONTRACT_ADDRESS,
+  GAME_CONTRACT_ABI,
 } from '@/app/utils/constants';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
@@ -269,6 +271,19 @@ const taskCheckers = {
     });
     return !!recentClaim;
   },
+  USE_MULTIPLIER: async (user: { id: string; }): Promise<boolean> => {
+    const todayUTC = getStartOfUTCDay();
+    const userProfile = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { lastMultiplierUsedAt: true },
+    });
+
+    if (!userProfile || !userProfile.lastMultiplierUsedAt) {
+      return false;
+    }
+
+    return userProfile.lastMultiplierUsedAt >= todayUTC;
+  },
 
   LEADERBOARD_VISIT: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying leaderboard visit for user ${user.id}...`);
@@ -281,6 +296,35 @@ const taskCheckers = {
       },
     });
     return !!visitEvent;
+  },
+
+  MAX_OUT_DAILY_CLAIMS: async (user: { fid: bigint; }) => {
+    try {
+      const [onChainProfile, maxClaims] = await Promise.all([
+        publicClient.readContract({
+          //@ts-ignore
+            address: GAME_CONTRACT_ADDRESS,
+            abi: GAME_CONTRACT_ABI,
+            functionName: 'getUserProfile',
+            args: [user.fid]
+        }),
+        publicClient.readContract({
+          //@ts-ignore  
+          address: GAME_CONTRACT_ADDRESS,
+            abi: GAME_CONTRACT_ABI,
+            functionName: 'maxClaimsPerCycle',
+        })
+      ]);
+
+      if (!onChainProfile.isRegistered) {
+        return false;
+      }
+
+      return onChainProfile.claimsInCurrentCycle >= maxClaims;
+    } catch (error) {
+      console.error("Failed to check max daily claims:", error);
+      return false;
+    }
   },
 
   MINT_ENB_BOUNTY_NFT: async (user: { walletAddress: string; }) => checkNftBalance(user.walletAddress),

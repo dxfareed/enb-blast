@@ -39,56 +39,42 @@ const tokensClaimedAbi = {
   "type": "event"
 };
 
-// --- Timing Constants ---
-const PRISMA_KEEP_ALIVE_INTERVAL = 60 * 1000; // 1 minute
-const WEBSOCKET_KEEP_ALIVE_INTERVAL = 30 * 1000; // 30 seconds (must be shorter than network timeout)
-const PROCESSOR_RETRY_DELAY = 15000; // 15 seconds
-const PROCESSOR_FALLBACK_INTERVAL = 10000; // 10 seconds
+const PRISMA_KEEP_ALIVE_INTERVAL = 60 * 1000;
+const PROCESSOR_RETRY_DELAY = 15000;
+const PROCESSOR_FALLBACK_INTERVAL = 10000;
 
-// --- Resilient Queue System ---
 const eventQueue = [];
 let isProcessing = false;
-// --- End Queue System ---
 
-
-/**
- * Processes a single event log. This function is designed to throw an error on failure,
- * which will be caught by the queue processor, allowing for retries.
- * @param {object} log - The event log object from viem.
- */
 async function processEvent(log) {
   const { fid, claimingWallet, amount, nonce } = log.args;
   const txHash = log.transactionHash;
 
   console.log(`  - ➡️  Attempting to process Nonce: ${nonce} for wallet ${claimingWallet} (FID: ${fid})...`);
 
-  // 1. Check if claim already exists in the DB to prevent duplicates
   const existingClaim = await prisma.claim.findUnique({
     where: { txHash },
   });
 
   if (existingClaim) {
     console.warn(`     - ℹ️  Claim with txHash ${txHash} already exists. Skipping.`);
-    return; // Exit successfully
+    return;
   }
 
-  // 2. Fetch block details for timestamp
   const block = await client.getBlock({ blockHash: log.blockHash });
   const timestamp = new Date(Number(block.timestamp) * 1000);
   const amountDecimal = formatUnits(amount, 18);
   const points = parseFloat(amountDecimal) * 10;
 
-  // 3. Find the user in our database
   const dbUser = await prisma.user.findUnique({
     where: { walletAddress: claimingWallet.toLowerCase() },
   });
 
   if (!dbUser) {
     console.warn(`     - ⚠️  User with wallet ${claimingWallet} not found in DB. Claim will not be indexed.`);
-    return; // Exit successfully
+    return;
   }
 
-  // 4. Calculate streak and daily claims (your existing logic)
   const { streak, lastClaimedAt, claimsToday } = dbUser;
   const isSameDay = lastClaimedAt
     ? timestamp.getUTCFullYear() === lastClaimedAt.getUTCFullYear() &&
@@ -114,7 +100,6 @@ async function processEvent(log) {
     }
   }
 
-  // 5. Execute database transaction
   await prisma.$transaction(async (tx) => {
     await tx.claim.create({
       data: {
@@ -141,10 +126,6 @@ async function processEvent(log) {
   console.log(` - ✅ Successfully indexed claim with txHash: ${txHash}`);
 }
 
-/**
- * The queue processor. It runs in a loop, attempting to process events from the front
- * of the queue. If an event fails, it waits and retries the same event later.
- */
 async function processQueue() {
   if (isProcessing) return;
   isProcessing = true;
@@ -154,29 +135,29 @@ async function processQueue() {
   }
 
   while (eventQueue.length > 0) {
-    const log = eventQueue[0]; // Peek at the first event without removing it
+    const log = eventQueue[0];
 
     try {
       await processEvent(log);
-      eventQueue.shift(); // Success! Remove the event from the queue.
+      eventQueue.shift();
     } catch (error) {
       console.error(`   - ❌ DB Error processing txHash ${log.transactionHash}. Will retry in ${PROCESSOR_RETRY_DELAY / 1000}s.`, error.message);
-      // Don't remove the event from the queue. Wait before the next attempt.
       isProcessing = false;
       await new Promise((res) => setTimeout(res, PROCESSOR_RETRY_DELAY));
-      // After waiting, restart the processing loop
       processQueue();
-      return; // Exit this loop instance to start a fresh one
+      return;
     }
   }
 
   isProcessing = false;
 }
 
-// Use a WebSocket transport for real-time events.
 const transport = webSocket(process.env.NEXT_PUBLIC_WS, {
   retryCount: 5,
   retryDelay: 5000,
+  ping: true,
+  pingInterval: 15_000,
+  pongTimeout: 10_000,
   async onConnect() {
     console.log("... ✅ WebSocket connection established. Listening for events... 👂");
   },
@@ -198,7 +179,6 @@ async function main() {
     throw new Error("Contract address or NEXT_PUBLIC_WS not found in environment variables.");
   }
 
-  // This watcher's only job is to add events to our in-memory queue.
   client.watchContractEvent({
     address: contractAddress,
     abi: [tokensClaimedAbi],
@@ -213,26 +193,13 @@ async function main() {
       processQueue();
     },
     onError: (error) => {
-        console.error("❗️ Critical Error in event watcher:", error);
+        console.error("❗️ Critical Error in event watcher: The event listener has stopped.", error);
+        console.log("   - ℹ️  Viem will automatically attempt to reconnect the WebSocket and resume listening.");
     }
   });
 
-  // Periodically try to process the queue as a fallback mechanism
   setInterval(processQueue, PROCESSOR_FALLBACK_INTERVAL);
 
-  // --- NEW: WebSocket Keep-Alive ---
-  // This prevents the connection from being dropped by network devices during long idle periods.
-  setInterval(async () => {
-    try {
-      const blockNumber = await client.getBlockNumber();
-      console.log(`   - ❤️  WebSocket Keep-Alive: Still connected at block ${blockNumber}.`);
-    } catch (error) {
-      console.error("   - 💔 WebSocket Keep-Alive failed. Connection might be dead. Viem will attempt to reconnect.", error.message);
-    }
-  }, WEBSOCKET_KEEP_ALIVE_INTERVAL);
-
-
-  // Keep the Prisma database connection alive
   setInterval(async () => {
     try {
       await prisma.$queryRaw`SELECT 1`;
