@@ -66,8 +66,13 @@ async function processEvent(log) {
   const amountDecimal = formatUnits(amount, 18);
   const points = parseFloat(amountDecimal) * 10;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { walletAddress: claimingWallet.toLowerCase() },
+  const dbUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { walletAddress: claimingWallet.toLowerCase() },
+        { verifiedWallets: { has: claimingWallet.toLowerCase() } }
+      ]
+    },
   });
 
   if (!dbUser) {
