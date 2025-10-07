@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useFeeData } from 'wagmi';
 import { useUser } from '@/app/context/UserContext';
-import { parseGwei, parseEther } from 'viem'; // [FIX] Use parseEther from viem for consistency
+import { parseGwei, parseEther } from 'viem';
 import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
 import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
@@ -28,14 +28,13 @@ export default function GamePage() {
     const [claimButtonText, setClaimButtonText] = useState('');
     const [isMuted, setIsMuted] = useState(false);
     const { context } = useMiniApp();
+    const { data: feeData } = useFeeData();
     const [showAddAppBanner, setShowAddAppBanner] = useState(false);
 
-    // [FIX] These state variables will be driven by the new, accurate /api/claim/status endpoint
     const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
     const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
     const [countdown, setCountdown] = useState('');
 
-    // [FIX] This useEffect now proactively fetches the user's REAL on-chain claim status on page load.
     useEffect(() => {
         async function fetchClaimStatus() {
             if (fid) {
@@ -58,7 +57,6 @@ export default function GamePage() {
         fetchClaimStatus();
     }, [fid]);
 
-    // [FIX] This countdown logic is now simpler and more accurate, driven by the server's `resetsAt` timestamp.
     useEffect(() => {
         const calculateCountdown = () => {
             const cooldownEnd = claimCooldownEnds ? new Date(claimCooldownEnds) : null;
@@ -73,7 +71,7 @@ export default function GamePage() {
                 } else {
                     setCountdown('00:00:00');
                     setClaimCooldownEnds(null);
-                    refetchUserProfile(); // Refresh data now that cooldown is over
+                    refetchUserProfile();
                 }
             } else {
                 setCountdown('');
@@ -107,10 +105,21 @@ export default function GamePage() {
 
     const handleClaim = async () => {
         if (!address || finalScore <= 0) return;
+
+        if (feeData?.gasPrice) {
+            const highGasThreshold = parseGwei('0.15');
+            if (feeData.gasPrice > highGasThreshold) {
+                setToast({
+                    message: 'Network is busy and gas is high. Please try again later.',
+                    type: 'info',
+                });
+                return;
+            }
+        }
+        
         const claimAmount = finalScore / 10;
         setIsSignatureLoading(true);
         try {
-            // [FIX] The API no longer needs walletAddress, it uses the authenticated FID.
             const signatureResponse = await sdk.quickAuth.fetch('/api/claim/signature', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -124,10 +133,9 @@ export default function GamePage() {
                 throw new Error(errorBody.message || 'Could not get signature.');
             }
 
-            const maxPriority = parseGwei('1');
-            const maxFee = parseGwei('30');
+            const maxPriority = parseGwei('0.05');
+            const maxFee = parseGwei('0.1');
 
-            // [CRITICAL FIX] Get both the signature AND the nonce from the API response.
             const { signature, nonce } = await signatureResponse.json();
             if (typeof nonce === 'undefined') {
                 throw new Error("Invalid response from server: nonce is missing.");
@@ -138,11 +146,9 @@ export default function GamePage() {
                 address: GAME_CONTRACT_ADDRESS,
                 abi: GAME_CONTRACT_ABI,
                 functionName: 'claimTokens',
-                // [CRITICAL FIX] Pass all three required arguments: amount, nonce, and signature.
-                //@ts-ignore
                 args: [parseEther(claimAmount.toString()), BigInt(nonce), signature],
-                //maxFeePerGas: maxFee,
-                //maxPriorityFeePerGas: maxPriority,
+                maxFeePerGas: maxFee,
+                maxPriorityFeePerGas: maxPriority,
             });
         } catch (err) {
             setToast({ message: (err as Error).message, type: 'error' });
@@ -203,7 +209,6 @@ export default function GamePage() {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
         setIsClaimUnlocked(false);
         setFinalScore(0);
-        setIsMultiplierUsed(false);
         setClaimButtonText('');
         if (isConfirmed) resetWriteContract();
         setIsClaimFinalized(false);
@@ -243,7 +248,6 @@ export default function GamePage() {
         }
     }, [isConfirmed, isClaimFinalized, hash, refetchUserProfile, queryClient, writeError, confirmationError, resetWriteContract]);
 
-    // [FIX] The disabled logic is now simpler and more accurate.
     const isClaimDisabled = isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmed || !!claimCooldownEnds || claimsLeft === 0;
 
     return (
@@ -300,7 +304,7 @@ export default function GamePage() {
                     )
                 )}
                 <div className={styles.statusMessage}>
-                    {/* [FIX] This status message now uses the accurate, real-time state. */}
+                    {/* This status message now uses the accurate, real-time state. */}
                     {claimsLeft !== null && !claimCooldownEnds && (<p>Claims left today: {claimsLeft}</p>)}
                 </div>
             </div>

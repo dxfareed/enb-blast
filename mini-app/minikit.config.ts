@@ -32,7 +32,6 @@ export const minikitConfig = {
     ogTitle: "Collect ENBs, avoid the bomb!",
     ogDescription: "Drag your avatar to collect ENBs and avoid bombs. Earn points and climb the leaderboard!",
     ogImageUrl: `${ROOT_URL}/hero.png`,
-    tagline: "Collect ENBs, avoid the bomb!",
-    "noindex": true,
+    tagline: "Collect ENBs, avoid the bomb!"
   },
 } as const;

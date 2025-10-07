@@ -7,7 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "notify": "tsx scripts/broadcast.ts"
+    "notify": "tsx scripts/broadcast.ts",
+    "notify:claim-reset": "tsx scripts/notify-claim-reset-onchain.ts"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.mjs"

@@ -42,6 +42,11 @@ const allowedCheckKeys = [
   'YOUTUBE_SUBSCRIBE_ENBMINIAPPS',
   'PARAGRAPH_SUBSCRIBE_ENB',
   'ZORA_FOLLOW_ENB',
+  'LUMA_FOLLOW_ENB',
+  'TELEGRAM_JOIN_ENB',
+  'X_FOLLOW_ENB',
+  'DISCORD_JOIN_ENB',
+  'CREATORX_FOLLOW_FOUNDER',
 ];
 
 export async function POST(request: NextRequest) {

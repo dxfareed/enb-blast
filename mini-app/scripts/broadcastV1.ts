@@ -1,5 +1,3 @@
-// scripts/broadcast.ts
-
 import 'dotenv/config';
 import prisma from '../lib/prisma';
 
@@ -60,7 +58,7 @@ async function main() {
           continue;
         }
 
-           const sanitizedToken = rawToken.trim().replace(/\0/g, '');
+        const sanitizedToken = rawToken.trim().replace(/\0/g, '');
        
         const notificationDetails = JSON.parse(sanitizedToken) as NotificationDetails;
 

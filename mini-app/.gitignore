@@ -42,3 +42,7 @@ next-env.d.ts
 
 /app/generated/prisma
 /ui-demo
+
+# Notification script state
+/scripts/notified-users.json
+/scripts/notify-claim-reset-onchain.ts

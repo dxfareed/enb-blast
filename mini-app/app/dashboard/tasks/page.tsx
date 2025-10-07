@@ -43,36 +43,47 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
   const handleGoClick = async () => {
     if (task.actionUrl) {
       const url = task.actionUrl;
+
+      // 1. Internal navigation
       if (url.startsWith('/')) {
         router.push(url);
         return;
       }
+
+      // 2. Open other mini apps
       if (url.startsWith('https://farcaster.xyz/miniapps/')) {
         try {
           await sdk.actions.openMiniApp({ url });
         } catch (error) {
-          console.error('Failed to open Mini App:', error);
-          window.open(url, '_blank');
+          console.error('Failed to open Mini App, falling back to openUrl:', error);
+          await sdk.actions.openUrl({ url });
         }
         return;
       }
+
+      // 3. View specific user profiles
       if (url.startsWith('https://farcaster.xyz/') && !url.includes('/~/channel/')) {
         let fid: number | null = null;
-        if (url.includes('dxfareed')) {
-          fid = 849768;
-        } else if (url.includes('kokocodes')) {
-          fid = 738574;
-        } else if (url.includes('enb')) {
-          fid = 1089736;
-        }
+        if (url.includes('dxfareed')) fid = 849768;
+        else if (url.includes('kokocodes')) fid = 738574;
+        else if (url.includes('enb')) fid = 1089736;
 
         if (fid) {
-          console.log('Viewing profile for fid:', fid);
-          sdk.actions.viewProfile({ fid });
-        } else {
-          window.open(url, '_blank');
+          try {
+            await sdk.actions.viewProfile({ fid });
+            return;
+          } catch (error) {
+             console.error('Failed to open profile, falling back to openUrl:', error);
+          }
         }
-      } else {
+      }
+      
+      // 4. Fallback for all other URLs (channels, external sites, etc.)
+      try {
+        await sdk.actions.openUrl({ url });
+      } catch (error) {
+        console.error(`Failed to open URL with SDK: ${url}`, error);
+        // Final fallback to window.open if sdk fails
         window.open(url, '_blank');
       }
     }
@@ -113,6 +124,11 @@ const fakeVerificationTasks = [
   'YOUTUBE_SUBSCRIBE_ENBMINIAPPS',
   'PARAGRAPH_SUBSCRIBE_ENB',
   'ZORA_FOLLOW_ENB',
+  'LUMA_FOLLOW_ENB',
+  'TELEGRAM_JOIN_ENB',
+  'X_FOLLOW_ENB',
+  'DISCORD_JOIN_ENB',
+  'CREATORX_FOLLOW_FOUNDER',
 ];
 
 export default function TasksPage() {
