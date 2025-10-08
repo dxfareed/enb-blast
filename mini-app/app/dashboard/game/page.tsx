@@ -20,10 +20,11 @@ export default function GamePage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
     const [finalScore, setFinalScore] = useState(0);
-    const [isMultiplierUsed, setIsMultiplierUsed] = useState(false);
-    const [isMultiplierLoading, setIsMultiplierLoading] = useState(false);
     const [isSignatureLoading, setIsSignatureLoading] = useState(false);
     const [isClaimFinalized, setIsClaimFinalized] = useState(false);
+    const [showShareButton, setShowShareButton] = useState(false);
+    const [playAgainCooldown, setPlayAgainCooldown] = useState(false);
+    const [shareProgress, setShareProgress] = useState(0);
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
     const [isMuted, setIsMuted] = useState(false);
@@ -93,16 +94,6 @@ export default function GamePage() {
 
     const toggleMute = () => { setIsMuted(prevState => !prevState); };
 
-    useEffect(() => {
-        if (userProfile?.lastMultiplierUsedAt) {
-            const lastUsedDate = new Date(userProfile.lastMultiplierUsedAt);
-            const now = new Date();
-            if (lastUsedDate.getUTCFullYear() === now.getUTCFullYear() && lastUsedDate.getUTCMonth() === now.getUTCMonth() && lastUsedDate.getUTCDate() === now.getUTCDate()) {
-                setIsMultiplierUsed(true);
-            }
-        }
-    }, [userProfile]);
-
     const handleClaim = async () => {
         if (!address || finalScore <= 0) return;
 
@@ -158,15 +149,12 @@ export default function GamePage() {
     };
 
     const handleShareScoreFrame = async () => {
-        if (isMultiplierUsed || isMultiplierLoading) return;
         sdk.haptics.impactOccurred('heavy');
-        setIsMultiplierLoading(true);
         try {
             if (!userProfile?.fid) {
                 await refetchUserProfile();
                 if (!userProfile?.fid) throw new Error("User profile could not be loaded.");
             }
-            const multipliedScore = finalScore * 2;
             const appUrl = process.env.NEXT_PUBLIC_URL || '';
             const username = userProfile.username || '@johndoe';
             const pfpUrl = userProfile.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU-C9_400x400.jpg';
@@ -177,25 +165,18 @@ export default function GamePage() {
 
             const rank = userProfile.weeklyRank?.toString() || 'N/A';
 
-            const frameUrl = `${appUrl}/share-frame?score=${multipliedScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
-            const castText = `I just scored ${multipliedScore} points and earned ${multipliedScore / 10} $ENB from the ENB BLAST mini app.\nGo claim yours now!`;
+            const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
+            const castText = `I just scored ${finalScore} points and earned ${finalScore / 10} $ENB from the ENB BLAST mini app.\nGo claim yours now!`;
 
             const result = await sdk.actions.composeCast({ text: castText, embeds: [frameUrl] });
 
             if (result.cast) {
-                await sdk.quickAuth.fetch('/api/game/use-multiplier', { method: 'POST' });
-                setFinalScore(multipliedScore);
-                setIsMultiplierUsed(true);
-                setClaimButtonText(`Claim ${(multipliedScore / 10).toFixed(1)} $ENB`);
-                setToast({ message: "Success! Score shared & doubled!", type: 'success' });
-                await refetchUserProfile();
+                setToast({ message: "Success! Score shared!", type: 'success' });
             } else {
-                setToast({ message: "Sharing cancelled. Multiplier was not used.", type: 'info' });
+                setToast({ message: "Sharing cancelled.", type: 'info' });
             }
         } catch (error) {
             setToast({ message: (error as Error).message || `An error occurred.`, type: 'error' });
-        } finally {
-            setIsMultiplierLoading(false);
         }
     };
 
@@ -212,6 +193,7 @@ export default function GamePage() {
         setClaimButtonText('');
         if (isConfirmed) resetWriteContract();
         setIsClaimFinalized(false);
+        setShowShareButton(false);
     };
 
     useEffect(() => {
@@ -222,11 +204,14 @@ export default function GamePage() {
             resetWriteContract();
             return;
         }
+
+        let progressInterval: NodeJS.Timeout;
+        let cooldownTimeout: NodeJS.Timeout;
+
         const confirmClaim = async () => {
             if (!hash || isClaimFinalized) return;
             setIsClaimFinalized(true);
             try {
-                // The /api/claim/confirm call is correct and does not need changes.
                 const response = await sdk.quickAuth.fetch('/api/claim/confirm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -237,18 +222,45 @@ export default function GamePage() {
                     throw new Error((await response.json()).message || 'Failed to confirm claim on the server.');
                 }
                 setToast({ message: 'Claim successful!', type: 'success' });
+                
+                setShowShareButton(true);
+                setPlayAgainCooldown(true);
+                setShareProgress(0);
+
+                progressInterval = setInterval(() => {
+                    setShareProgress(prev => {
+                        if (prev >= 100) {
+                            clearInterval(progressInterval);
+                            return 100;
+                        }
+                        return prev + 1;
+                    });
+                }, 50); // Update every 50ms for a 5s duration
+
+                cooldownTimeout = setTimeout(() => {
+                    setShowShareButton(false);
+                    setPlayAgainCooldown(false);
+                    clearInterval(progressInterval);
+                }, 7000);
+
                 await refetchUserProfile();
                 queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
             } catch (err) {
                 setToast({ message: (err as Error).message, type: 'error' });
             }
         };
+
         if (isConfirmed) {
             confirmClaim();
         }
+
+        return () => {
+            clearInterval(progressInterval);
+            clearTimeout(cooldownTimeout);
+        };
     }, [isConfirmed, isClaimFinalized, hash, refetchUserProfile, queryClient, writeError, confirmationError, resetWriteContract]);
 
-    const isClaimDisabled = isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmed || !!claimCooldownEnds || claimsLeft === 0;
+    const isClaimDisabled = isWritePending || isConfirming || isSignatureLoading || isConfirmed || !!claimCooldownEnds || claimsLeft === 0;
 
     return (
         <div className={styles.gameContainer}>
@@ -274,19 +286,25 @@ export default function GamePage() {
                                                             isConfirming ? 'Confirming...' :
                                                                 claimButtonText}
                                         </button>
-                                        {!isMultiplierUsed && <button
-                                            onClick={handleShareScoreFrame}
-                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isMultiplierUsed}
-                                            className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
-                                        >
-                                            {isMultiplierLoading ? '2x...' : isMultiplierUsed ? '2xed!' : '2x'}
-                                        </button>}
                                     </div>
                                 </>
                             ) : (
-                                <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>
-                                    Play Again
-                                </button>
+                                <>
+                                    {playAgainCooldown ? (
+                                        showShareButton && (
+                                            <button onClick={handleShareScoreFrame} className={`${styles.claimButton} ${styles.shareButton}`}>
+                                                <div className={styles.shareProgress} style={{ width: `${shareProgress}%` }}></div>
+                                                <span className={styles.buttonText}>Share Score</span>
+                                            </button>
+                                        )
+                                    ) : (
+                                        isClaimFinalized && !playAgainCooldown && (
+                                            <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>
+                                                Play Again
+                                            </button>
+                                        )
+                                    )}
+                                </>
                             )
                         ) : (
                             <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>

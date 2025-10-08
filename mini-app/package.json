@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "notify": "tsx scripts/broadcast.ts",
+    "notify:v1": "tsx scripts/broadcastV1.ts",
     "notify:claim-reset": "tsx scripts/notify-claim-reset-onchain.ts"
   },
   "prisma": {
