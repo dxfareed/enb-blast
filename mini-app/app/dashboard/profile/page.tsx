@@ -12,6 +12,7 @@ import {
   TOKEN_MEMBERSHIP_LEVELS
 } from '@/app/utils/constants';
 import Loader from '@/app/components/Loader';
+import AppListModal from '@/app/components/AppListModal'; // Importing the AppListModal component
 
 type UserProfile = {
   username: string;
@@ -19,12 +20,13 @@ type UserProfile = {
   streak: number;
   totalPoints: string;
   totalClaimed: string;
-  weeklyRank?: number; 
+  weeklyRank?: number;
   fid: number;
 };
 
 export default function ProfilePage() {
   const { userProfile, isLoading: isUserLoading, refetchUserProfile } = useUser();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { address } = useAccount();
 
   useEffect(() => {
@@ -50,8 +52,8 @@ export default function ProfilePage() {
   const isLoading = isUserLoading || (!!address && isContractLoading);
 
   const handleShare = async () => {
-    if (!userProfile){
-      console.error("User profile is not loaded yet.");  
+    if (!userProfile) {
+      console.error("User profile is not loaded yet.");
       return
     };
 
@@ -100,7 +102,7 @@ export default function ProfilePage() {
       </div>
       <h2 className={styles.username}>@{userProfile.username}
         <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px' }} title="Share Profile">
-        <Share size={19} color="rgba(31, 105, 241, 1)" />
+          <Share size={19} color="rgba(31, 105, 241, 1)" />
         </button>
       </h2>
       <div className={styles.statsGrid}>
@@ -128,9 +130,13 @@ export default function ProfilePage() {
         </div>
         <div>
           <p className={styles.levelLabel}>Membership Level</p>
-            <p className={styles.levelValue}>{membershipLevelName}</p>
+          <p className={styles.levelValue}>{membershipLevelName}</p>
         </div>
       </div>
+      <div className={styles.exploreFooter} onClick={() => setIsModalOpen(true)}>
+        <p>Explore more ENB Apps</p>
+      </div>
+      {isModalOpen && <AppListModal onClose={() => setIsModalOpen(false)} />}
     </div>
   );
 }

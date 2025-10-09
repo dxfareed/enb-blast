@@ -1,11 +1,22 @@
+/* app/components/TokenBalanceDisplay.module.css */
+
 .tokenBadge {
-    background-color:rgb(116, 51, 235);
-    color: white;
+    /* --- MODIFIED --- */
+    background-color: transparent; /* Changed from purple to transparent */
+    color: rgb(116, 51, 235);      /* Changed from white to your brand's purple */
+    border: 2px solid rgb(116, 51, 235); /* Added a border with your brand's purple */
+    
+    /* --- UNCHANGED --- */
     border-radius: 9999px;
     padding: 0.6rem 1rem;
-    font-size: 0.875rem;
+    font-size: 0.55rem;
     font-weight: bold;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     min-width: 120px;
     text-align: center;
+}
+
+.balanceContainer{
+    font-size: 15px;
+    font-weight: 600;
 }

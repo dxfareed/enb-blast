@@ -26,6 +26,16 @@ const GAME_CONTRACT_ABI = [
           "internalType": "uint256",
           "name": "_initialMaxClaims",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_initialMaxClaimAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_initialCooldownPeriod",
+          "type": "uint256"
         }
       ],
       "stateMutability": "nonpayable",
@@ -86,6 +96,32 @@ const GAME_CONTRACT_ABI = [
         {
           "indexed": false,
           "internalType": "uint256",
+          "name": "newPeriod",
+          "type": "uint256"
+        }
+      ],
+      "name": "CooldownPeriodChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "MaxClaimAmountChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
           "name": "newLimit",
           "type": "uint256"
         }
@@ -110,31 +146,6 @@ const GAME_CONTRACT_ABI = [
         }
       ],
       "name": "OwnershipTransferred",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "onBehalfOfUser",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "totalAmount",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "recipientCount",
-          "type": "uint256"
-        }
-      ],
-      "name": "RewardsSent",
       "type": "event"
     },
     {
@@ -234,6 +245,19 @@ const GAME_CONTRACT_ABI = [
       "name": "claimTokens",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cooldownPeriod",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -383,6 +407,19 @@ const GAME_CONTRACT_ABI = [
     },
     {
       "inputs": [],
+      "name": "maxClaimAmount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "maxClaimsPerCycle",
       "outputs": [
         {
@@ -440,22 +477,25 @@ const GAME_CONTRACT_ABI = [
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "_user",
-          "type": "address"
-        },
-        {
-          "internalType": "address[]",
-          "name": "_recipients",
-          "type": "address[]"
-        },
-        {
           "internalType": "uint256",
-          "name": "_totalAmount",
+          "name": "_newPeriod",
           "type": "uint256"
         }
       ],
-      "name": "sendReward",
+      "name": "setCooldownPeriod",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_newAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "setMaxClaimAmount",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -560,6 +600,24 @@ const GAME_CONTRACT_ABI = [
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_tokenAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdrawMistakenlySentTokens",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

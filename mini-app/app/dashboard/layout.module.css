@@ -109,7 +109,6 @@
 .skipButton {
   position: fixed;
   top: 20px;
-  /* MODIFIED: Changed from 'right' to 'left' */
   left: 20px;
   z-index: 1000;
   padding: 8px 16px;
@@ -127,27 +126,29 @@
 }
 
 .headerRight {
-  /* This container holds the Token Balance display */
   display: flex;
 }
 
 .buyButton {
-  background-color: rgb(116, 51, 235); /* Using your exact purple color */
+  background-color: rgb(116, 51, 235);
   color: white;
-  border-radius: 9999px; /* Matches your .tokenBadge */
-  padding: 0.6rem 1.5rem;   /* Similar padding to .tokenBadge but wider */
-  font-size: 0.875rem;      /* Matches your .tokenBadge */
-  font-weight: bold;        /* Matches your .tokenBadge */
-  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
   border: none;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+  transition: transform 0.15s ease-out, background-color 0.15s ease-out;
 }
 
 .buyButton:hover {
-  background-color: rgb(99, 44, 205); /* A slightly darker shade for hover */
+  background-color: rgb(101, 45, 204);
 }
 
 .buyButton:active {
-  transform: scale(0.98); /* Adds a subtle press effect */
+  transform: scale(0.97);
 }

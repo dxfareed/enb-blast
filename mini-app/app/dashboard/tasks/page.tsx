@@ -137,6 +137,7 @@ export default function TasksPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [checkingTaskId, setCheckingTaskId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
+  const [activeTab, setActiveTab] = useState<'daily' | 'default'>('daily'); // <-- NEW: State for tabs
 
   const fetchTasks = async () => {
     if (!fid) return;
@@ -245,7 +246,7 @@ export default function TasksPage() {
   return (
     <div className={styles.tasksContainer}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <h1 className={styles.title}>Tasks</h1>
+      {/* <h1 className={styles.title}>Tasks</h1> */}
 
       {partnerTasks.length > 0 && (
         <section className={styles.taskSection}>
@@ -256,18 +257,38 @@ export default function TasksPage() {
         </section>
       )}
 
-      <section className={styles.taskSection}>
-        <h2 className={`${styles.sectionTitle} ${styles.dailyTasksTitle}`}>Daily Tasks</h2>
-        <div className={styles.taskList}>
-          {dailyTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
-        </div>
-      </section>
-      <section className={styles.taskSection}>
-        <h2 className={`${styles.sectionTitle} ${styles.defaultTasksTitle}`}>Default Tasks</h2>
-        <div className={styles.taskList}>
-          {defaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
-        </div>
-      </section>
+      {/* NEW: Tab Switcher UI */}
+      <div className={styles.taskSwitcher}>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'daily' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('daily')}
+        >
+          Daily Tasks
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'default' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('default')}
+        >
+          Default Tasks
+        </button>
+      </div>
+
+      {/* NEW: Conditionally Rendered Task Lists */}
+      {activeTab === 'daily' && (
+        <section className={styles.taskSection}>
+          <div className={styles.taskList}>
+            {dailyTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'default' && (
+        <section className={styles.taskSection}>
+          <div className={styles.taskList}>
+            {defaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

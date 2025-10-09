@@ -3,13 +3,14 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther, parseGwei } from 'viem';
+import { parseGwei } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Toast from '@/app/components/Toast';
 import Loader from '@/app/components/Loader';
 import styles from './register.module.css';
+import modalStyles from './pendingModal.module.css';
 import animationStyles from '../../animations.module.css';
 import { useUser } from '@/app/context/UserContext';
 
@@ -33,34 +34,37 @@ const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `
 export default function RegisterPage() {
   const [isPopping, setIsPopping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { address, isConnected } = useAccount();
   const router = useRouter();
-  // We now use refetchUserProfile to get the final 'ACTIVE' status
   const { userProfile, fid, refetchUserProfile } = useUser();
 
-  // Redirect the user if their profile is already ACTIVE
+  // Redirect user or show pending modal based on status
   useEffect(() => {
-    if (userProfile && userProfile.registrationStatus === 'ACTIVE') {
-      router.replace('/dashboard/game');
+    if (userProfile) {
+      if (userProfile.registrationStatus === 'ACTIVE') {
+        router.replace('/dashboard/game');
+      } else if (userProfile.registrationStatus === 'PENDING') {
+        setShowPendingModal(true);
+      }
     }
   }, [userProfile, router]);
 
   const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, error: confirmationError } = useWaitForTransactionReceipt({ hash });
 
-  // This combined loading state is correct
+  // Combined loading state
   useEffect(() => {
     setIsLoading(isPending || isConfirming);
   }, [isPending, isConfirming]);
 
-  // [CORRECTED FLOW] This effect now handles the ACTIVATION step after a successful transaction
+  // Handle user activation after successful transaction
   useEffect(() => {
     async function activateUserOnSuccess() {
       if (isSuccess && hash) {
-        setIsLoading(true); // Keep the loader on for this final step
+        setIsLoading(true);
         try {
-          // Call your activate endpoint. sdk.quickAuth.fetch handles the auth token.
           const activateResponse = await sdk.quickAuth.fetch('/api/user/activate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -72,7 +76,6 @@ export default function RegisterPage() {
             throw new Error(errorData.message || 'Failed to activate user status.');
           }
 
-          // After successful activation, refetch the profile to get the 'ACTIVE' status
           await refetchUserProfile();
           setToast({ message: 'Activation complete! Redirecting...', type: 'success' });
           setTimeout(() => router.push('/dashboard/game'), 1500);
@@ -87,6 +90,7 @@ export default function RegisterPage() {
     activateUserOnSuccess();
   }, [isSuccess, hash, router, refetchUserProfile]);
 
+  // Handle contract errors
   useEffect(() => {
     const error = writeContractError || confirmationError;
     if (error) {
@@ -96,6 +100,11 @@ export default function RegisterPage() {
   }, [writeContractError, confirmationError]);
 
   async function handleRegister() {
+    // Hide modal if it was open
+    if (showPendingModal) {
+      setShowPendingModal(false);
+    }
+
     setIsPopping(true);
     setTimeout(() => setIsPopping(false), 500);
 
@@ -107,7 +116,6 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Step 1: Call the profile endpoint to get the signature
       const response = await sdk.quickAuth.fetch('/api/user/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -121,25 +129,23 @@ export default function RegisterPage() {
 
       const { signature, wallets } = await response.json();
 
-      // If no signature is returned, the user is already active on-chain.
       if (!signature) {
         await refetchUserProfile();
         setToast({ message: "You're already registered! Redirecting...", type: 'success' });
-        setTimeout(() => router.push('/dashboard/game'), 1000);
+        setTimeout(() => router.push('/dashboard/game'), 100);
         return;
       }
-      const maxPriority = parseGwei('0.01');
-      const maxFee = parseGwei('30');
-      // Step 2: Use the signature to call the on-chain register function
+      const maxPriority = parseGwei('0.05');
+      const maxFee = parseGwei('0.1');
+
+
       writeContract({
         address: GAME_CONTRACT_ADDRESS,
         abi: GAME_ABI,
         functionName: 'register',
         args: [BigInt(fid), wallets, signature],
-        //maxFeePerGas: maxFee,
-        //maxPriorityFeePerGas: maxPriority,
-
-
+        maxFeePerGas: maxFee,
+        maxPriorityFeePerGas: maxPriority,
       });
 
     } catch (error) {
@@ -152,16 +158,35 @@ export default function RegisterPage() {
     <div className={styles.container}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <ParticleBackground />
-      <div className={styles.buttonContainer}>
-        <button
-          className={`${styles.button} ${isPopping ? animationStyles.popAnimation : ''}`}
-          type="button"
-          onClick={handleRegister}
-          disabled={isLoading || !isConnected}
-        >
-          {isLoading ? <Loader /> : 'REGISTER'}
-        </button>
-      </div>
+
+      {showPendingModal && (
+        <div className={modalStyles.modalOverlay}>
+          <div className={modalStyles.modalContent}>
+            <h2 className={modalStyles.modalTitle}>Quick Update!</h2>
+            <p className={modalStyles.modalMessage}>
+              Hey <i>{userProfile?.username}</i>, We've updated our systems to better
+              reward more <b style={{color:"purple", fontSize:"20px"}}>$ENB</b> and more rewarding surpises to everyone.
+              Let's get you properly registered!
+            </p>
+            <button onClick={handleRegister} className={modalStyles.modalButton} disabled={isLoading}>
+              {isLoading ? <Loader /> : "LET'S G0O"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showPendingModal && (
+        <div className={styles.buttonContainer}>
+          <button
+            className={`${styles.button} ${isPopping ? animationStyles.popAnimation : ''}`}
+            type="button"
+            onClick={handleRegister}
+            disabled={isLoading || !isConnected}
+          >
+            {isLoading ? <Loader /> : "START"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

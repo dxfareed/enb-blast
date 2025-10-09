@@ -11,7 +11,8 @@ import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useMiniApp } from '@neynar/react';
 import AddAppBanner from '@/app/components/AddAppBanner';
-import { GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI } from '@/app/utils/constants';
+import { GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, TOKEN_ADDRESS } from '@/app/utils/constants';
+import { getTokenMarqueeData } from '@/lib/dexscreener';
 
 export default function GamePage() {
     const { address } = useAccount();
@@ -31,6 +32,17 @@ export default function GamePage() {
     const { context } = useMiniApp();
     const { data: feeData } = useFeeData();
     const [showAddAppBanner, setShowAddAppBanner] = useState(false);
+    const [tokenPrice, setTokenPrice] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchTokenPrice = async () => {
+            const data = await getTokenMarqueeData(TOKEN_ADDRESS);
+            if (data) {
+                setTokenPrice(data.priceUsd);
+            }
+        };
+        fetchTokenPrice();
+    }, []);
 
     const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
     const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
@@ -108,7 +120,7 @@ export default function GamePage() {
             }
         }
         
-        const claimAmount = finalScore / 10;
+        const claimAmount = finalScore;
         setIsSignatureLoading(true);
         try {
             const signatureResponse = await sdk.quickAuth.fetch('/api/claim/signature', {
@@ -166,7 +178,13 @@ export default function GamePage() {
             const rank = userProfile.weeklyRank?.toString() || 'N/A';
 
             const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
-            const castText = `I just scored ${finalScore} points and earned ${finalScore / 10} $ENB from the ENB BLAST mini app.\nGo claim yours now!`;
+            
+            const claimAmount = finalScore / 10;
+            let castText = `I just scored ${finalScore} points and earned ${claimAmount.toFixed(1)} $ENB from the ENB Blast.\nGo claim yours now!`;
+            if (tokenPrice) {
+                const usdValue = (claimAmount * tokenPrice).toFixed(3);
+                castText = `I just scored ${finalScore} points and earned ${claimAmount.toFixed(1)} $ENB (~$${usdValue}) from the ENB Blast.\nGo claim yours now!`;
+            }
 
             const result = await sdk.actions.composeCast({ text: castText, embeds: [frameUrl] });
 
@@ -183,7 +201,7 @@ export default function GamePage() {
     const handleGameWin = useCallback((scoreFromGame: number) => {
         setIsClaimUnlocked(true);
         setFinalScore(scoreFromGame);
-        setClaimButtonText(`Claim ${(scoreFromGame / 10).toFixed(1)} $ENB`);
+        setClaimButtonText(`Claim ${(scoreFromGame).toFixed(1)} $ENB`);
     }, []);
 
     const handleTryAgain = () => {
@@ -266,7 +284,16 @@ export default function GamePage() {
         <div className={styles.gameContainer}>
             {showAddAppBanner && <AddAppBanner onAppAdded={() => setShowAddAppBanner(false)} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
+            <GameEngine
+                ref={gameEngineRef}
+                onGameWin={handleGameWin}
+                displayScore={finalScore}
+                isMuted={isMuted}
+                onToggleMute={toggleMute}
+                claimCooldownEnds={claimCooldownEnds}
+                countdown={countdown}
+                claimsLeft={claimsLeft}
+            />
             <div className={styles.actionContainer}>
                 {isClaimUnlocked ? (
                     <div className={styles.actionButtonsContainer}>
