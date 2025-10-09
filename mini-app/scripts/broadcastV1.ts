@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-  title: "New Tasks Available!",
-  body: "Fresh tasks have been added. Jump in now to earn more points!",
+  title: "Reward Reward Reward",
+  body: "Rewards will be going out every thursday at 4pm UTC!",
 };
 
 const API_URL = process.env.NEXT_PUBLIC_URL

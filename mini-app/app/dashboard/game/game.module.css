@@ -22,7 +22,7 @@
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  min-height: 20rem;
+  min-height: 30rem;
   transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
   touch-action: none;
   user-select: none;

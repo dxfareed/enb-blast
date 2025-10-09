@@ -47,7 +47,6 @@ export default function TokenBalanceDisplay() {
   const formattedBalance = balanceData ? Number(balanceData.formatted).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
 
   return (
-    // MODIFIED: Use new class names for a text-based display
     <div className={styles.balanceContainer}>
       {/* Optional: Add the token icon here
       <Image src="/path/to/enb-token-icon.svg" alt="ENB Token" width={24} height={24} /> 

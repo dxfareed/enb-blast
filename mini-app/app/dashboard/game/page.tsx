@@ -179,7 +179,7 @@ export default function GamePage() {
 
             const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
             
-            const claimAmount = finalScore / 10;
+            const claimAmount = finalScore;
             let castText = `I just scored ${finalScore} points and earned ${claimAmount.toFixed(1)} $ENB from the ENB Blast.\nGo claim yours now!`;
             if (tokenPrice) {
                 const usdValue = (claimAmount * tokenPrice).toFixed(3);
@@ -341,11 +341,9 @@ export default function GamePage() {
                     </div>
                 ) : (
                     claimCooldownEnds ? (
-                        <button disabled className={styles.claimButton}>
-                            Cooldown: {countdown}
-                        </button>
+                        <></>
                     ) : (
-                        <button disabled className={styles.claimButton}>Survive to Unlock Claim</button>
+                        <div>&nbsp;</div>
                     )
                 )}
                 <div className={styles.statusMessage}>

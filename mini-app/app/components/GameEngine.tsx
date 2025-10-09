@@ -12,21 +12,21 @@ import HighlightTooltip from './HighlightTooltip';
 const GAME_DURATION = 30;
 
 const INITIAL_SPAWN_RATE = 310;
-const INITIAL_BOMB_SPEED = 4.5;
-const INITIAL_PICTURE_SPEED = 4;
-const INITIAL_BOMB_CHANCE = 0.2;
+const INITIAL_BOMB_SPEED = 7;
+const INITIAL_PICTURE_SPEED = 7;
+const INITIAL_BOMB_CHANCE = 0.5;
 
 const FINAL_SPAWN_RATE = 250;
-const FINAL_BOMB_SPEED = 10;
-const FINAL_PICTURE_SPEED = 10;
-const FINAL_BOMB_CHANCE = 0.3;
+const FINAL_BOMB_SPEED = 12;
+const FINAL_PICTURE_SPEED = 12;
+const FINAL_BOMB_CHANCE = 0.7;
 
 const PICTURE_URL = "/Enb_000.png";
 const BASE_PICTURE_VALUE = 6;
 
 const POWER_UP_POINT_5_URL = "/powerup_5.png";
 const POWER_UP_POINT_5_VALUE = 20;
-const POWER_UP_POINT_5_CHANCE = 0.025;
+const POWER_UP_POINT_5_CHANCE = 0.0109;
 
 const POWER_UP_POINT_10_URL = "/powerup_10.png";
 const POWER_UP_POINT_10_VALUE = 35;
@@ -34,7 +34,7 @@ const POWER_UP_POINT_10_CHANCE = 0.008;
 
 const POWER_UP_POINT_2_URL = "/powerup_2.png";
 const POWER_UP_POINT_2_VALUE = 9;
-const POWER_UP_POINT_2_CHANCE = 0.05;
+const POWER_UP_POINT_2_CHANCE = 0.04;
 
 type GameEngineProps = {
   onGameWin: (finalScore: number) => void;
@@ -68,7 +68,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [floatingScores, setFloatingScores] = useState<{ id: number; points: number; x: number; y: number; }[]>([]);
   const [isBombHit, setIsBombHit] = useState(false);
-  const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 300 });
+  const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 400 });
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
@@ -249,7 +249,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
         }
         let processedItems = currentItems
           .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
-          .filter(item => item.y < 450);
+          .filter(item => item.y < 500);
         if (avatarRef.current) {
           const avatarRect = avatarRef.current.getBoundingClientRect();
           let hitBomb = false;
