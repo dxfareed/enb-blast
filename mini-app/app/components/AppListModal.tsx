@@ -15,7 +15,7 @@ const apps: App[] = [
   {
     name: 'ENB Mining',
     url: 'https://farcaster.xyz/miniapps/4uqcueQifUYV/enb-mining',
-    logo: 'https://enb-crushers.vercel.app/logo.png'
+    logo: 'https://bounty.enb.fun/Logo_enb.svg'
   },
   {
     name: 'ENB Bounty',
@@ -40,7 +40,6 @@ export default function AppListModal({ onClose }: AppListModalProps) {
         <button className={styles.closeButton} onClick={onClose}>
           <X size={24} />
         </button>
-        <h3 className={styles.modalTitle}>Explore ENB Apps</h3>
         <div className={styles.appList}>
           {apps.map((app) => (
             <div key={app.name} className={styles.appItem} onClick={() => handleAppClick(app.url)}>

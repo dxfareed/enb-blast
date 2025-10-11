@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
     
     const maxClaims = await getMaxClaims();
-    const cooldownPeriod = BigInt(24 * 60 * 60); // 24 hours in seconds
+    const cooldownPeriod = BigInt(12 * 60 * 60); // 24 hours in seconds
 
     // Check if the user is currently on cooldown
     if (onChainProfile.claimsInCurrentCycle >= maxClaims) {
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
         const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
         if (now < cooldownEndTime) {
             return NextResponse.json({ 
-                message: 'Your 24-hour claim cooldown has not passed yet.',
+                message: 'Your 12 hour claim cooldown has not passed yet.',
                 resetsAt: new Date(Number(cooldownEndTime) * 1000).toISOString()
             }, { status: 429 }); // 429 Too Many Requests
         }

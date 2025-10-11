@@ -100,11 +100,13 @@ export default function ProfilePage() {
           style={{ borderRadius: '9999px', objectFit: 'cover' }}
         />
       </div>
-      <h2 className={styles.username}>@{userProfile.username}
-        <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px' }} title="Share Profile">
-          <Share size={19} color="rgba(31, 105, 241, 1)" />
+      <div className={styles.profileHeader}>
+        <h2 className={styles.username}>@{userProfile.username}</h2>
+        <button onClick={handleShare} className={styles.shareProfileButton}>
+          <span>share profile</span>
+          <Share size={16}/>
         </button>
-      </h2>
+      </div>
       <div className={styles.statsGrid}>
         <div className={`${styles.statCard} ${styles.streakCard}`}>
           <p className={styles.statLabel}>Streak</p>
@@ -120,7 +122,7 @@ export default function ProfilePage() {
         </div>
         <div className={`${styles.statCard} ${styles.claimedCard}`}>
           <p className={styles.statLabel}>Total Claimed</p>
-          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(userProfile.totalClaimed).toFixed(2)}</p>
+          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(userProfile.totalClaimed).toFixed(1)}</p>
         </div>
       </div>
 
@@ -134,7 +136,7 @@ export default function ProfilePage() {
         </div>
       </div>
       <div className={styles.exploreFooter} onClick={() => setIsModalOpen(true)}>
-        <p>Explore more ENB Apps</p>
+        <p>Explore our Apps</p>
       </div>
       {isModalOpen && <AppListModal onClose={() => setIsModalOpen(false)} />}
     </div>

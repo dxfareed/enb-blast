@@ -66,6 +66,8 @@ async function processEvent(log) {
   const amountDecimal = formatUnits(amount, 18);
   const points = parseFloat(amountDecimal) * 10;
 
+  // will change later
+
   const dbUser = await prisma.user.findFirst({
     where: {
       OR: [

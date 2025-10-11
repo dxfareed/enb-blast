@@ -21,6 +21,7 @@ export default function GamePage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
     const [finalScore, setFinalScore] = useState(0);
+    const [pumpkinsCollected, setPumpkinsCollected] = useState(0);
     const [isSignatureLoading, setIsSignatureLoading] = useState(false);
     const [isClaimFinalized, setIsClaimFinalized] = useState(false);
     const [showShareButton, setShowShareButton] = useState(false);
@@ -47,6 +48,7 @@ export default function GamePage() {
     const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
     const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
     const [countdown, setCountdown] = useState('');
+    const [isClaimStatusLoading, setIsClaimStatusLoading] = useState(true);
 
     useEffect(() => {
         async function fetchClaimStatus() {
@@ -64,6 +66,8 @@ export default function GamePage() {
                     }
                 } catch (error) {
                     console.error("Failed to fetch claim status:", error);
+                } finally {
+                    setIsClaimStatusLoading(false);
                 }
             }
         }
@@ -178,12 +182,17 @@ export default function GamePage() {
             const rank = userProfile.weeklyRank?.toString() || 'N/A';
 
             const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
-            
+            /* 
+            I just scored 546 points and earned 546.0 $ENB worth  $0.067 from ENB Blast round 
+Go claim yours now!
+            */
             const claimAmount = finalScore;
-            let castText = `I just scored ${finalScore} points and earned ${claimAmount.toFixed(1)} $ENB from the ENB Blast.\nGo claim yours now!`;
+            const pumpkinText = pumpkinsCollected > 0 ? ' plus a Halloween 🎃 Coin' : '';
+
+            let castText = `I just scored ${finalScore} points${pumpkinText} and earned ${claimAmount.toFixed(1)} $ENB from the ENB Blast.\nGo claim yours now!`;
             if (tokenPrice) {
                 const usdValue = (claimAmount * tokenPrice).toFixed(3);
-                castText = `I just scored ${finalScore} points and earned ${claimAmount.toFixed(1)} $ENB (~$${usdValue}) from the ENB Blast.\nGo claim yours now!`;
+                castText = `I just scored ${finalScore} points${pumpkinText} and earned ${claimAmount.toFixed(1)} $ENB worth $${usdValue} from ENB Blast Round.\nGo claim yours now!`;
             }
 
             const result = await sdk.actions.composeCast({ text: castText, embeds: [frameUrl] });
@@ -198,16 +207,18 @@ export default function GamePage() {
         }
     };
 
-    const handleGameWin = useCallback((scoreFromGame: number) => {
+    const handleGameWin = useCallback((scoreFromGame: number, pumpkinsFromGame: number) => {
         setIsClaimUnlocked(true);
         setFinalScore(scoreFromGame);
-        setClaimButtonText(`Claim ${(scoreFromGame).toFixed(1)} $ENB`);
+        setPumpkinsCollected(pumpkinsFromGame);
+        setClaimButtonText(`Claim ${(scoreFromGame).toLocaleString()} $ENB`);
     }, []);
 
     const handleTryAgain = () => {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
         setIsClaimUnlocked(false);
         setFinalScore(0);
+        setPumpkinsCollected(0);
         setClaimButtonText('');
         if (isConfirmed) resetWriteContract();
         setIsClaimFinalized(false);
@@ -293,64 +304,18 @@ export default function GamePage() {
                 claimCooldownEnds={claimCooldownEnds}
                 countdown={countdown}
                 claimsLeft={claimsLeft}
+                handleClaim={handleClaim}
+                handleShareScoreFrame={handleShareScoreFrame}
+                handleTryAgain={handleTryAgain}
+                isClaimDisabled={isClaimDisabled}
+                isSignatureLoading={isSignatureLoading}
+                isWritePending={isWritePending}
+                isConfirming={isConfirming}
+                isConfirmed={isConfirmed}
+                claimButtonText={claimButtonText}
+                isClaimStatusLoading={isClaimStatusLoading}
             />
-            <div className={styles.actionContainer}>
-                {isClaimUnlocked ? (
-                    <div className={styles.actionButtonsContainer}>
-                        {finalScore > 0 ? (
-                            !isConfirmed ? (
-                                <>
-                                    <div className={styles.topButtonsWrapper}>
-                                        <button
-                                            onClick={handleClaim}
-                                            disabled={isClaimDisabled}
-                                            className={`${styles.claimButton} ${styles.claimButtonGreen}`}
-                                        >
-                                            {claimCooldownEnds ? `On Cooldown` :
-                                                claimsLeft === 0 ? 'No Claims Left' :
-                                                    isSignatureLoading ? 'Preparing...' :
-                                                        isWritePending ? 'Check Wallet...' :
-                                                            isConfirming ? 'Confirming...' :
-                                                                claimButtonText}
-                                        </button>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    {playAgainCooldown ? (
-                                        showShareButton && (
-                                            <button onClick={handleShareScoreFrame} className={`${styles.claimButton} ${styles.shareButton}`}>
-                                                <div className={styles.shareProgress} style={{ width: `${shareProgress}%` }}></div>
-                                                <span className={styles.buttonText}>Share Score</span>
-                                            </button>
-                                        )
-                                    ) : (
-                                        isClaimFinalized && !playAgainCooldown && (
-                                            <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>
-                                                Play Again
-                                            </button>
-                                        )
-                                    )}
-                                </>
-                            )
-                        ) : (
-                            <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>
-                                Try Again
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    claimCooldownEnds ? (
-                        <></>
-                    ) : (
-                        <div>&nbsp;</div>
-                    )
-                )}
-                <div className={styles.statusMessage}>
-                    {/* This status message now uses the accurate, real-time state. */}
-                    {claimsLeft !== null && !claimCooldownEnds && (<p>Claims left today: {claimsLeft}</p>)}
-                </div>
-            </div>
+
         </div>
     );
 }

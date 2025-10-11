@@ -1,7 +1,18 @@
 import { Errors, createClient } from "@farcaster/quick-auth";
 import { NextRequest, NextResponse } from "next/server";
+import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
 
 const client = createClient();
+
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
+if (!NEYNAR_API_KEY) {
+  throw new Error("NEYNAR_API_KEY is not set");
+}
+const neynarClient = new NeynarAPIClient(
+  new Configuration({
+    apiKey: NEYNAR_API_KEY,
+  })
+);
 
 export async function GET(request: NextRequest) {
   // Because we're fetching this endpoint via `sdk.quickAuth.fetch`,
@@ -27,6 +38,21 @@ export async function GET(request: NextRequest) {
     // You can now use this to do anything you want, e.g. fetch the user's data from your database
     // or fetch the user's info from a service like Neynar.
     const userFid = payload.sub;
+
+    const user = await neynarClient.fetchBulkUsers({
+      fids: [userFid],
+    });
+    const neynarScore = user.users[0]?.score;
+
+    if (neynarScore !== undefined && neynarScore < 0.3) {
+      console.log(
+        `Restricted user attempt: ${userFid}, score: ${neynarScore} at ${new Date().toISOString()}`
+      );
+      return NextResponse.json(
+        { message: "You are restricted from using this app." },
+        { status: 403 }
+      );
+    }
 
     // By default, we'll return the user's FID. Update this to meet your needs.
     return NextResponse.json({ userFid });

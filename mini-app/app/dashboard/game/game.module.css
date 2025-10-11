@@ -14,7 +14,7 @@
 }
 
 .gameArea {
-  width: 100%;
+  width: 93vw;
   flex-grow: 1; 
   background-color: rgb(195, 173, 234);
   border: 2px solid rgb(116, 51, 235);
@@ -40,8 +40,8 @@
   position: absolute;
   user-select: none;
   transform: translate(-50%, -50%);
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -80,6 +80,74 @@
   font-size: 1rem;
   margin-top: 0.5rem;
 }
+
+.overlay .loadingText {
+  font-size: 1.30rem;
+}
+
+.overlayButtonContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  width: 100%;
+}
+
+.overlayButton {
+  color: white;
+  font-weight: 700;
+  padding: 0.75rem 0;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.overlayButton:active {
+  transform: scale(0.98);
+}
+
+.overlayButton:disabled {
+  background-color: #e5e7eb !important;
+  color: #9ca3af !important;
+  cursor: not-allowed;
+  transform: scale(1);
+  box-shadow: none;
+}
+
+.claimButtonGreen {
+  background-color: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  width: 60%;
+}
+.claimButtonGreen:hover {
+  background-color: #bbf7d0;
+}
+
+.tryAgainButtonRed {
+  background-color: #ffedd5;
+  color: #f97316;
+  border: 1px solid #fed7aa;
+  width: 60%;
+}
+.tryAgainButtonRed:hover {
+  background-color: #fed7aa;
+}
+
+.shareButton {
+  background-color: #8b5cf6;
+  color: white;
+  width: 80%;
+}
+.shareButton:hover {
+  background-color: #7c3aed;
+}
+
 
 @keyframes popAnimation {
   from {
