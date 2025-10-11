@@ -14,23 +14,28 @@ interface GameInfoModalProps {
 const gameItems = [
   {
     imgSrc: '/Enb_000.png',
-    name: '+1 Point',
+    name: '+6 Points',
     effect: 'The standard collectible. Grab these to increase your score.',
   },
   {
-    imgSrc: 'https://pbs.twimg.com/profile_images/1878738447067652096/tXQbWfpf_400x400.jpg',
-    name: '+2 Points',
+    imgSrc: '/powerup_2.png',
+    name: '+12 Points',
     effect: 'A rare collectible that gives a small score boost.',
   },
   {
-    imgSrc: 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU9C9_400x400.jpg',
-    name: '+5 Points',
+    imgSrc: '/powerup_5.png',
+    name: '+20 Points',
     effect: 'A very rare collectible that gives a medium score boost.',
   },
   {
-    imgSrc: 'https://pbs.twimg.com/profile_images/1945608199500910592/rnk6ixxH_400x400.jpg',
-    name: '+10 Points',
+    imgSrc: '/powerup_10.png',
+    name: '+30 Points',
     effect: 'The rarest collectible for a huge score boost!',
+  },
+  {
+    imgSrc: '/pumpkin.png',
+    name: '+500 Points',
+    effect: 'A rare seasonal collectible that gives a massive score boost!',
   },
   {
     imgSrc: '/bomb.png',

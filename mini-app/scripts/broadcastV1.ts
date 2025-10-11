@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-  title: "New Logo Who dis?",
-  body: "Rewards will be going out in 5d",
+  title: "Reward Reward Reward",
+  body: "Rewards will be going out every thursday at 4pm UTC!",
 };
 
 const API_URL = process.env.NEXT_PUBLIC_URL
@@ -27,7 +27,6 @@ async function main() {
   try {
     const usersToNotify = await prisma.user.findMany({
       where: {
-        fid:849768,
         notificationToken: { not: null },
       },
       select: {

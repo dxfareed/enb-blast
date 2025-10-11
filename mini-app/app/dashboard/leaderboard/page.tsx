@@ -17,23 +17,24 @@ type LeaderboardUser = {
 };
 
 const getRankStyling = (rank: number) => {
-  if (rank === 1) return styles.rank1; // Gold
-  if (rank === 2) return styles.rank2; // Silver
-  if (rank === 3) return styles.rank3; // Bronze
-  if (rank >= 4 && rank <= 8) return styles.rankSuperBased; // Purple
-  if (rank >= 9 && rank <= 15) return styles.rankBased; // Blue
-  return styles.rankDefault; // Default for others
+  if (rank === 1) return styles.rank1;
+  if (rank === 2) return styles.rank2;
+  if (rank === 3) return styles.rank3;
+  if (rank >= 4 && rank <= 8) return styles.rankSuperBased;
+  if (rank >= 9 && rank <= 15) return styles.rankBased;
+  return styles.rankDefault;
 };
 
 const prizePoolAmount = 300000;
 
 export default function LeaderboardPage() {
   const { userProfile } = useUser();
-  const username = userProfile?.username;
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
-  const [currentUser, setCurrentUser] = useState<LeaderboardUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   
+  // This state will hold the full user object from the API's `currentUser` property
+  const [myRank, setMyRank] = useState<LeaderboardUser | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('rewards');
 
@@ -54,35 +55,42 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
+      // We wait until we have the user's FID to make the API call
+      if (!userProfile?.fid) {
+        setIsLoading(true); // Keep showing loader until we have a FID
+        return;
+      }
+      
       setIsLoading(true);
       try {
-        const response = await fetch('/api/leaderboard');
+        // Make ONE API call to your existing endpoint, passing the user's FID
+        const response = await fetch(`/api/leaderboard?fid=${userProfile.fid}`);
         if (!response.ok) {
           throw new Error('Failed to fetch leaderboard data');
         }
+        
         const data = await response.json();
-        //@ts-ignore
-        const rankedData = data.topUsers.map((user, index) => ({ ...user, rank: index + 1 }));
+        
+        // Set the Top 100 list
+        const rankedData = (data.topUsers || []).map((user: any, index: number) => ({ ...user, rank: index + 1 }));
         setLeaderboardData(rankedData);
+        
+        // Set the current user's data from the `currentUser` object in the API response
+        if (data.currentUser) {
+          setMyRank(data.currentUser);
+        } else {
+          setMyRank(null);
+        }
+        
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching leaderboard data:", error);
       } finally {
         setIsLoading(false);
       }
     };
+    
     fetchLeaderboard();
-  }, []);
-
-  useEffect(() => {
-    if (username && leaderboardData.length > 0) {
-      const currentUserData = leaderboardData.find(user => user.username === username);
-      if (currentUserData) {
-        setCurrentUser(currentUserData);
-      } else {
-        setCurrentUser(null);
-      }
-    }
-  }, [username, leaderboardData]);
+  }, [userProfile?.fid]); // This effect runs only when the FID is available
 
   if (isLoading) {
     return <Loader />;
@@ -91,12 +99,14 @@ export default function LeaderboardPage() {
   return (
     <div className={styles.leaderboardContainer}>
       <div className={styles.headerContainer}>
-        <h1 className={styles.title}>Leaderboard</h1>
+        <h5 className={styles.title}>Rewards</h5>
         <div className={styles.subHeader}>
           <div className={styles.prizePool}>
-            <span>{prizePoolAmount.toLocaleString()} $ENB</span>
+            <span className={styles.cardLabel}>PRIZE POOL</span>
+            <span className={styles.cardValue}>{prizePoolAmount.toLocaleString()} $ENB</span>
           </div>
           <div className={styles.countdown}>
+            <span className={styles.cardLabel}>TIME LEFT</span>
             <WeeklyCountdown />
           </div>
         </div>
@@ -151,7 +161,7 @@ export default function LeaderboardPage() {
         {leaderboardData.map((user) => (
             <div
               key={user.rank}
-              className={`${styles.userRow} ${user.username === username ? styles.currentUser : ''}`}
+              className={`${styles.userRow} ${user.username === userProfile?.username ? styles.currentUser : ''}`}
             >
               {user.rank && (
                 <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>
@@ -176,17 +186,16 @@ export default function LeaderboardPage() {
           ))}
       </div>
 
-      {currentUser && (
+      {myRank && (
         <div className={styles.currentUserFooter}>
-           {currentUser.rank && (
-              // Same here, only the one function call
-              <div className={`${styles.rankCircle} ${getRankStyling(currentUser.rank)}`}>
-                  {currentUser.rank}
+           {myRank.rank && (
+              <div className={`${styles.rankCircle} ${getRankStyling(myRank.rank)}`}>
+                  {myRank.rank}
               </div>
             )}
               <img
-                src={currentUser.pfpUrl || '/icon.png'}
-                alt={`${currentUser.username}'s profile picture`}
+                src={myRank.pfpUrl || '/icon.png'}
+                alt={`${myRank.username}'s profile picture`}
                 className={styles.pfp}
                 width={48}
                 height={48}
@@ -195,7 +204,7 @@ export default function LeaderboardPage() {
                 <p className={styles.username}>Your Rank</p>
               </div>
               <div className={styles.scoreInfo}>
-                <p className={styles.score}>{parseInt(currentUser.weeklyPoints, 10).toLocaleString()}</p>
+                <p className={styles.score}>{parseInt(myRank.weeklyPoints, 10).toLocaleString()}</p>
                 <p className={styles.scoreLabel}>points</p>
               </div>
         </div>

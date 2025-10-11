@@ -1,9 +1,7 @@
+// File: /api/leaderboard/route.ts
+
 import prisma from '../../../lib/prisma'
 import { NextResponse } from 'next/server';
-
-//const prisma = new PrismaClient();
-
-// /api/leaderboard
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -19,29 +17,38 @@ export async function GET(request: Request) {
         username: true,
         pfpUrl: true,
         weeklyPoints: true,
-        level: true,
-        walletAddress: true,
       },
     });
 
     const topUsers = users.slice(0, 100);
 
-    let currentUserRank = null;
+    // --- MODIFICATION START ---
+    let currentUserData = null;
     if (fid) {
       const userIndex = users.findIndex(user => user.fid.toString() === fid);
+      
       if (userIndex !== -1) {
-        currentUserRank = userIndex + 1;
+        const user = users[userIndex];
+        // Now, we create a full object with all the user's data AND their rank
+        currentUserData = {
+          ...user,
+          rank: userIndex + 1, // Add the rank property to the user object
+          weeklyPoints: user.weeklyPoints.toString(),
+          fid: user.fid.toString(),
+        };
       }
     }
+    // --- MODIFICATION END ---
 
-    //@ts-ignore
-    const serializableUsers = topUsers.map(user => ({
+    const serializableTopUsers = topUsers.map(user => ({
       ...user,
       weeklyPoints: user.weeklyPoints.toString(),
       fid: user.fid.toString(),
     }));
+    
+    // We now return a `currentUser` object instead of just a `rank` number
+    return NextResponse.json({ topUsers: serializableTopUsers, currentUser: currentUserData }, { status: 200 });
 
-    return NextResponse.json({ topUsers: serializableUsers, rank: currentUserRank }, { status: 200 });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
     return NextResponse.json({ message: 'Error fetching leaderboard' }, { status: 500 });

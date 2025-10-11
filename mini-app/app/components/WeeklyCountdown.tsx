@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 function getNextThursday4PMUTC(): Date {
   const now = new Date();
   const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 16, 0, 0, 0));
-  const targetDay = 1; // Thursday
+  const targetDay = 4; // Thursday
 
   const daysUntilTarget = (targetDay - now.getUTCDay() + 7) % 7;
   

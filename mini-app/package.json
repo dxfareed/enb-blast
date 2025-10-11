@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "notify": "tsx scripts/broadcast.ts",
+    "notify:v1": "tsx scripts/broadcastV1.ts",
     "notify:claim-reset": "tsx scripts/notify-claim-reset-onchain.ts"
   },
   "prisma": {
@@ -22,8 +23,11 @@
     "@neynar/react": "^1.2.13",
     "@prisma/client": "^6.16.2",
     "@rainbow-me/rainbowkit": "^2.2.8",
+    "@reown/appkit": "^1.8.9",
+    "@reown/appkit-adapter-wagmi": "^1.8.9",
     "@tanstack/react-query": "^5.90.2",
     "@vercel/analytics": "^1.5.0",
+    "@walletconnect/modal": "^2.7.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "eruda": "^3.4.3",
@@ -36,8 +40,8 @@
     "prisma": "^6.16.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "viem": "^2.37.12",
-    "wagmi": "^2.17.5",
+    "viem": "^2.38.0",
+    "wagmi": "^2.18.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

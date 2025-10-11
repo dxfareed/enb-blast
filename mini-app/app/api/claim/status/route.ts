@@ -71,10 +71,10 @@ export async function GET(req: NextRequest) {
     ]);
 
     if (!onChainProfile.isRegistered) {
-        return NextResponse.json({ message: "User not registered on-chain" }, { status: 404 });
+        return NextResponse.json({ message: "User not registered onchain" }, { status: 404 });
     }
 
-    const cooldownPeriod = BigInt(24 * 60 * 60); // 24 hours in seconds
+    const cooldownPeriod = BigInt(12 * 60 * 60); // 12 hours in seconds
     const claimsLeft = Number(maxClaims) - Number(onChainProfile.claimsInCurrentCycle);
     let isOnCooldown = false;
     let resetsAt: string | null = null;

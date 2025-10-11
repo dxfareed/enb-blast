@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUser } from '@/app/context/UserContext';
-import { Home, Trophy, User, ClipboardList } from 'lucide-react';
+import { Home, Trophy, User, ClipboardList, Plus} from 'lucide-react';
 import styles from './layout.module.css';
 import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 import HighlightTooltip from '@/app/components/HighlightTooltip';
@@ -13,7 +13,7 @@ import GameInfoModal from '@/app/components/GameInfoModal';
 import Marquee from '@/app/components/Marquee';
 import { getTokenMarqueeData, TokenMarqueeRawData } from '@/lib/dexscreener';
 import { TOKEN_ADDRESS } from '../utils/constants';
-import {sdk} from '@farcaster/miniapp-sdk'
+import { sdk } from '@farcaster/miniapp-sdk'
 
 const TOOLTIP_STORAGE_KEY = 'hasSeenDashboardTooltip';
 
@@ -42,7 +42,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [activeTourStep, setActiveTourStep] = useState(-1);
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
-  
+
   const [tokenData, setTokenData] = useState<TokenMarqueeRawData | null>(null);
   const [isLoadingTokenData, setIsLoadingTokenData] = useState(true);
 
@@ -121,21 +121,21 @@ export default function DashboardLayout({
   const isLastStep = activeTourStep === tourSteps.length - 1;
 
   const buyFunction = async () => {
-      try {
-        const buyToken = `eip155:8453/erc20:${TOKEN_ADDRESS}`;
-        const result = await sdk.actions.swapToken({
-          buyToken,
-        });
-  
-        if (result.success) {
-          console.log('Swap successful:', result.swap);
-        } else {
-          console.error('Swap failed:', result.reason, result.error);
-        }
-      } catch (error) {
-        console.error('An error occurred while trying to swap tokens:', error);
+    try {
+      const buyToken = `eip155:8453/erc20:${TOKEN_ADDRESS}`;
+      const result = await sdk.actions.swapToken({
+        buyToken,
+      });
+
+      if (result.success) {
+        console.log('Swap successful:', result.swap);
+      } else {
+        console.error('Swap failed:', result.reason, result.error);
+      }
+    } catch (error) {
+      console.error('An error occurred while trying to swap tokens:', error);
+    }
   }
-}
 
   return (
     <TourProvider value={tourContextValue}>
@@ -151,11 +151,12 @@ export default function DashboardLayout({
           <header className={styles.header}>
             {/* START: Added Buy Button */}
             <div className={styles.headerLeft}>
-              <div onClick={buyFunction}
-                className={styles.buyButton}
-              >
-                BUY $ENB
-              </div>
+              {/* --- MODIFIED CODE START --- */}
+              <button onClick={buyFunction} className={styles.buyButton}>
+                <Plus size={18} strokeWidth={3} /> {/* Added Icon */}
+                <span>BUY $ENB</span> {/* Wrapped text in a span for spacing */}
+              </button>
+              {/* --- MODIFIED CODE END --- */}
             </div>
             {/* END: Added Buy Button */}
 
@@ -174,7 +175,7 @@ export default function DashboardLayout({
             </div>
           </header>
 
-          <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS}/>
+          <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS} />
 
           <main className={styles.main}>
             {children}

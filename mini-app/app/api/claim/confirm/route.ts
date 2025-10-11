@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
     }
     
     // [THE CRITICAL FIX]
-    // Check if the sender of the transaction is one of the user's verified wallets.
+    // Check if the sender of the transaction is one of the user's verified wallets or their primary wallet.
     const senderWallet = receipt.from.toLowerCase();
-    const isWalletVerified = user.verifiedWallets.includes(senderWallet);
+    const isWalletVerified = user.verifiedWallets.includes(senderWallet) || user.walletAddress.toLowerCase() === senderWallet;
 
     if (!isWalletVerified) {
       // This provides a much clearer error message

@@ -3,6 +3,8 @@ import "@nomicfoundation/hardhat-toolbox-viem";
 import "dotenv/config";
 import "./scripts/check-user";
 import "./scripts/delete-user";
+import "./scripts/increase-claim-limit";
+import "./scripts/set-cooldown";
 
 const BASE_SEPOLIA_RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || "";
 const BASE_MAINNET_RPC_URL = process.env.BASE_MAINNET_RPC_URL || "";

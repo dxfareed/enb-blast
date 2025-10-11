@@ -11,7 +11,8 @@ import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useMiniApp } from '@neynar/react';
 import AddAppBanner from '@/app/components/AddAppBanner';
-import { GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI } from '@/app/utils/constants';
+import { GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, TOKEN_ADDRESS } from '@/app/utils/constants';
+import { getTokenMarqueeData } from '@/lib/dexscreener';
 
 export default function GamePage() {
     const { address } = useAccount();
@@ -20,20 +21,34 @@ export default function GamePage() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
     const [finalScore, setFinalScore] = useState(0);
-    const [isMultiplierUsed, setIsMultiplierUsed] = useState(false);
-    const [isMultiplierLoading, setIsMultiplierLoading] = useState(false);
+    const [pumpkinsCollected, setPumpkinsCollected] = useState(0);
     const [isSignatureLoading, setIsSignatureLoading] = useState(false);
     const [isClaimFinalized, setIsClaimFinalized] = useState(false);
+    const [showShareButton, setShowShareButton] = useState(false);
+    const [playAgainCooldown, setPlayAgainCooldown] = useState(false);
+    const [shareProgress, setShareProgress] = useState(0);
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [claimButtonText, setClaimButtonText] = useState('');
     const [isMuted, setIsMuted] = useState(false);
     const { context } = useMiniApp();
     const { data: feeData } = useFeeData();
     const [showAddAppBanner, setShowAddAppBanner] = useState(false);
+    const [tokenPrice, setTokenPrice] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchTokenPrice = async () => {
+            const data = await getTokenMarqueeData(TOKEN_ADDRESS);
+            if (data) {
+                setTokenPrice(data.priceUsd);
+            }
+        };
+        fetchTokenPrice();
+    }, []);
 
     const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
     const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
     const [countdown, setCountdown] = useState('');
+    const [isClaimStatusLoading, setIsClaimStatusLoading] = useState(true);
 
     useEffect(() => {
         async function fetchClaimStatus() {
@@ -51,6 +66,8 @@ export default function GamePage() {
                     }
                 } catch (error) {
                     console.error("Failed to fetch claim status:", error);
+                } finally {
+                    setIsClaimStatusLoading(false);
                 }
             }
         }
@@ -93,16 +110,6 @@ export default function GamePage() {
 
     const toggleMute = () => { setIsMuted(prevState => !prevState); };
 
-    useEffect(() => {
-        if (userProfile?.lastMultiplierUsedAt) {
-            const lastUsedDate = new Date(userProfile.lastMultiplierUsedAt);
-            const now = new Date();
-            if (lastUsedDate.getUTCFullYear() === now.getUTCFullYear() && lastUsedDate.getUTCMonth() === now.getUTCMonth() && lastUsedDate.getUTCDate() === now.getUTCDate()) {
-                setIsMultiplierUsed(true);
-            }
-        }
-    }, [userProfile]);
-
     const handleClaim = async () => {
         if (!address || finalScore <= 0) return;
 
@@ -117,7 +124,7 @@ export default function GamePage() {
             }
         }
         
-        const claimAmount = finalScore / 10;
+        const claimAmount = finalScore;
         setIsSignatureLoading(true);
         try {
             const signatureResponse = await sdk.quickAuth.fetch('/api/claim/signature', {
@@ -158,15 +165,12 @@ export default function GamePage() {
     };
 
     const handleShareScoreFrame = async () => {
-        if (isMultiplierUsed || isMultiplierLoading) return;
         sdk.haptics.impactOccurred('heavy');
-        setIsMultiplierLoading(true);
         try {
             if (!userProfile?.fid) {
                 await refetchUserProfile();
                 if (!userProfile?.fid) throw new Error("User profile could not be loaded.");
             }
-            const multipliedScore = finalScore * 2;
             const appUrl = process.env.NEXT_PUBLIC_URL || '';
             const username = userProfile.username || '@johndoe';
             const pfpUrl = userProfile.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU-C9_400x400.jpg';
@@ -177,41 +181,48 @@ export default function GamePage() {
 
             const rank = userProfile.weeklyRank?.toString() || 'N/A';
 
-            const frameUrl = `${appUrl}/share-frame?score=${multipliedScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
-            const castText = `I just scored ${multipliedScore} points and earned ${multipliedScore / 10} $ENB from the ENB BLAST mini app.\nGo claim yours now!`;
+            const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&streak=${streak}&claimed=${claimed}&weeklyPoints=${weeklyPoints}&rank=${rank}&fid=${fid}&revalidate=true`;
+            /* 
+            I just scored 546 points and earned 546.0 $ENB worth  $0.067 from ENB Blast round 
+Go claim yours now!
+            */
+            const claimAmount = finalScore;
+            const pumpkinText = pumpkinsCollected > 0 ? ' plus a Halloween 🎃 Coin' : '';
+
+            let castText = `I just scored ${finalScore} points${pumpkinText} and earned ${claimAmount.toFixed(1)} $ENB from the ENB Blast.\nGo claim yours now!`;
+            if (tokenPrice) {
+                const usdValue = (claimAmount * tokenPrice).toFixed(3);
+                castText = `I just scored ${finalScore} points${pumpkinText} and earned ${claimAmount.toFixed(1)} $ENB worth $${usdValue} from ENB Blast Round.\nGo claim yours now!`;
+            }
 
             const result = await sdk.actions.composeCast({ text: castText, embeds: [frameUrl] });
 
             if (result.cast) {
-                await sdk.quickAuth.fetch('/api/game/use-multiplier', { method: 'POST' });
-                setFinalScore(multipliedScore);
-                setIsMultiplierUsed(true);
-                setClaimButtonText(`Claim ${(multipliedScore / 10).toFixed(1)} $ENB`);
-                setToast({ message: "Success! Score shared & doubled!", type: 'success' });
-                await refetchUserProfile();
+                setToast({ message: "Success! Score shared!", type: 'success' });
             } else {
-                setToast({ message: "Sharing cancelled. Multiplier was not used.", type: 'info' });
+                setToast({ message: "Sharing cancelled.", type: 'info' });
             }
         } catch (error) {
             setToast({ message: (error as Error).message || `An error occurred.`, type: 'error' });
-        } finally {
-            setIsMultiplierLoading(false);
         }
     };
 
-    const handleGameWin = useCallback((scoreFromGame: number) => {
+    const handleGameWin = useCallback((scoreFromGame: number, pumpkinsFromGame: number) => {
         setIsClaimUnlocked(true);
         setFinalScore(scoreFromGame);
-        setClaimButtonText(`Claim ${(scoreFromGame / 10).toFixed(1)} $ENB`);
+        setPumpkinsCollected(pumpkinsFromGame);
+        setClaimButtonText(`Claim ${(scoreFromGame).toLocaleString()} $ENB`);
     }, []);
 
     const handleTryAgain = () => {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
         setIsClaimUnlocked(false);
         setFinalScore(0);
+        setPumpkinsCollected(0);
         setClaimButtonText('');
         if (isConfirmed) resetWriteContract();
         setIsClaimFinalized(false);
+        setShowShareButton(false);
     };
 
     useEffect(() => {
@@ -222,11 +233,14 @@ export default function GamePage() {
             resetWriteContract();
             return;
         }
+
+        let progressInterval: NodeJS.Timeout;
+        let cooldownTimeout: NodeJS.Timeout;
+
         const confirmClaim = async () => {
             if (!hash || isClaimFinalized) return;
             setIsClaimFinalized(true);
             try {
-                // The /api/claim/confirm call is correct and does not need changes.
                 const response = await sdk.quickAuth.fetch('/api/claim/confirm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -237,77 +251,71 @@ export default function GamePage() {
                     throw new Error((await response.json()).message || 'Failed to confirm claim on the server.');
                 }
                 setToast({ message: 'Claim successful!', type: 'success' });
+                
+                setShowShareButton(true);
+                setPlayAgainCooldown(true);
+                setShareProgress(0);
+
+                progressInterval = setInterval(() => {
+                    setShareProgress(prev => {
+                        if (prev >= 100) {
+                            clearInterval(progressInterval);
+                            return 100;
+                        }
+                        return prev + 1;
+                    });
+                }, 50); // Update every 50ms for a 5s duration
+
+                cooldownTimeout = setTimeout(() => {
+                    setShowShareButton(false);
+                    setPlayAgainCooldown(false);
+                    clearInterval(progressInterval);
+                }, 7000);
+
                 await refetchUserProfile();
                 queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
             } catch (err) {
                 setToast({ message: (err as Error).message, type: 'error' });
             }
         };
+
         if (isConfirmed) {
             confirmClaim();
         }
+
+        return () => {
+            clearInterval(progressInterval);
+            clearTimeout(cooldownTimeout);
+        };
     }, [isConfirmed, isClaimFinalized, hash, refetchUserProfile, queryClient, writeError, confirmationError, resetWriteContract]);
 
-    const isClaimDisabled = isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isConfirmed || !!claimCooldownEnds || claimsLeft === 0;
+    const isClaimDisabled = isWritePending || isConfirming || isSignatureLoading || isConfirmed || !!claimCooldownEnds || claimsLeft === 0;
 
     return (
         <div className={styles.gameContainer}>
             {showAddAppBanner && <AddAppBanner onAppAdded={() => setShowAddAppBanner(false)} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-            <GameEngine ref={gameEngineRef} onGameWin={handleGameWin} displayScore={finalScore} isMuted={isMuted} onToggleMute={toggleMute} />
-            <div className={styles.actionContainer}>
-                {isClaimUnlocked ? (
-                    <div className={styles.actionButtonsContainer}>
-                        {finalScore > 0 ? (
-                            !isConfirmed ? (
-                                <>
-                                    <div className={styles.topButtonsWrapper}>
-                                        <button
-                                            onClick={handleClaim}
-                                            disabled={isClaimDisabled}
-                                            className={`${styles.claimButton} ${styles.claimButtonGreen}`}
-                                        >
-                                            {claimCooldownEnds ? `On Cooldown` :
-                                                claimsLeft === 0 ? 'No Claims Left' :
-                                                    isSignatureLoading ? 'Preparing...' :
-                                                        isWritePending ? 'Check Wallet...' :
-                                                            isConfirming ? 'Confirming...' :
-                                                                claimButtonText}
-                                        </button>
-                                        {!isMultiplierUsed && <button
-                                            onClick={handleShareScoreFrame}
-                                            disabled={isWritePending || isConfirming || isMultiplierLoading || isSignatureLoading || isMultiplierUsed}
-                                            className={`${styles.claimButton} ${styles.multiplierButtonPurple}`}
-                                        >
-                                            {isMultiplierLoading ? '2x...' : isMultiplierUsed ? '2xed!' : '2x'}
-                                        </button>}
-                                    </div>
-                                </>
-                            ) : (
-                                <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>
-                                    Play Again
-                                </button>
-                            )
-                        ) : (
-                            <button onClick={handleTryAgain} className={`${styles.claimButton} ${styles.tryAgainButtonRed}`}>
-                                Try Again
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    claimCooldownEnds ? (
-                        <button disabled className={styles.claimButton}>
-                            Cooldown: {countdown}
-                        </button>
-                    ) : (
-                        <button disabled className={styles.claimButton}>Survive to Unlock Claim</button>
-                    )
-                )}
-                <div className={styles.statusMessage}>
-                    {/* This status message now uses the accurate, real-time state. */}
-                    {claimsLeft !== null && !claimCooldownEnds && (<p>Claims left today: {claimsLeft}</p>)}
-                </div>
-            </div>
+            <GameEngine
+                ref={gameEngineRef}
+                onGameWin={handleGameWin}
+                displayScore={finalScore}
+                isMuted={isMuted}
+                onToggleMute={toggleMute}
+                claimCooldownEnds={claimCooldownEnds}
+                countdown={countdown}
+                claimsLeft={claimsLeft}
+                handleClaim={handleClaim}
+                handleShareScoreFrame={handleShareScoreFrame}
+                handleTryAgain={handleTryAgain}
+                isClaimDisabled={isClaimDisabled}
+                isSignatureLoading={isSignatureLoading}
+                isWritePending={isWritePending}
+                isConfirming={isConfirming}
+                isConfirmed={isConfirmed}
+                claimButtonText={claimButtonText}
+                isClaimStatusLoading={isClaimStatusLoading}
+            />
+
         </div>
     );
 }

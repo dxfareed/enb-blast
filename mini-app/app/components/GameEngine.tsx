@@ -11,38 +11,59 @@ import HighlightTooltip from './HighlightTooltip';
 
 const GAME_DURATION = 30;
 
-const INITIAL_SPAWN_RATE = 310; // ms between spawns
-const INITIAL_BOMB_SPEED = 2.4; // pixels per frame
-const INITIAL_PICTURE_SPEED = 2.2; // pixels per frame
-const INITIAL_BOMB_CHANCE = 0.196; // 10% chance
+const INITIAL_SPAWN_RATE = 300;
+const INITIAL_BOMB_SPEED = 7;
+const INITIAL_PICTURE_SPEED = 7;
+const INITIAL_BOMB_CHANCE = 0.3;
 
-// Final game parameters at the end of the timer for scaling
-const FINAL_SPAWN_RATE = 250; // ms between spawns
-const FINAL_BOMB_SPEED = 4.5; // pixels per frame
-const FINAL_PICTURE_SPEED = 5.4; // pixels per frame
-const FINAL_BOMB_CHANCE = 0.35; // 40% chance
+const FINAL_SPAWN_RATE = 250;
+const FINAL_BOMB_SPEED = 12;
+const FINAL_PICTURE_SPEED = 12;
+const FINAL_BOMB_CHANCE = 0.6;
 
-// Power-up configuration
 const PICTURE_URL = "/Enb_000.png";
+const BASE_PICTURE_VALUE = 6;
+
 const POWER_UP_POINT_5_URL = "/powerup_5.png";
-const POWER_UP_POINT_5_VALUE = 5;
-const POWER_UP_POINT_5_CHANCE = 0.01;
+const POWER_UP_POINT_5_VALUE = 10;
+const POWER_UP_POINT_5_CHANCE = 0.0109;
+
 const POWER_UP_POINT_10_URL = "/powerup_10.png";
-const POWER_UP_POINT_10_VALUE = 10;
-const POWER_UP_POINT_10_CHANCE = 0.005;
+const POWER_UP_POINT_10_VALUE = 15;
+const POWER_UP_POINT_10_CHANCE = 0.008;
+
 const POWER_UP_POINT_2_URL = "/powerup_2.png";
-const POWER_UP_POINT_2_VALUE = 2;
-const POWER_UP_POINT_2_CHANCE = 0.03;
+const POWER_UP_POINT_2_VALUE = 5;
+const POWER_UP_POINT_2_CHANCE = 0.08;
+
+const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
+const POWER_UP_PUMPKIN_VALUE = 250;
+const POWER_UP_PUMPKIN_CHANCE = 0.0008;
 
 type GameEngineProps = {
-  onGameWin: (finalScore: number) => void;
+  onGameWin: (finalScore: number, pumpkinsCollected: number) => void;
   displayScore: number;
   isMuted: boolean;
   onToggleMute: () => void;
+  claimCooldownEnds: string | null;
+  countdown: string;
+  claimsLeft: number | null;
+  // Props for new overlay buttons
+  handleClaim: () => void;
+  handleShareScoreFrame: () => void;
+  handleTryAgain: () => void;
+  isClaimDisabled: boolean;
+  isSignatureLoading: boolean;
+  isWritePending: boolean;
+  isConfirming: boolean;
+  isConfirmed: boolean;
+  claimButtonText: string;
+  isClaimStatusLoading: boolean;
 };
+
 export type GameEngineHandle = { resetGame: () => void; };
 
-type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10';
+type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin';
 type Item = {
   id: number; type: ItemType; x: number; y: number; speed: number;
   ref: React.RefObject<HTMLDivElement>;
@@ -55,24 +76,40 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
   return !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
 }
 
-const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, displayScore, isMuted, onToggleMute }, ref) => {
-  // --- STATE MANAGEMENT ---
+const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ 
+  onGameWin, 
+  displayScore, 
+  isMuted, 
+  onToggleMute, 
+  claimCooldownEnds, 
+  countdown, 
+  claimsLeft,
+  handleClaim,
+  handleShareScoreFrame,
+  handleTryAgain,
+  isClaimDisabled,
+  isSignatureLoading,
+  isWritePending,
+  isConfirming,
+  isConfirmed,
+  claimButtonText,
+  isClaimStatusLoading
+}, ref) => {
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<GameState>('idle');
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [floatingScores, setFloatingScores] = useState<{ id: number; points: number; x: number; y: number; }[]>([]);
   const [isBombHit, setIsBombHit] = useState(false);
-  const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 300 });
+  const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 400 });
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
-  //const [showTooltip, setShowTooltip] = useState(false);
 
-  // --- REFS ---
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef(score);
+  const pumpkinsCollectedRef = useRef(0);
   const lastSpawnTimeRef = useRef(0);
   const coinSoundRef = useRef<HTMLAudioElement | null>(null);
   const bombSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -91,20 +128,15 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const { activeTourStep, tourSteps } = useTour();
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
 
+  const isGameLocked = claimCooldownEnds !== null || claimsLeft === 0;
+
   useEffect(() => {
     const imageUrls = [
-      '/bomb.png',
-      PICTURE_URL,
-      POWER_UP_POINT_5_URL,
-      POWER_UP_POINT_10_URL,
-      POWER_UP_POINT_2_URL,
-      avatarPfp
+      '/bomb.png', PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
+      POWER_UP_POINT_2_URL, avatarPfp
     ];
     imageUrls.forEach(url => {
-      if (url) {
-        const img = new Image();
-        img.src = url;
-      }
+      if (url) { new Image().src = url; }
     });
   }, [avatarPfp]);
 
@@ -116,25 +148,23 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   useEffect(() => {
     coinSoundRef.current = new Audio('/sounds/coin.wav');
     coinSoundRef.current.load();
-    coinSoundRef.current.volume = 1.0;
+    coinSoundRef.current.volume = 0.7;
     bombSoundRef.current = new Audio('/sounds/bomb.wav');
     bombSoundRef.current.load();
-    bombSoundRef.current.volume = 1.0;
+    bombSoundRef.current.volume = 0.5;
     backgroundSoundRef.current = new Audio('/sounds/background.mp3');
     backgroundSoundRef.current.load();
     backgroundSoundRef.current.loop = true;
     backgroundSoundRef.current.volume = 0.3;
     gameOverSoundRef.current = new Audio('/sounds/game-over.wav');
     gameOverSoundRef.current.load();
-    gameOverSoundRef.current.volume = 1.0;
+    gameOverSoundRef.current.volume = 0.6;
     heartbeatSoundRef.current = new Audio('/sounds/heartbeat.wav');
     heartbeatSoundRef.current.load();
-    heartbeatSoundRef.current.volume = 1.0;
+    heartbeatSoundRef.current.volume = 0.8;
   }, []);
 
-  // --- GAME CONTROL FUNCTIONS ---
   const resetGame = useCallback(() => {
-    console.log("%c--- RESETTING GAME STATE ---", "color: orange; font-weight: bold;");
     setGameState('idle');
     setItems([]);
     setScore(0);
@@ -143,8 +173,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     setFloatingScores([]);
     setIsDragging(false);
     setIsGameOverSoundPlayed(false);
-
-    // Explicitly reset game parameters to their initial values.
+    pumpkinsCollectedRef.current = 0;
     gameParamsRef.current = {
       bombSpeed: INITIAL_BOMB_SPEED,
       pictureSpeed: INITIAL_PICTURE_SPEED,
@@ -158,48 +187,26 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   const startGame = () => {
     resetGame();
     setGameState('playing');
-
-    // Unlock audio on first user gesture
-    if (coinSoundRef.current && coinSoundRef.current.paused) {
-      coinSoundRef.current.play().catch(() => { });
-      coinSoundRef.current.pause();
-    }
-    if (bombSoundRef.current && bombSoundRef.current.paused) {
-      bombSoundRef.current.play().catch(() => { });
-      bombSoundRef.current.pause();
-    }
-    if (backgroundSoundRef.current && backgroundSoundRef.current.paused) {
-      backgroundSoundRef.current.play().catch(() => { });
-      backgroundSoundRef.current.pause();
-    }
-    if (gameOverSoundRef.current && gameOverSoundRef.current.paused) {
-      gameOverSoundRef.current.play().catch(() => { });
-      gameOverSoundRef.current.pause();
-    }
+    if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => {}).then(() => coinSoundRef.current?.pause()); }
+    if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => {}).then(() => bombSoundRef.current?.pause()); }
+    if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => {}).then(() => gameOverSoundRef.current?.pause()); }
   };
 
-  // --- POINTER HANDLERS for AVATAR ---
   const handlePointerDown = (e: React.PointerEvent) => {
     if (gameState !== 'playing') return;
     setIsDragging(true);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !gameAreaRef.current || !avatarRef.current) return; // Ensure avatarRef is available
+    if (!isDragging || !gameAreaRef.current || !avatarRef.current) return;
     const gameRect = gameAreaRef.current.getBoundingClientRect();
     const avatarRect = avatarRef.current.getBoundingClientRect();
-
     const avatarHalfWidth = avatarRect.width / 2;
     const avatarHalfHeight = avatarRect.height / 2;
-
     let newX = e.clientX - gameRect.left;
     let newY = e.clientY - gameRect.top;
-
-    // Clamp X coordinate
     newX = Math.max(avatarHalfWidth, Math.min(newX, gameRect.width - avatarHalfWidth));
-    // Clamp Y coordinate
     newY = Math.max(avatarHalfHeight, Math.min(newY, gameRect.height - avatarHalfHeight));
-
     setAvatarPosition({ x: newX, y: newY });
   };
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -208,7 +215,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   };
 
   useEffect(() => {
-    // This effect manages the audio mix during invincibility
     if (isInvincible) {
       heartbeatSoundRef.current?.play().catch(e => console.error("Heartbeat audio play failed:", e));
       if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.08;
@@ -224,7 +230,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   }, [isInvincible]);
 
   useEffect(() => {
-    // This effect manages the background music playback based on game state
     if (gameState === 'playing' && !isMuted) {
       backgroundSoundRef.current?.play().catch(e => console.error("Background audio play failed:", e));
     } else {
@@ -236,38 +241,23 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
   }, [gameState, isMuted]);
 
   useEffect(() => {
-    // This effect only runs when the game starts ('playing') and cleans up when it stops.
-    // The dependency array is intentionally limited to `[gameState]` to prevent re-runs.
-    if (gameState !== 'playing') {
-      return;
-    }
-
-    console.log(`%c--- NEW GAME STARTED ---`, "color: green; font-weight: bold;");
-
+    if (gameState !== 'playing') return;
     const timerInterval = setInterval(() => {
       setTimeLeft(prevTime => {
         const newTime = prevTime - 1;
         if (newTime <= 0) {
           clearInterval(timerInterval);
-          setGameState('won'); // Changing state triggers effect cleanup.
+          setGameState('won');
           return 0;
         }
-
         const timeElapsed = GAME_DURATION - newTime;
-        const progress = Math.min(timeElapsed / (GAME_DURATION - 10), 1);
-
-        const newBombSpeed = INITIAL_BOMB_SPEED + (FINAL_BOMB_SPEED - INITIAL_BOMB_SPEED) * progress;
-        const newSpawnRate = INITIAL_SPAWN_RATE - (INITIAL_SPAWN_RATE - FINAL_SPAWN_RATE) * progress;
-        const newBombChance = INITIAL_BOMB_CHANCE + (FINAL_BOMB_CHANCE - INITIAL_BOMB_CHANCE) * progress;
-
+        const progress = Math.min(timeElapsed / (GAME_DURATION - 15), 1);
         gameParamsRef.current = {
-          ...gameParamsRef.current,
-          bombSpeed: newBombSpeed,
+          bombSpeed: INITIAL_BOMB_SPEED + (FINAL_BOMB_SPEED - INITIAL_BOMB_SPEED) * progress,
           pictureSpeed: INITIAL_PICTURE_SPEED + (FINAL_PICTURE_SPEED - INITIAL_PICTURE_SPEED) * progress,
-          spawnRate: newSpawnRate,
-          bombChance: newBombChance,
+          spawnRate: INITIAL_SPAWN_RATE - (INITIAL_SPAWN_RATE - FINAL_SPAWN_RATE) * progress,
+          bombChance: INITIAL_BOMB_CHANCE + (FINAL_BOMB_CHANCE - INITIAL_BOMB_CHANCE) * progress,
         };
-
         return newTime;
       });
     }, 1000);
@@ -275,62 +265,47 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
     let animationFrameId: number;
     const gameLoop = (timestamp: number) => {
       if (!lastSpawnTimeRef.current) lastSpawnTimeRef.current = timestamp;
-
       const shouldSpawn = timestamp - lastSpawnTimeRef.current > gameParamsRef.current.spawnRate;
-      if (shouldSpawn) {
-        lastSpawnTimeRef.current = timestamp;
-      }
+      if (shouldSpawn) lastSpawnTimeRef.current = timestamp;
 
       setItems(prevItems => {
         let currentItems = [...prevItems];
-
-        // 1. Spawn new items
         if (shouldSpawn) {
           const rand = Math.random();
-          let itemType: ItemType = 'picture';
           const { bombChance } = gameParamsRef.current;
-
-          if (rand < bombChance) { itemType = 'bomb'; }
-          else if (rand < bombChance + POWER_UP_POINT_10_CHANCE) { itemType = 'powerup_point_10'; }
-          else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) { itemType = 'powerup_point_5'; }
-          else if (rand < bombChance + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) { itemType = 'powerup_point_2'; }
-
+          let itemType: ItemType = 'picture';
+          if (rand < bombChance) itemType = 'bomb';
+          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE) itemType = 'powerup_pumpkin';
+          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE) itemType = 'powerup_point_10';
+          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) itemType = 'powerup_point_5';
+          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) itemType = 'powerup_point_2';
           const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
-          const newItem: Item = { id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef<HTMLDivElement>() };
-          currentItems.push(newItem);
+          currentItems.push({ id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef() });
         }
-
-        // 2. Move items and filter those out of bounds
         let processedItems = currentItems
           .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
-          .filter(item => item.y < 450);
-
-
-        // 3. Collision detection
+          .filter(item => item.y < 500);
         if (avatarRef.current) {
           const avatarRect = avatarRef.current.getBoundingClientRect();
           let hitBomb = false;
-
           const remainingItems = processedItems.filter(item => {
             if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
-
             if (item.type === 'bomb') {
-              if (!isInvincibleRef.current) {
-                hitBomb = true;
-              }
-              // Bomb is removed even if invincible, but doesn't trigger the penalty.
+              if (!isInvincibleRef.current) hitBomb = true;
             } else {
               if (coinSoundRef.current) {
                 coinSoundRef.current.currentTime = 0;
-                coinSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
+                coinSoundRef.current.play().catch(e => console.error(e));
               }
-              if (!isInvincibleRef.current) {
-                sdk.haptics.impactOccurred('soft');
-              }
-              let points = 1;
+              if (!isInvincibleRef.current) sdk.haptics.impactOccurred('soft');
+              let points = BASE_PICTURE_VALUE;
               if (item.type === 'powerup_point_2') points = POWER_UP_POINT_2_VALUE;
               if (item.type === 'powerup_point_5') points = POWER_UP_POINT_5_VALUE;
               if (item.type === 'powerup_point_10') points = POWER_UP_POINT_10_VALUE;
+              if (item.type === 'powerup_pumpkin') {
+                points = POWER_UP_PUMPKIN_VALUE;
+                pumpkinsCollectedRef.current += 1;
+              }
               setScore(prev => prev + points);
               const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
               setFloatingScores(prev => [...prev, newFloatingScore]);
@@ -338,36 +313,25 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
             }
             return false;
           });
-
           if (hitBomb) {
-            if (bombSoundRef.current) {
-              bombSoundRef.current.currentTime = 0;
-              bombSoundRef.current.play().catch(error => console.error("Audio play failed:", error));
-            }
+            bombSoundRef.current?.play().catch(e => console.error(e));
             sdk.haptics.impactOccurred('heavy');
             setIsBombHit(true);
-            setTimeout(() => setIsBombHit(false), 500); // Short red flash
-
+            setTimeout(() => setIsBombHit(false), 500);
             setScore(0);
+            pumpkinsCollectedRef.current = 0;
             setIsInvincible(true);
-            setTimeout(() => setIsInvincible(false), 3000); // 3s invincibility
-
-            return []; // Clear all items on hit
+            setTimeout(() => setIsInvincible(false), 3000);
+            return [];
           }
           return remainingItems;
         }
-
         return processedItems;
       });
-
       animationFrameId = requestAnimationFrame(gameLoop);
     };
-
-    // Start the unified loop
     animationFrameId = requestAnimationFrame(gameLoop);
-
     return () => {
-      console.log(`%c--- CLEANING UP GAME LOOPS ---`, "color: red; font-weight: bold;");
       clearInterval(timerInterval);
       cancelAnimationFrame(animationFrameId);
     };
@@ -375,10 +339,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
 
   useEffect(() => {
     if (gameState === 'won' && !isGameOverSoundPlayed) {
-      onGameWin(scoreRef.current);
-      if (gameOverSoundRef.current) {
-        gameOverSoundRef.current.play().catch(e => console.error(e));
-      }
+      onGameWin(scoreRef.current, pumpkinsCollectedRef.current);
+      gameOverSoundRef.current?.play().catch(e => console.error(e));
       setIsGameOverSoundPlayed(true);
     }
   }, [gameState, onGameWin, isGameOverSoundPlayed]);
@@ -390,56 +352,128 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ onGameWin, d
       case 'powerup_point_5': return <img src={POWER_UP_POINT_5_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_10': return <img src={POWER_UP_POINT_10_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_2': return <img src={POWER_UP_POINT_2_URL} alt="Power Up" className={gameStyles.itemImage} />;
+      case 'powerup_pumpkin': return <img src={POWER_UP_PUMPKIN_URL} alt="Power Up" className={gameStyles.itemImage} />;
       default: return null;
     }
   };
 
-    const isSoundButtonTourActive = tourSteps[activeTourStep]?.id === 'sound-toggle';
+  const isSoundButtonTourActive = tourSteps[activeTourStep]?.id === 'sound-toggle';
   const soundButtonTourStep = tourSteps.find(step => step.id === 'sound-toggle');
 
   return (
     <>
       <div className={gameStyles.gameStats}>
-        <span onClick={() => { setScore(0); setItems([]); }} style={{ cursor: 'pointer' }}>Score: <strong>{score}</strong></span>
+        <span onClick={() => { setScore(0); setItems([]); }} style={{ cursor: 'pointer' }}>Score: <strong>{score.toLocaleString()}</strong></span>
         <span>Time Left: <strong>{timeLeft}s</strong></span>
       </div>
       <div
         ref={gameAreaRef}
         className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`}
-        onClick={gameState === 'idle' ? startGame : undefined}
+        onClick={gameState === 'idle' && !isGameLocked && !isClaimStatusLoading ? startGame : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-        {gameState === 'idle' && (
-          <HighlightTooltip
-            text={soundButtonTourStep?.text || ''}
-            show={isSoundButtonTourActive}
-            position="bottom"
-            alignment="right"
-            className={`${gameStyles.muteButtonContainer} ${gameStyles.soundButtonTooltipWrapper}`}
-          >
-            <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
-              <button onClick={(e) => {
-                e.stopPropagation();
-                onToggleMute();
-              }} className={gameStyles.muteButton}>
-                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-              </button>
-            </div>
-          </HighlightTooltip>
-
-        )}
-        {gameState === 'idle' && (
+        {isGameLocked && (
           <div className={gameStyles.overlay}>
-            <h2>blast ENBS</h2>
-            <p>Drag your avatar to collect.<br />Avoid the Wormhole ENBs!<br /><br />Click to Start</p>
+            <h2>Game on Cooldown</h2>
+            {claimCooldownEnds ? (
+              <p>Next claim in: <br/><strong>{countdown}</strong></p>
+            ) : (
+              <p>You have no claims left today.</p>
+            )}
           </div>
         )}
-        {gameState === 'lost' && <div className={gameStyles.overlay} onClick={resetGame}><h2>Game Over!</h2><p><RotateCcw size={48} /></p></div>}
-        {gameState === 'won' && <div className={gameStyles.overlay}><h2>Game Over!</h2><p>Your final score: {displayScore}<br />Claim is unlocked below.</p></div>}
 
+        {gameState === 'idle' && !isGameLocked && (
+          <>
+            <HighlightTooltip
+              text={soundButtonTourStep?.text || ''}
+              show={isSoundButtonTourActive}
+              position="bottom"
+              alignment="right"
+              className={`${gameStyles.muteButtonContainer} ${gameStyles.soundButtonTooltipWrapper}`}
+            >
+              <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
+                <button onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleMute();
+                }} className={gameStyles.muteButton}>
+                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                </button>
+              </div>
+            </HighlightTooltip>
+            <div className={gameStyles.overlay}>
+              {isClaimStatusLoading ? (
+                <>
+                  <h2 className={gameStyles.loadingText}>Checking claim status...</h2>
+                  <p>Please wait a moment.</p>
+                </>
+              ) : (
+                <>
+                  <h2>blast ENBS</h2>
+                  <p>Drag your avatar to collect.<br />Avoid the Wormhole ENBs!<br /><br />Click to Start</p>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {gameState === 'lost' && !isGameLocked && (
+          <div className={gameStyles.overlay}>
+            <h2>Game Over!</h2>
+            <p>Your final score: {displayScore}</p>
+            <div className={gameStyles.overlayButtonContainer}>
+              <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                Try Again
+              </button>
+              {displayScore > 0 && (
+                <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
+                  Share Score
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {gameState === 'won' && !isGameLocked && (
+          <div className={gameStyles.overlay}>
+            <h2>Game Over!</h2>
+            <p>Your final score: {(displayScore).toLocaleString()}</p>
+            <div className={gameStyles.overlayButtonContainer}>
+              {displayScore > 0 ? (
+                <>
+                  {!isConfirmed ? (
+                    <button
+                      onClick={handleClaim}
+                      disabled={isClaimDisabled}
+                      className={`${gameStyles.overlayButton} ${gameStyles.claimButtonGreen}`}
+                    >
+                      {claimCooldownEnds ? `On Cooldown` :
+                        claimsLeft === 0 ? 'No Claims Left' :
+                          isSignatureLoading ? 'Preparing...' :
+                            isWritePending ? 'Check Wallet...' :
+                              isConfirming ? 'Confirming...' :
+                                claimButtonText}
+                    </button>
+                  ) : (
+                    <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                      Play Again
+                    </button>
+                  )}
+                  <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
+                    Share Score
+                  </button>
+                </>
+              ) : (
+                <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                  Try Again
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        
         {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />}
 
         {items.map(item => (

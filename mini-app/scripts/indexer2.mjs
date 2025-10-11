@@ -66,8 +66,15 @@ async function processEvent(log) {
   const amountDecimal = formatUnits(amount, 18);
   const points = parseFloat(amountDecimal) * 10;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { walletAddress: claimingWallet.toLowerCase() },
+  // will change later
+
+  const dbUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { walletAddress: claimingWallet.toLowerCase() },
+        { verifiedWallets: { has: claimingWallet.toLowerCase() } }
+      ]
+    },
   });
 
   if (!dbUser) {
@@ -174,7 +181,7 @@ const client = createPublicClient({
 async function main() {
   console.log("🚀 Starting viem-based indexer...");
 
-  const contractAddress = "0xc3fEb4f9E4ca293595aeA1bb6f1A7E0764deD4eD";
+  const contractAddress = "0xe7f16d266dbda5451d0a3f67d9404ff2e8178d91";
   if (!contractAddress || !process.env.NEXT_PUBLIC_WS) {
     throw new Error("Contract address or NEXT_PUBLIC_WS not found in environment variables.");
   }
