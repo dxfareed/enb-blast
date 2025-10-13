@@ -27,6 +27,7 @@ async function main() {
   try {
     const usersToNotify = await prisma.user.findMany({
       where: {
+        fid:849768,
         notificationToken: { not: null },
       },
       select: {

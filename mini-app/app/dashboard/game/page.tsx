@@ -46,6 +46,7 @@ export default function GamePage() {
     }, []);
 
     const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
+    const [maxClaims, setMaxClaims] = useState<number | null>(null);
     const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
     const [countdown, setCountdown] = useState('');
     const [isClaimStatusLoading, setIsClaimStatusLoading] = useState(true);
@@ -56,8 +57,9 @@ export default function GamePage() {
                 try {
                     const statusResponse = await sdk.quickAuth.fetch('/api/claim/status');
                     if (statusResponse.ok) {
-                        const { claimsLeft, isOnCooldown, resetsAt } = await statusResponse.json();
+                        const { claimsLeft, isOnCooldown, resetsAt, maxClaims } = await statusResponse.json();
                         setClaimsLeft(claimsLeft);
+                        setMaxClaims(maxClaims);
                         if (isOnCooldown) {
                             setClaimCooldownEnds(resetsAt);
                         }
@@ -304,6 +306,7 @@ Go claim yours now!
                 claimCooldownEnds={claimCooldownEnds}
                 countdown={countdown}
                 claimsLeft={claimsLeft}
+                maxClaims={maxClaims}
                 handleClaim={handleClaim}
                 handleShareScoreFrame={handleShareScoreFrame}
                 handleTryAgain={handleTryAgain}

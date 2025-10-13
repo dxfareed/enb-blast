@@ -182,9 +182,13 @@
   font-weight: bold;
   color: white;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  animation: floatUp 0.5s ease-out forwards;
+  animation: floatUp 1.6s ease-out forwards;
   pointer-events: none;
   user-select: none;
+}
+
+.floatingScoreNegative {
+  color: #ff9999;
 }
 
 .muteButton {
@@ -225,4 +229,10 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+.claimsLeftText {
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+  color: #d1d5db;
 }
