@@ -12,14 +12,14 @@ import HighlightTooltip from './HighlightTooltip';
 const GAME_DURATION = 30;
 
 const INITIAL_SPAWN_RATE = 300;
-const INITIAL_BOMB_SPEED = 7;
-const INITIAL_PICTURE_SPEED = 7;
-const INITIAL_BOMB_CHANCE = 0.3;
+const INITIAL_BOMB_SPEED = 5.5;
+const INITIAL_PICTURE_SPEED = 5.2;
+const INITIAL_BOMB_CHANCE = 0.4;
 
 const FINAL_SPAWN_RATE = 250;
-const FINAL_BOMB_SPEED = 12;
-const FINAL_PICTURE_SPEED = 12;
-const FINAL_BOMB_CHANCE = 0.6;
+const FINAL_BOMB_SPEED = 8.5;
+const FINAL_PICTURE_SPEED = 9;
+const FINAL_BOMB_CHANCE = 0.7;
 
 const PICTURE_URL = "/Enb_000.png";
 const BASE_PICTURE_VALUE = 6;
@@ -48,6 +48,7 @@ type GameEngineProps = {
   claimCooldownEnds: string | null;
   countdown: string;
   claimsLeft: number | null;
+  maxClaims: number | null;
   // Props for new overlay buttons
   handleClaim: () => void;
   handleShareScoreFrame: () => void;
@@ -84,6 +85,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   claimCooldownEnds, 
   countdown, 
   claimsLeft,
+  maxClaims,
   handleClaim,
   handleShareScoreFrame,
   handleTryAgain,
@@ -105,6 +107,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
+  const isProcessingBombHit = useRef(false);
 
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -238,6 +241,9 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         backgroundSoundRef.current.currentTime = 0;
       }
     }
+    if (gameState !== 'playing') {
+      isProcessingBombHit.current = false;
+    }
   }, [gameState, isMuted]);
 
   useEffect(() => {
@@ -287,11 +293,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           .filter(item => item.y < 500);
         if (avatarRef.current) {
           const avatarRect = avatarRef.current.getBoundingClientRect();
-          let hitBomb = false;
+          let bombCollisionItem: Item | null = null;
           const remainingItems = processedItems.filter(item => {
             if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
+            
             if (item.type === 'bomb') {
-              if (!isInvincibleRef.current) hitBomb = true;
+              if (!isInvincibleRef.current) {
+                bombCollisionItem = item;
+              }
             } else {
               if (coinSoundRef.current) {
                 coinSoundRef.current.currentTime = 0;
@@ -309,19 +318,38 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               setScore(prev => prev + points);
               const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
               setFloatingScores(prev => [...prev, newFloatingScore]);
-              setTimeout(() => setFloatingScores(prev => prev.filter(s => s.id !== newFloatingScore.id)), 500);
+              setTimeout(() => setFloatingScores(prev => prev.filter(s => s.id !== newFloatingScore.id)), 1600);
             }
             return false;
           });
-          if (hitBomb) {
+
+          if (bombCollisionItem) {
+            if (isProcessingBombHit.current) return [];
+            isProcessingBombHit.current = true;
+
             bombSoundRef.current?.play().catch(e => console.error(e));
             sdk.haptics.impactOccurred('heavy');
             setIsBombHit(true);
             setTimeout(() => setIsBombHit(false), 500);
-            setScore(0);
+            
+            const { x, y } = bombCollisionItem;
+            setScore(prev => {
+              const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
+              const pointsDeducted = prev - newScore;
+              if (pointsDeducted > 0) {
+                const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
+                setFloatingScores(prevScores => [...prevScores, newFloatingScore]);
+                setTimeout(() => setFloatingScores(prevScores => prevScores.filter(s => s.id !== newFloatingScore.id)), 1600);
+              }
+              return newScore;
+            });
+
             pumpkinsCollectedRef.current = 0;
             setIsInvincible(true);
-            setTimeout(() => setIsInvincible(false), 3000);
+            setTimeout(() => {
+              setIsInvincible(false);
+              isProcessingBombHit.current = false;
+            }, 3000);
             return [];
           }
           return remainingItems;
@@ -413,7 +441,17 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               ) : (
                 <>
                   <h2>blast ENBS</h2>
-                  <p>Drag your avatar to collect.<br />Avoid the Wormhole ENBs!<br /><br />Click to Start</p>
+                  <p>
+                    Drag your avatar to collect.<br />Avoid the Wormhole ENBs!
+                    <br /><br />
+                    {claimsLeft !== null && maxClaims !== null && (
+                      <>
+                        Claims left: {claimsLeft}/{maxClaims}
+                        <br /><br />
+                      </>
+                    )}
+                    Click to Start
+                  </p>
                 </>
               )}
             </div>
@@ -425,6 +463,11 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
             <h2>Game Over!</h2>
             <p>Your final score: {displayScore}</p>
             <div className={gameStyles.overlayButtonContainer}>
+              {claimsLeft !== null && maxClaims !== null && (
+                <p className={gameStyles.claimsLeftText}>
+                  Claims left: {claimsLeft}/{maxClaims}
+                </p>
+              )}
               <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
                 Try Again
               </button>
@@ -443,6 +486,11 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
             <div className={gameStyles.overlayButtonContainer}>
               {displayScore > 0 ? (
                 <>
+                  {claimsLeft !== null && maxClaims !== null && (
+                    <p className={gameStyles.claimsLeftText}>
+                      Claims left: {claimsLeft}/{maxClaims}
+                    </p>
+                  )}
                   {!isConfirmed ? (
                     <button
                       onClick={handleClaim}
@@ -466,9 +514,16 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   </button>
                 </>
               ) : (
-                <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                  Try Again
-                </button>
+                <>
+                  {claimsLeft !== null && maxClaims !== null && (
+                    <p className={gameStyles.claimsLeftText}>
+                      Claims left: {claimsLeft}/{maxClaims}
+                    </p>
+                  )}
+                  <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                    Try Again
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -489,10 +544,13 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         {floatingScores.map(score => (
           <div
             key={score.id}
-            className={gameStyles.floatingScore}
-            style={{ top: `${score.y}px`, left: `${score.x}px` }}
+            className={`${gameStyles.floatingScore} ${score.points < 0 ? gameStyles.floatingScoreNegative : ''}`}
+            style={{ 
+              top: `${score.y}px`, 
+              left: `${score.x}px`
+            }}
           >
-            +{score.points}
+            {score.points > 0 ? `+${score.points}` : score.points}
           </div>
         ))}
       </div>

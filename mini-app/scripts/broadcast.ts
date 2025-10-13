@@ -96,10 +96,10 @@ function getNotificationContent() {
     const daysRemaining = (REWARD_DAY_UTC - currentDayUTC + 7) % 7;
     
     if (daysRemaining === 1) {
-      title = `$ENB Rewards go out in ${daysRemaining} day!`;
+      title = `ENB Rewards go out in ${daysRemaining} day!`;
       body = `Keep blasting $ENBs for the top of the leaderboard.`;
     } else {
-      title = `$ENB Rewards go out in ${daysRemaining} days!`;
+      title = `ENB Rewards go out in ${daysRemaining} days!`;
       body = `Keep blasting $ENBs for the top of the leaderboard.`;
     }
   }

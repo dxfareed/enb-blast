@@ -1,4 +1,4 @@
-import { sendFrameNotification } from "@/lib/notification-client";
+import { sendFrameNotification, sendMiniAppNotification } from "@/lib/notification-client";
 import {
   deleteUserNotificationDetails,
   setUserNotificationDetails,
@@ -74,7 +74,31 @@ export async function POST(request: Request) {
     );
   }
 
+  console.log("Full webhook event:", JSON.stringify(event, null, 2));
+
   switch (event.event) {
+    case "miniapp_added":
+      console.log(
+        "miniapp_added",
+        "event.notificationDetails",
+        event.notificationDetails
+      );
+      if (event.notificationDetails) {
+        await setUserNotificationDetails(fid, event.notificationDetails);
+        await sendMiniAppNotification({
+          fid,
+          title: `Welcome to ENB Blast`,
+          body: `Get ready to blast $ENB and earn $ENB`,
+        });
+      } else {
+        await deleteUserNotificationDetails(fid);
+      }
+      break;
+    case "miniapp_removed": {
+      console.log(`user fid ${fid} miniapp_removed`);
+      await deleteUserNotificationDetails(fid);
+      break;
+    }
     case "frame_added":
       console.log(
         "frame_added",

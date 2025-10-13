@@ -94,7 +94,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
         claimsLeft: finalClaimsLeft,
         isOnCooldown,
-        resetsAt
+        resetsAt,
+        maxClaims: Number(maxClaims)
     }, { status: 200 });
 
   } catch (error) {
