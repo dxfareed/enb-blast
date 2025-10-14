@@ -2,11 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Errors, createClient } from "@farcaster/quick-auth";
 import prisma from '@/lib/prisma';
 
-const MAX_SCORE_PER_SECOND = 20; // Adjust this value based on your game's mechanics
+// Server-side authoritative values
+const ITEM_VALUES = {
+  picture: 6,
+  powerup_point_2: 5,
+  powerup_point_5: 10,
+  powerup_point_10: 15,
+  powerup_pumpkin: 250,
+};
+
 const GAME_DURATION_SECONDS = 40;
-const GRACE_PERIOD_SECONDS = 5; // Allow for some network latency
+const GRACE_PERIOD_SECONDS = 5;
+const MAX_EVENTS_PER_SECOND = 5; // Max items a user can plausibly collect per second
 
 const client = createClient();
+
+// Define types locally on the server to avoid dependency on client-side code
+type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin';
+type GameEvent = {
+  type: 'collect';
+  itemType: ItemType;
+  timestamp: number;
+} | {
+  type: 'bomb_hit';
+  timestamp: number;
+};
 
 function getUrlHost(request: NextRequest): string {
     const origin = request.headers.get("origin");
@@ -31,9 +51,9 @@ export async function POST(req: NextRequest) {
     });
     const fid = BigInt(payload.sub);
 
-    const { sessionId, score } = await req.json();
+    const { sessionId, events } = await req.json();
 
-    if (!sessionId || typeof score !== 'number') {
+    if (!sessionId || !Array.isArray(events)) {
       return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
     }
 
@@ -58,33 +78,58 @@ export async function POST(req: NextRequest) {
     const endTime = new Date();
     const durationSeconds = (endTime.getTime() - startTime.getTime()) / 1000;
 
+    // --- Security Check: Session Duration ---
     if (durationSeconds > GAME_DURATION_SECONDS + GRACE_PERIOD_SECONDS) {
       await prisma.gameSession.update({
         where: { id: sessionId },
-        data: { status: 'TIMED_OUT', endTime, score },
+        data: { status: 'TIMED_OUT', endTime, score: 0 }, // Score is 0 on timeout
       });
-      return NextResponse.json({ message: 'Game session timed out' }, { status: 408 });
+      // Return a specific score of 0 for timed out sessions
+      return NextResponse.json({ score: 0, pumpkinsCollected: 0, message: 'Game session timed out' }, { status: 200 });
     }
 
-    const maxPossibleScore = durationSeconds * MAX_SCORE_PER_SECOND;
-    if (score > maxPossibleScore) {
-      await prisma.gameSession.update({
-        where: { id: sessionId },
-        data: { status: 'INVALID_SCORE', score, endTime },
-      });
-      return NextResponse.json({ message: 'Score is too high for the session duration' }, { status: 400 });
+    // --- Security Check: Event Rate ---
+    const maxPossibleEvents = durationSeconds * MAX_EVENTS_PER_SECOND;
+    if (events.length > maxPossibleEvents) {
+        await prisma.gameSession.update({
+            where: { id: sessionId },
+            data: { status: 'INVALID_SCORE', score: 0, endTime },
+        });
+        return NextResponse.json({ message: 'Event count is too high for the session duration' }, { status: 400 });
+    }
+
+    // --- Secure Score Calculation ---
+    let calculatedScore = 0;
+    let pumpkinsCollected = 0;
+    for (const event of events) {
+        if (event.type === 'collect') {
+            const itemValue = ITEM_VALUES[event.itemType as keyof typeof ITEM_VALUES];
+            if (itemValue) {
+                calculatedScore += itemValue;
+                if (event.itemType === 'powerup_pumpkin') {
+                    pumpkinsCollected += 1;
+                }
+            }
+        } else if (event.type === 'bomb_hit') {
+            // Apply the same penalty logic as the client
+            calculatedScore = calculatedScore <= 100 
+                ? Math.floor(calculatedScore * 0.5) 
+                : Math.floor(calculatedScore * 0.4);
+            // On bomb hit, the user loses all pumpkins collected *so far*
+            pumpkinsCollected = 0;
+        }
     }
 
     await prisma.gameSession.update({
       where: { id: sessionId },
       data: {
-        score,
+        score: calculatedScore,
         endTime,
         status: 'COMPLETED',
       },
     });
 
-    return NextResponse.json({ message: 'Game session completed' }, { status: 200 });
+    return NextResponse.json({ score: calculatedScore, pumpkinsCollected }, { status: 200 });
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {
         return NextResponse.json({ message: "Invalid token" }, { status: 401 });

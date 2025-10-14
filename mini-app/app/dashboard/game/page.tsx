@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useFeeData } from 'wagmi';
 import { useUser } from '@/app/context/UserContext';
 import { parseGwei, parseEther } from 'viem';
-import GameEngine, { GameEngineHandle } from '@/app/components/GameEngine';
+import GameEngine, { GameEngineHandle, GameEvent } from '@/app/components/GameEngine';
 import Toast from '@/app/components/Toast';
 import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
@@ -266,7 +266,7 @@ Go claim yours now!
         }
     };
 
-    const handleGameWin = useCallback(async (scoreFromGame: number, pumpkinsFromGame: number) => {
+    const handleGameWin = useCallback(async (events: GameEvent[]) => {
         if (!sessionId) {
             setToast({ message: 'No active game session.', type: 'error' });
             return;
@@ -276,17 +276,19 @@ Go claim yours now!
             const response = await sdk.quickAuth.fetch('/api/game/end', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId, score: scoreFromGame }),
+                body: JSON.stringify({ sessionId, events }),
             });
 
             if (!response.ok) {
                 throw new Error((await response.json()).message || 'Failed to end game session.');
             }
             
+            const { score, pumpkinsCollected } = await response.json();
+
             setIsClaimUnlocked(true);
-            setFinalScore(scoreFromGame);
-            setPumpkinsCollected(pumpkinsFromGame);
-            setClaimButtonText(`Claim ${(scoreFromGame).toLocaleString()} $ENB`);
+            setFinalScore(score);
+            setPumpkinsCollected(pumpkinsCollected);
+            setClaimButtonText(`Claim ${score.toLocaleString()} $ENB`);
 
         } catch (err) {
             setToast({ message: (err as Error).message, type: 'error' });

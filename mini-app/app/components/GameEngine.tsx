@@ -40,8 +40,17 @@ const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
 const POWER_UP_PUMPKIN_VALUE = 250;
 const POWER_UP_PUMPKIN_CHANCE = 0.0008;
 
+export type GameEvent = {
+  type: 'collect';
+  itemType: ItemType;
+  timestamp: number;
+} | {
+  type: 'bomb_hit';
+  timestamp: number;
+};
+
 type GameEngineProps = {
-  onGameWin: (finalScore: number, pumpkinsCollected: number) => void;
+  onGameWin: (events: GameEvent[]) => void;
   onStartGame: () => Promise<boolean>;
   displayScore: number;
   isMuted: boolean;
@@ -120,7 +129,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef(score);
-  const pumpkinsCollectedRef = useRef(0);
+  const gameEventsRef = useRef<GameEvent[]>([]);
   const lastSpawnTimeRef = useRef(0);
   const coinSoundRef = useRef<HTMLAudioElement | null>(null);
   const bombSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -184,7 +193,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     setFloatingScores([]);
     setIsDragging(false);
     setIsGameOverSoundPlayed(false);
-    pumpkinsCollectedRef.current = 0;
+    gameEventsRef.current = [];
     gameParamsRef.current = {
       bombSpeed: INITIAL_BOMB_SPEED,
       pictureSpeed: INITIAL_PICTURE_SPEED,
@@ -313,6 +322,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 bombCollisionItem = item;
               }
             } else {
+              gameEventsRef.current.push({ type: 'collect', itemType: item.type, timestamp: Date.now() });
               if (coinSoundRef.current) {
                 coinSoundRef.current.currentTime = 0;
                 coinSoundRef.current.play().catch(e => console.error(e));
@@ -324,7 +334,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               if (item.type === 'powerup_point_10') points = POWER_UP_POINT_10_VALUE;
               if (item.type === 'powerup_pumpkin') {
                 points = POWER_UP_PUMPKIN_VALUE;
-                pumpkinsCollectedRef.current += 1;
               }
               setScore(prev => prev + points);
               const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
@@ -337,7 +346,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           if (bombCollisionItem) {
             if (isProcessingBombHit.current) return [];
             isProcessingBombHit.current = true;
-
+            
+            gameEventsRef.current.push({ type: 'bomb_hit', timestamp: Date.now() });
             bombSoundRef.current?.play().catch(e => console.error(e));
             sdk.haptics.impactOccurred('heavy');
             setIsBombHit(true);
@@ -355,7 +365,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               return newScore;
             });
 
-            pumpkinsCollectedRef.current = 0;
             setIsInvincible(true);
             setTimeout(() => {
               setIsInvincible(false);
@@ -378,7 +387,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useEffect(() => {
     if (gameState === 'won' && !isGameOverSoundPlayed) {
-      onGameWin(scoreRef.current, pumpkinsCollectedRef.current);
+      onGameWin(gameEventsRef.current);
       gameOverSoundRef.current?.play().catch(e => console.error(e));
       setIsGameOverSoundPlayed(true);
     }

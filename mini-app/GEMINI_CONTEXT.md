@@ -53,11 +53,10 @@ During this session, the following issues were identified and resolved:
     *   **Problem:** The UI provided no feedback to the user while the game was being initiated, making it feel unresponsive.
     *   **Solution:** Added an `isStartingGame` state to `app/dashboard/game/page.tsx` and passed it to the `GameEngine` component to display a "Starting game..." message.
 
-### Security Proposal (October 14, 2025)
+### Security Fix (October 14, 2025)
 
 *   **Vulnerability:** Client-Side Score Manipulation.
-    *   **Problem:** The game score is calculated entirely on the client-side (`GameEngine.tsx`) and sent to the `/api/game/end` endpoint. The server currently trusts this score, making it trivial for a malicious user to intercept the request and submit a fraudulent, high score.
-    *   **Proposed Solution:** Implement Server-Authoritative Scoring.
-        *   **Client-Side Change:** Instead of sending the final score, the client will send a summary of game actions (e.g., number of each type of item collected).
-        *   **Server-Side Change:** The `/api/game/end` endpoint will be modified to calculate the score based on the received game actions. It will also perform validation to ensure the actions are plausible for a single game session. This makes the server the source of truth for the score, preventing cheating.
-        *   **Performance:** This change will have a negligible impact on user-perceived performance, as the calculation is fast and occurs during an existing network request that is already covered by a loading spinner.
+    *   **Problem:** The game score was calculated entirely on the client-side (`GameEngine.tsx`) and sent to the `/api/game/end` endpoint. The server trusted this score, making it trivial for a malicious user to intercept the request and submit a fraudulent, high score.
+    *   **Solution:** Implemented Server-Authoritative Scoring.
+        *   **Client-Side Change:** The `GameEngine` was modified to record a log of all game events (e.g., collecting an item, hitting a bomb). This event log, rather than a final score, is now sent to the server.
+        *   **Server-Side Change:** The `/api/game/end` endpoint was completely refactored. It now securely calculates the score based on the received event log and server-defined item values. It also performs validation checks on the session duration and event rate to prevent cheating. This makes the server the single source of truth for the score.
