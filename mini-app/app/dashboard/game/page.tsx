@@ -241,6 +241,10 @@ Go claim yours now!
 
         const confirmClaim = async () => {
             if (!hash || isClaimFinalized) return;
+
+            // Optimistically update the claims count
+            setClaimsLeft(prev => (prev !== null ? Math.max(0, prev - 1) : null));
+
             setIsClaimFinalized(true);
             try {
                 const response = await sdk.quickAuth.fetch('/api/claim/confirm', {

@@ -75,24 +75,32 @@ export async function GET(req: NextRequest) {
     }
 
     const cooldownPeriod = BigInt(12 * 60 * 60); // 12 hours in seconds
-    const claimsLeft = Number(maxClaims) - Number(onChainProfile.claimsInCurrentCycle);
+    const claimsMade = onChainProfile.claimsInCurrentCycle;
+    
+    let claimsLeft = Number(maxClaims) - Number(claimsMade);
     let isOnCooldown = false;
     let resetsAt: string | null = null;
+    
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
 
-    if (onChainProfile.claimsInCurrentCycle >= maxClaims) {
-        const now = BigInt(Math.floor(Date.now() / 1000));
-        const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
+    // Scenario 1: User has used up all claims
+    if (claimsMade >= maxClaims) {
+        // Check if they are still within the cooldown period
         if (now < cooldownEndTime) {
             isOnCooldown = true;
+            claimsLeft = 0;
             resetsAt = new Date(Number(cooldownEndTime) * 1000).toISOString();
+        } else {
+            // Cooldown has passed, so they get a full set of claims
+            isOnCooldown = false;
+            claimsLeft = Number(maxClaims);
+            resetsAt = null;
         }
     }
-    
-    // If the cooldown has passed, the number of claims left is the max
-    const finalClaimsLeft = isOnCooldown ? 0 : (claimsLeft > 0 ? claimsLeft : Number(maxClaims));
 
     return NextResponse.json({
-        claimsLeft: finalClaimsLeft,
+        claimsLeft: claimsLeft < 0 ? 0 : claimsLeft, // Ensure claimsLeft isn't negative
         isOnCooldown,
         resetsAt,
         maxClaims: Number(maxClaims)

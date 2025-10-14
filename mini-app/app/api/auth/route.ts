@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     });
     const neynarScore = user.users[0]?.score;
 
-    if (neynarScore !== undefined && neynarScore < 0.3) {
+    if (neynarScore !== undefined && neynarScore <= 0.2) {
       console.log(
         `Restricted user attempt: ${userFid}, score: ${neynarScore} at ${new Date().toISOString()}`
       );
