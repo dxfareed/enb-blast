@@ -8,6 +8,8 @@ import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
 import { useTour } from '@/app/context/TourContext';
 import HighlightTooltip from './HighlightTooltip';
+import DidYouKnow from './DidYouKnow';
+import { BASE_BLOCKCHAIN_FACTS } from '@/app/utils/constants';
 
 const GAME_DURATION = 30;
 
@@ -466,6 +468,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 <>
                   <div className={gameStyles.spinner}></div>
                   <p>Starting game...</p>
+                  <DidYouKnow facts={BASE_BLOCKCHAIN_FACTS} />
                 </>
               ) : isClaimStatusLoading ? (
                 <>

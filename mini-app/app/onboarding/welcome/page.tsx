@@ -24,32 +24,52 @@ export default function WelcomePage() {
   }, []);
 
   async function checkUserRegistration(fid: number | string) {
-    try {
-      setToast(null);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    let attempts = 0;
+    const maxAttempts = 3;
 
-      const response = await fetch(`/api/user/profile?fid=${fid}`);
-      if (response.ok) {
-        const user = await response.json();
-        if (user.registrationStatus === 'ACTIVE') {
-          console.log('User is registered and active, go to game');
-          router.push('/dashboard/game');
-        } else {
-          console.log('User is pending, go to register');
-          router.push('/onboarding/register');
+    while (attempts < maxAttempts) {
+      try {
+        // No toast needed at the start of an attempt
+        if (attempts === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
-      } else if (response.status === 500) {
-        setToast({ message: 'Server timeout. Please try again in a moment.', type: 'error' });
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } else {
-        console.log("User is not registered or other error, redirecting to register");
-        router.push('/onboarding/register');
+
+        const response = await fetch(`/api/user/profile?fid=${fid}`);
+
+        if (response.ok) {
+          const user = await response.json();
+          if (user.registrationStatus === 'ACTIVE') {
+            console.log('User is registered and active, go to game');
+            router.push('/dashboard/game');
+          } else {
+            console.log('User is pending, go to register');
+            router.push('/onboarding/register');
+          }
+          return; // Success, exit the function
+        }
+
+        if (response.status >= 500) {
+          throw new Error('Server error'); // Trigger the catch block for retry logic
+        } else {
+          // For non-server errors (e.g., 404), redirect without retrying
+          console.log("User not found or other client error, redirecting to register");
+          router.push('/onboarding/register');
+          return;
+        }
+      } catch (error) {
+        attempts++;
+        console.error(`Attempt ${attempts} to check user registration failed:`, error);
+
+        if (attempts < maxAttempts) {
+          setToast({ message: 'Server timeout. Reconnecting...', type: 'info' });
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retrying
+        } else {
+          setToast({ message: 'Server is unavailable. Please try again later.', type: 'error' });
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        }
       }
-    } catch (error) {
-      console.error('Failed to check user registration:', error);
-      setToast({ message: 'Network error. Please check your internet connection.', type: 'error' });
     }
   }
 

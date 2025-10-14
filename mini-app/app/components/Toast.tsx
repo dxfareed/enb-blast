@@ -7,13 +7,14 @@ type ToastProps = {
   message: string;
   type: 'success' | 'error' | 'info';
   onClose: () => void;
+  duration?: number;
 };
 
-export default function Toast({ message, type, onClose }: ToastProps) {
+export default function Toast({ message, type, onClose, duration = 3000 }: ToastProps) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
+    const timer = setTimeout(onClose, duration);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, duration]);
 
   return (
     <div className={`${styles.toast} ${styles[type]}`}>

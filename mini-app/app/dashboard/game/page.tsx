@@ -11,6 +11,7 @@ import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useMiniApp } from '@neynar/react';
 import AddAppBanner from '@/app/components/AddAppBanner';
+import ApologyModal from '@/app/components/ApologyModal';
 import { GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, TOKEN_ADDRESS } from '@/app/utils/constants';
 import { getTokenMarqueeData } from '@/lib/dexscreener';
 
@@ -22,30 +23,60 @@ export default function GamePage() {
     const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
     const [isClaimStatusLoading, setIsClaimStatusLoading] = useState(true);
     const [claimStatusError, setClaimStatusError] = useState(false);
+    const [showApologyModal, setShowApologyModal] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowApologyModal(true);
+        }, 1000); 
+        return () => clearTimeout(timer);
+    }, []);
 
     const fetchClaimStatus = useCallback(async () => {
         setIsClaimStatusLoading(true);
-        try {
-            const statusResponse = await sdk.quickAuth.fetch('/api/claim/status');
-            if (statusResponse.ok) {
-                const data = await statusResponse.json();
-                console.log('Claim Status API Response:', data); // DEBUG LOG
-                const { claimsLeft, isOnCooldown, resetsAt, maxClaims } = data;
-                setClaimsLeft(claimsLeft);
-                setMaxClaims(maxClaims);
-                if (isOnCooldown) {
-                    setClaimCooldownEnds(resetsAt);
+        setClaimStatusError(false);
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+            try {
+                const statusResponse = await sdk.quickAuth.fetch('/api/claim/status');
+                if (statusResponse.ok) {
+                    const data = await statusResponse.json();
+                    console.log('Claim Status API Response:', data); // DEBUG LOG
+                    const { claimsLeft, isOnCooldown, resetsAt, maxClaims } = data;
+                    setClaimsLeft(claimsLeft);
+                    setMaxClaims(maxClaims);
+                    if (isOnCooldown) {
+                        setClaimCooldownEnds(resetsAt);
+                    }
+                    setClaimStatusError(false);
+                    setIsClaimStatusLoading(false);
+                    return; // Success
                 }
-                setClaimStatusError(false);
-            } else {
+
+                if (statusResponse.status >= 500) {
+                    attempts++;
+                    setToast({ message: `Server timeout. Reconnecting...`, type: 'info', duration: 700 });
+                    if (attempts >= maxAttempts) {
+                        throw new Error("Failed to fetch claim status after multiple attempts.");
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    continue;
+                }
+
+                // Non-5xx error, don't retry
                 console.warn("Could not fetch real-time claim status.");
                 setClaimStatusError(true);
+                setIsClaimStatusLoading(false);
+                return;
+
+            } catch (error) {
+                console.error("Failed to fetch claim status:", error);
+                setClaimStatusError(true);
+                setIsClaimStatusLoading(false);
+                return; // Exit on catch
             }
-        } catch (error) {
-            console.error("Failed to fetch claim status:", error);
-            setClaimStatusError(true);
-        } finally {
-            setIsClaimStatusLoading(false);
         }
     }, []);
 
@@ -58,7 +89,7 @@ export default function GamePage() {
     }, [fid, fetchClaimStatus]);
 
     const queryClient = useQueryClient();
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info', duration?: number } | null>(null);
     const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
     const [finalScore, setFinalScore] = useState(0);
     const [pumpkinsCollected, setPumpkinsCollected] = useState(0);
@@ -101,6 +132,7 @@ export default function GamePage() {
                 if (response.status >= 500) {
                     // Server error, so we'll retry
                     attempts++;
+                    setToast({ message: `Server timeout. Reconnecting...`, type: 'info', duration: 700 });
                     if (attempts >= maxAttempts) {
                         throw new Error('Failed to start game session after multiple attempts.');
                     }
@@ -272,30 +304,46 @@ Go claim yours now!
             return;
         }
         setIsEndingGame(true);
-        try {
-            const response = await sdk.quickAuth.fetch('/api/game/end', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId, events }),
-            });
+        let attempts = 0;
+        const maxAttempts = 3;
 
-            if (!response.ok) {
+        while (attempts < maxAttempts) {
+            try {
+                const response = await sdk.quickAuth.fetch('/api/game/end', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId, events }),
+                });
+
+                if (response.ok) {
+                    const { score, pumpkinsCollected } = await response.json();
+                    setIsClaimUnlocked(true);
+                    setFinalScore(score);
+                    setPumpkinsCollected(pumpkinsCollected);
+                    setClaimButtonText(`Claim ${score.toLocaleString()} $ENB`);
+                    setIsEndingGame(false);
+                    return; 
+                }
+
+                if (response.status >= 500) {
+                    attempts++;
+                    setToast({ message: `Server timeout. Reconnecting...`, type: 'info', duration: 700 });
+                    if (attempts >= maxAttempts) {
+                        throw new Error('Failed to save score after multiple attempts.');
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    continue;
+                }
+
                 throw new Error((await response.json()).message || 'Failed to end game session.');
+
+            } catch (err) {
+                setToast({ message: (err as Error).message, type: 'error' });
+                setIsEndingGame(false);
+                return; 
             }
-            
-            const { score, pumpkinsCollected } = await response.json();
-
-            setIsClaimUnlocked(true);
-            setFinalScore(score);
-            setPumpkinsCollected(pumpkinsCollected);
-            setClaimButtonText(`Claim ${score.toLocaleString()} $ENB`);
-
-        } catch (err) {
-            setToast({ message: (err as Error).message, type: 'error' });
-            // Optionally reset the game or handle the error in another way
-        } finally {
-            setIsEndingGame(false);
         }
+        setIsEndingGame(false);
     }, [sessionId]);
 
     const handleTryAgain = () => {
@@ -381,8 +429,9 @@ Go claim yours now!
 
     return (
         <div className={styles.gameContainer}>
+            {showApologyModal && <ApologyModal onClose={() => setShowApologyModal(false)} />}
             {showAddAppBanner && <AddAppBanner onAppAdded={() => setShowAddAppBanner(false)} />}
-            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} duration={toast.duration} />}
             <GameEngine
                 ref={gameEngineRef}
                 onGameWin={handleGameWin}

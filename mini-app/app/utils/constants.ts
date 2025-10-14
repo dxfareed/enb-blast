@@ -1,6 +1,17 @@
 const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS!;
 
-const TOKEN_ADDRESS = "0xf73978b3a7d1d4974abae11f696c1b4408c027a0";
+const TOKEN_ADDRESS = '0xf73978b3a7d1d4974abae11f696c1b4408c027a0'
+
+export const BASE_BLOCKCHAIN_FACTS = [
+  "Base is a secure, low-cost, builder-friendly Ethereum L2.",
+  "Base was incubated by Coinbase and built on the open-source OP Stack.",
+  "Base aims to be decentralized, permissionless, and open to anyone.",
+  "Base settled over $1 billion in transactions in its first month.",
+  "ENB was launched March 15, 2025.",
+  "ENB was launched on Cliza v1.",
+  "Everybody Needs Base."
+];
+
 const TOKEN_MEMBERSHIP_CONTRACT_ADDRESS = "0x54F400Ce798049303594DdA9Df724996b9B6dEAF";
 const TOKEN_MEMBERSHIP_LEVELS = ["Based", "SuperBased", "Legendary"];
 const TOKEN_MEMBERSHIP_CONTRACT_ABI = [{ "inputs": [{ "internalType": "address", "name": "", "type": "address" }], "name": "userAccounts", "outputs": [{ "internalType": "uint40", "name": "lastDailyClaimTime", "type": "uint40" }, { "internalType": "uint40", "name": "accountCreatedAt", "type": "uint40" }, { "internalType": "uint32", "name": "totalDailyClaims", "type": "uint32" }, { "internalType": "uint96", "name": "totalYieldClaimed", "type": "uint96" }, { "internalType": "enum EnbMiniApp.MembershipLevel", "name": "membershipLevel", "type": "uint8" }, { "internalType": "bool", "name": "exists", "type": "bool" }], "stateMutability": "view", "type": "function" }];
