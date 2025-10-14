@@ -62,6 +62,8 @@ type GameEngineProps = {
   claimButtonText: string;
   isClaimStatusLoading: boolean;
   claimStatusError: boolean;
+  isStartingGame: boolean;
+  isEndingGame: boolean;
 };
 
 export type GameEngineHandle = { resetGame: () => void; };
@@ -99,7 +101,9 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   isConfirmed,
   claimButtonText,
   isClaimStatusLoading,
-  claimStatusError
+  claimStatusError,
+  isStartingGame,
+  isEndingGame
 }, ref) => {
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
@@ -449,7 +453,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               </div>
             </HighlightTooltip>
             <div className={gameStyles.overlay}>
-              {isClaimStatusLoading ? (
+              {isStartingGame ? (
+                <>
+                  <div className={gameStyles.spinner}></div>
+                  <p>Starting game...</p>
+                </>
+              ) : isClaimStatusLoading ? (
                 <>
                   <h2 className={gameStyles.loadingText}>Checking claim status...</h2>
                   <p>Please wait a moment.</p>
@@ -497,51 +506,60 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         )}
         {gameState === 'won' && !isGameLocked && (
           <div className={gameStyles.overlay}>
-            <h2>Game Over!</h2>
-            <p>Your final score: {(displayScore).toLocaleString()}</p>
-            <div className={gameStyles.overlayButtonContainer}>
-              {displayScore > 0 ? (
-                <>
-                  {claimsLeft !== null && maxClaims !== null && (
-                    <p className={gameStyles.claimsLeftText}>
-                      Claims left: {claimsLeft}/{maxClaims}
-                    </p>
-                  )}
-                  {!isConfirmed ? (
-                    <button
-                      onClick={handleClaim}
-                      disabled={isClaimDisabled}
-                      className={`${gameStyles.overlayButton} ${gameStyles.claimButtonGreen}`}
-                    >
-                      {claimCooldownEnds ? `On Cooldown` :
-                        claimsLeft === 0 ? 'No Claims Left' :
-                          isSignatureLoading ? 'Preparing...' :
-                            isWritePending ? 'Check Wallet...' :
-                              isConfirming ? 'Confirming...' :
-                                claimButtonText}
-                    </button>
+            {isEndingGame ? (
+              <>
+                <div className={gameStyles.spinner}></div>
+                <p>Saving score...</p>
+              </>
+            ) : (
+              <>
+                <h2>Game Over!</h2>
+                <p>Your final score: {(displayScore).toLocaleString()}</p>
+                <div className={gameStyles.overlayButtonContainer}>
+                  {displayScore > 0 ? (
+                    <>
+                      {claimsLeft !== null && maxClaims !== null && (
+                        <p className={gameStyles.claimsLeftText}>
+                          Claims left: {claimsLeft}/{maxClaims}
+                        </p>
+                      )}
+                      {!isConfirmed ? (
+                        <button
+                          onClick={handleClaim}
+                          disabled={isClaimDisabled}
+                          className={`${gameStyles.overlayButton} ${gameStyles.claimButtonGreen}`}
+                        >
+                          {claimCooldownEnds ? `On Cooldown` :
+                            claimsLeft === 0 ? 'No Claims Left' :
+                              isSignatureLoading ? 'Preparing...' :
+                                isWritePending ? 'Check Wallet...' :
+                                  isConfirming ? 'Confirming...' :
+                                    claimButtonText}
+                        </button>
+                      ) : (
+                        <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                          Play Again
+                        </button>
+                      )}
+                      <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
+                        Share Score
+                      </button>
+                    </>
                   ) : (
-                    <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                      Play Again
-                    </button>
+                    <>
+                      {claimsLeft !== null && maxClaims !== null && (
+                        <p className={gameStyles.claimsLeftText}>
+                          Claims left: {claimsLeft}/{maxClaims}
+                        </p>
+                      )}
+                      <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                        Try Again
+                      </button>
+                    </>
                   )}
-                  <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
-                    Share Score
-                  </button>
-                </>
-              ) : (
-                <>
-                  {claimsLeft !== null && maxClaims !== null && (
-                    <p className={gameStyles.claimsLeftText}>
-                      Claims left: {claimsLeft}/{maxClaims}
-                    </p>
-                  )}
-                  <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                    Try Again
-                  </button>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
         

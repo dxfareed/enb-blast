@@ -76,29 +76,49 @@ export default function GamePage() {
     const [tokenPrice, setTokenPrice] = useState<number | null>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [isStartingGame, setIsStartingGame] = useState(false);
+    const [isEndingGame, setIsEndingGame] = useState(false);
 
     const handleStartGame = async () => {
         setIsStartingGame(true);
-        try {
-            const response = await sdk.quickAuth.fetch('/api/game/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-            });
+        let attempts = 0;
+        const maxAttempts = 3;
 
-            if (!response.ok) {
+        while (attempts < maxAttempts) {
+            try {
+                const response = await sdk.quickAuth.fetch('/api/game/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+
+                if (response.ok) {
+                    const { sessionId } = await response.json();
+                    setSessionId(sessionId);
+                    setIsStartingGame(false);
+                    return true; // Indicate success
+                }
+
+                if (response.status >= 500) {
+                    // Server error, so we'll retry
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        throw new Error('Failed to start game session after multiple attempts.');
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retrying
+                    continue;
+                }
+
+                // For non-server errors (e.g., 4xx), we don't retry
                 throw new Error((await response.json()).message || 'Failed to start game session.');
-            }
 
-            const { sessionId } = await response.json();
-            setSessionId(sessionId);
-            return true; // Indicate success
-        } catch (err) {
-            setToast({ message: (err as Error).message, type: 'error' });
-            return false; // Indicate failure
-        } finally {
-            setIsStartingGame(false);
+            } catch (err) {
+                setToast({ message: (err as Error).message, type: 'error' });
+                setIsStartingGame(false);
+                return false; // Indicate failure
+            }
         }
+        setIsStartingGame(false);
+        return false; // Should be unreachable, but for safety
     };
 
     useEffect(() => {
@@ -251,6 +271,7 @@ Go claim yours now!
             setToast({ message: 'No active game session.', type: 'error' });
             return;
         }
+        setIsEndingGame(true);
         try {
             const response = await sdk.quickAuth.fetch('/api/game/end', {
                 method: 'POST',
@@ -270,6 +291,8 @@ Go claim yours now!
         } catch (err) {
             setToast({ message: (err as Error).message, type: 'error' });
             // Optionally reset the game or handle the error in another way
+        } finally {
+            setIsEndingGame(false);
         }
     }, [sessionId]);
 
@@ -381,6 +404,7 @@ Go claim yours now!
                 isClaimStatusLoading={isClaimStatusLoading}
                 claimStatusError={claimStatusError}
                 isStartingGame={isStartingGame}
+                isEndingGame={isEndingGame}
             />
 
         </div>
