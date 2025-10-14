@@ -27,6 +27,13 @@ const GAME_CONTRACT_ABI = [
         "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
         "stateMutability": "view",
         "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "cooldownPeriod",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
     }
 ] as const;
 
@@ -56,7 +63,7 @@ export async function GET(req: NextRequest) {
     });
     const userFid = BigInt(payload.sub);
 
-    const [onChainProfile, maxClaims] = await Promise.all([
+    const [onChainProfile, maxClaims, cooldownPeriod] = await Promise.all([
         publicClient.readContract({
             address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
             abi: GAME_CONTRACT_ABI,
@@ -67,6 +74,11 @@ export async function GET(req: NextRequest) {
             address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
             abi: GAME_CONTRACT_ABI,
             functionName: 'maxClaimsPerCycle',
+        }),
+        publicClient.readContract({
+            address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+            abi: GAME_CONTRACT_ABI,
+            functionName: 'cooldownPeriod',
         })
     ]);
 
@@ -74,30 +86,32 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ message: "User not registered onchain" }, { status: 404 });
     }
 
-    const cooldownPeriod = BigInt(12 * 60 * 60); // 12 hours in seconds
     const claimsMade = onChainProfile.claimsInCurrentCycle;
     
     let claimsLeft = Number(maxClaims) - Number(claimsMade);
     let isOnCooldown = false;
     let resetsAt: string | null = null;
     
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
+    // Cooldown should only apply when the user has no claims left in the current cycle.
+    if (claimsLeft <= 0) {
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
 
-    // Scenario 1: User has used up all claims
-    if (claimsMade >= maxClaims) {
-        // Check if they are still within the cooldown period
-        if (now < cooldownEndTime) {
+        // Check if the cooldown period is active
+        if (onChainProfile.lastClaimTimestamp > 0 && now < cooldownEndTime) {
             isOnCooldown = true;
-            claimsLeft = 0;
             resetsAt = new Date(Number(cooldownEndTime) * 1000).toISOString();
-        } else {
-            // Cooldown has passed, so they get a full set of claims
-            isOnCooldown = false;
-            claimsLeft = Number(maxClaims);
-            resetsAt = null;
         }
+        // Ensure claimsLeft is not negative
+        claimsLeft = 0;
     }
+
+    console.log('API Claim Status:', { // DEBUG LOG
+        claimsLeft: claimsLeft < 0 ? 0 : claimsLeft,
+        isOnCooldown,
+        resetsAt,
+        maxClaims: Number(maxClaims)
+    });
 
     return NextResponse.json({
         claimsLeft: claimsLeft < 0 ? 0 : claimsLeft, // Ensure claimsLeft isn't negative

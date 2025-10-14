@@ -1,5 +1,6 @@
 // app/api/claim/signature/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { 
   createPublicClient, 
   http, 
@@ -103,10 +104,39 @@ export async function POST(req: NextRequest) {
     const userFid = BigInt(payload.sub);
     console.log(`[API LOG] ✅ JWT Verified. Request from FID: ${userFid}`);
 
-    const { amount } = await req.json();
-    if (amount === undefined) {
-      return NextResponse.json({ message: 'amount is required' }, { status: 400 });
+    if (!prisma) {
+      throw new Error("Database client is not available");
     }
+
+    // [SECURITY CRITICAL] The `amount` is no longer accepted from the client.
+    // Instead, we fetch the server-validated score from the latest completed game session.
+    const user = await prisma.user.findUnique({
+      where: { fid: userFid },
+      include: {
+        gameSessions: {
+          where: { status: 'COMPLETED' },
+          orderBy: { endTime: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    const latestSession = user.gameSessions[0];
+    if (!latestSession || !latestSession.score) {
+      return NextResponse.json({ message: 'No completed game session found to claim' }, { status: 400 });
+    }
+    
+    const amount = latestSession.score;
+    
+    // Invalidate the session so it cannot be claimed again
+    await prisma.gameSession.update({
+        where: { id: latestSession.id },
+        data: { status: 'CLAIMED' }
+    });
 
     // [CORRECTED] Step 1: Fetch the user's full on-chain profile in one call
     const onChainProfile = await getOnChainProfile(userFid);

@@ -42,6 +42,7 @@ const POWER_UP_PUMPKIN_CHANCE = 0.0008;
 
 type GameEngineProps = {
   onGameWin: (finalScore: number, pumpkinsCollected: number) => void;
+  onStartGame: () => Promise<boolean>;
   displayScore: number;
   isMuted: boolean;
   onToggleMute: () => void;
@@ -60,6 +61,7 @@ type GameEngineProps = {
   isConfirmed: boolean;
   claimButtonText: string;
   isClaimStatusLoading: boolean;
+  claimStatusError: boolean;
 };
 
 export type GameEngineHandle = { resetGame: () => void; };
@@ -79,6 +81,7 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
 
 const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ 
   onGameWin, 
+  onStartGame,
   displayScore, 
   isMuted, 
   onToggleMute, 
@@ -95,7 +98,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   isConfirming,
   isConfirmed,
   claimButtonText,
-  isClaimStatusLoading
+  isClaimStatusLoading,
+  claimStatusError
 }, ref) => {
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
@@ -131,7 +135,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const { activeTourStep, tourSteps } = useTour();
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
 
-  const isGameLocked = claimCooldownEnds !== null || claimsLeft === 0;
+  const isGameLocked = claimCooldownEnds !== null || claimsLeft === 0 || claimStatusError;
 
   useEffect(() => {
     const imageUrls = [
@@ -187,12 +191,15 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useImperativeHandle(ref, () => ({ resetGame }));
 
-  const startGame = () => {
+  const startGame = async () => {
     resetGame();
-    setGameState('playing');
-    if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => {}).then(() => coinSoundRef.current?.pause()); }
-    if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => {}).then(() => bombSoundRef.current?.pause()); }
-    if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => {}).then(() => gameOverSoundRef.current?.pause()); }
+    const success = await onStartGame();
+    if (success) {
+      setGameState('playing');
+      if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => {}).then(() => coinSoundRef.current?.pause()); }
+      if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => {}).then(() => bombSoundRef.current?.pause()); }
+      if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => {}).then(() => gameOverSoundRef.current?.pause()); }
+    }
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -405,11 +412,20 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
       >
         {isGameLocked && (
           <div className={gameStyles.overlay}>
-            <h2>Game on Cooldown</h2>
-            {claimCooldownEnds ? (
-              <p>Next claim in: <br/><strong>{countdown}</strong></p>
+            {claimStatusError ? (
+              <>
+                <h2>Error</h2>
+                <p>Could not check your game limit.<br/>Please try again later.</p>
+              </>
             ) : (
-              <p>You have no claims left today.</p>
+              <>
+                <h2>Game on Cooldown</h2>
+                {claimCooldownEnds ? (
+                  <p>Next claim in: <br/><strong>{countdown}</strong></p>
+                ) : (
+                  <p>You have no claims left today.</p>
+                )}
+              </>
             )}
           </div>
         )}

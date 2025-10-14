@@ -40,12 +40,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUserProfile = useCallback(async (currentFid: number) => {
+  const fetchUserProfile = useCallback(async (currentFid: number, onSuccess?: () => void) => {
     try {
       const response = await fetch(`/api/user/profile?fid=${currentFid}`);
       if (response.ok) {
         const profileData = await response.json();
         setUserProfile(profileData);
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
         console.error("Failed to fetch user profile:", response.statusText);
         setUserProfile(null);
@@ -85,10 +88,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
-export function useUser() {
+type UseUserOptions = {
+  onSuccess?: () => void;
+};
+
+export function useUser(options?: UseUserOptions) {
   const context = useContext(UserContext);
   if (context === undefined) {
     throw new Error('useUser must be used within a UserProvider');
   }
+
+  // Re-fetch user profile when the hook is used with an onSuccess callback
+  useEffect(() => {
+    if (options?.onSuccess && context.fid) {
+      // This is a bit of a workaround to trigger a fetch when the component using the hook mounts
+      // and provides an onSuccess callback.
+      // A more robust solution might involve a more complex state management pattern.
+      context.refetchUserProfile();
+    }
+  }, []);
+
+
   return context;
 }

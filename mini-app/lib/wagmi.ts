@@ -11,7 +11,7 @@ export const config = createConfig({
   chains: [base],
   transports: {
     [base.id]: fallback([
-      http(rpc_url),
+      http("https://mainnet-preconf.base.org"),
       webSocket(ws)
     ]),
   },

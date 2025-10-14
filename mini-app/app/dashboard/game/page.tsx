@@ -16,7 +16,47 @@ import { getTokenMarqueeData } from '@/lib/dexscreener';
 
 export default function GamePage() {
     const { address } = useAccount();
+    
+    const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
+    const [maxClaims, setMaxClaims] = useState<number | null>(null);
+    const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
+    const [isClaimStatusLoading, setIsClaimStatusLoading] = useState(true);
+    const [claimStatusError, setClaimStatusError] = useState(false);
+
+    const fetchClaimStatus = useCallback(async () => {
+        setIsClaimStatusLoading(true);
+        try {
+            const statusResponse = await sdk.quickAuth.fetch('/api/claim/status');
+            if (statusResponse.ok) {
+                const data = await statusResponse.json();
+                console.log('Claim Status API Response:', data); // DEBUG LOG
+                const { claimsLeft, isOnCooldown, resetsAt, maxClaims } = data;
+                setClaimsLeft(claimsLeft);
+                setMaxClaims(maxClaims);
+                if (isOnCooldown) {
+                    setClaimCooldownEnds(resetsAt);
+                }
+                setClaimStatusError(false);
+            } else {
+                console.warn("Could not fetch real-time claim status.");
+                setClaimStatusError(true);
+            }
+        } catch (error) {
+            console.error("Failed to fetch claim status:", error);
+            setClaimStatusError(true);
+        } finally {
+            setIsClaimStatusLoading(false);
+        }
+    }, []);
+
     const { userProfile, fid, refetchUserProfile } = useUser();
+
+    useEffect(() => {
+        if (fid) {
+            fetchClaimStatus();
+        }
+    }, [fid, fetchClaimStatus]);
+
     const queryClient = useQueryClient();
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isClaimUnlocked, setIsClaimUnlocked] = useState(false);
@@ -34,6 +74,32 @@ export default function GamePage() {
     const { data: feeData } = useFeeData();
     const [showAddAppBanner, setShowAddAppBanner] = useState(false);
     const [tokenPrice, setTokenPrice] = useState<number | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [isStartingGame, setIsStartingGame] = useState(false);
+
+    const handleStartGame = async () => {
+        setIsStartingGame(true);
+        try {
+            const response = await sdk.quickAuth.fetch('/api/game/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+
+            if (!response.ok) {
+                throw new Error((await response.json()).message || 'Failed to start game session.');
+            }
+
+            const { sessionId } = await response.json();
+            setSessionId(sessionId);
+            return true; // Indicate success
+        } catch (err) {
+            setToast({ message: (err as Error).message, type: 'error' });
+            return false; // Indicate failure
+        } finally {
+            setIsStartingGame(false);
+        }
+    };
 
     useEffect(() => {
         const fetchTokenPrice = async () => {
@@ -45,36 +111,7 @@ export default function GamePage() {
         fetchTokenPrice();
     }, []);
 
-    const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
-    const [maxClaims, setMaxClaims] = useState<number | null>(null);
-    const [claimCooldownEnds, setClaimCooldownEnds] = useState<string | null>(null);
     const [countdown, setCountdown] = useState('');
-    const [isClaimStatusLoading, setIsClaimStatusLoading] = useState(true);
-
-    useEffect(() => {
-        async function fetchClaimStatus() {
-            if (fid) {
-                try {
-                    const statusResponse = await sdk.quickAuth.fetch('/api/claim/status');
-                    if (statusResponse.ok) {
-                        const { claimsLeft, isOnCooldown, resetsAt, maxClaims } = await statusResponse.json();
-                        setClaimsLeft(claimsLeft);
-                        setMaxClaims(maxClaims);
-                        if (isOnCooldown) {
-                            setClaimCooldownEnds(resetsAt);
-                        }
-                    } else {
-                        console.warn("Could not fetch real-time claim status.");
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch claim status:", error);
-                } finally {
-                    setIsClaimStatusLoading(false);
-                }
-            }
-        }
-        fetchClaimStatus();
-    }, [fid]);
 
     useEffect(() => {
         const calculateCountdown = () => {
@@ -132,7 +169,7 @@ export default function GamePage() {
             const signatureResponse = await sdk.quickAuth.fetch('/api/claim/signature', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: claimAmount }),
+                body: JSON.stringify({}), // No longer sending amount from client
             });
             if (!signatureResponse.ok) {
                 const errorBody = await signatureResponse.json();
@@ -209,12 +246,32 @@ Go claim yours now!
         }
     };
 
-    const handleGameWin = useCallback((scoreFromGame: number, pumpkinsFromGame: number) => {
-        setIsClaimUnlocked(true);
-        setFinalScore(scoreFromGame);
-        setPumpkinsCollected(pumpkinsFromGame);
-        setClaimButtonText(`Claim ${(scoreFromGame).toLocaleString()} $ENB`);
-    }, []);
+    const handleGameWin = useCallback(async (scoreFromGame: number, pumpkinsFromGame: number) => {
+        if (!sessionId) {
+            setToast({ message: 'No active game session.', type: 'error' });
+            return;
+        }
+        try {
+            const response = await sdk.quickAuth.fetch('/api/game/end', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, score: scoreFromGame }),
+            });
+
+            if (!response.ok) {
+                throw new Error((await response.json()).message || 'Failed to end game session.');
+            }
+            
+            setIsClaimUnlocked(true);
+            setFinalScore(scoreFromGame);
+            setPumpkinsCollected(pumpkinsFromGame);
+            setClaimButtonText(`Claim ${(scoreFromGame).toLocaleString()} $ENB`);
+
+        } catch (err) {
+            setToast({ message: (err as Error).message, type: 'error' });
+            // Optionally reset the game or handle the error in another way
+        }
+    }, [sessionId]);
 
     const handleTryAgain = () => {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
@@ -304,6 +361,7 @@ Go claim yours now!
             <GameEngine
                 ref={gameEngineRef}
                 onGameWin={handleGameWin}
+                onStartGame={handleStartGame}
                 displayScore={finalScore}
                 isMuted={isMuted}
                 onToggleMute={toggleMute}
@@ -321,6 +379,8 @@ Go claim yours now!
                 isConfirmed={isConfirmed}
                 claimButtonText={claimButtonText}
                 isClaimStatusLoading={isClaimStatusLoading}
+                claimStatusError={claimStatusError}
+                isStartingGame={isStartingGame}
             />
 
         </div>
