@@ -265,7 +265,12 @@ export default function GamePage() {
                 maxPriorityFeePerGas: maxPriority,
             });
         } catch (err) {
-            setToast({ message: (err as Error).message, type: 'error' });
+            const errorMessage = (err as Error).message;
+            if (errorMessage.includes('User is restricted')) {
+                setToast({ message: 'Your account is restricted from claiming.', type: 'error' });
+            } else {
+                setToast({ message: errorMessage, type: 'error' });
+            }
         } finally {
             setIsSignatureLoading(false);
         }

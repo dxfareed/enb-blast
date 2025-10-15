@@ -1,6 +1,7 @@
 import { Errors, createClient } from "@farcaster/quick-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { NeynarAPIClient, Configuration } from "@neynar/nodejs-sdk";
+import { isFidRestricted } from "@/lib/restricted-fids";
 
 const client = createClient();
 
@@ -37,7 +38,11 @@ export async function GET(request: NextRequest) {
     // This is guaranteed to be the user that signed the message in the mini app.
     // You can now use this to do anything you want, e.g. fetch the user's data from your database
     // or fetch the user's info from a service like Neynar.
-    const userFid = payload.sub;
+    const userFid = Number(payload.sub);
+
+    if (isFidRestricted(userFid)) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
+    }
 
     const user = await neynarClient.fetchBulkUsers({
       fids: [userFid],
@@ -49,7 +54,7 @@ export async function GET(request: NextRequest) {
         `Restricted user attempt: ${userFid}, score: ${neynarScore} at ${new Date().toISOString()}`
       );
       return NextResponse.json(
-        { message: "You are restricted from using this app." },
+        { message: "Neynar score too low." },
         { status: 403 }
       );
     }

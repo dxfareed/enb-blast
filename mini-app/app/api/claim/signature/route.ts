@@ -11,6 +11,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { Errors, createClient } from "@farcaster/quick-auth";
+import { isFidRestricted } from '@/lib/restricted-fids';
 
 // =================================================================================
 //                                  CONFIGURATION
@@ -82,7 +83,7 @@ function getUrlHost(request: NextRequest): string {
     const host = request.headers.get("host");
     if (host) { return host; }
     const vercelUrl = process.env.VERCEL_URL;
-    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://vercelUrl}` : "http://localhost:3000";
+    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
     return new URL(urlValue).host;
 }
 
@@ -103,6 +104,10 @@ export async function POST(req: NextRequest) {
     });
     const userFid = BigInt(payload.sub);
     console.log(`[API LOG] ✅ JWT Verified. Request from FID: ${userFid}`);
+
+    if (isFidRestricted(Number(userFid))) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
+    }
 
     if (!prisma) {
       throw new Error("Database client is not available");

@@ -149,7 +149,12 @@ export default function RegisterPage() {
       });
 
     } catch (error) {
-      setToast({ message: `Error: ${(error as Error).message}`, type: 'error' });
+      const errorMessage = (error as Error).message;
+      if (errorMessage.includes('Neynar score too low')) {
+        setToast({ message: 'Your account reputation is too low to qualify at this time.', type: 'error' });
+      } else {
+        setToast({ message: `Error: ${errorMessage}`, type: 'error' });
+      }
       setIsLoading(false);
     }
   }

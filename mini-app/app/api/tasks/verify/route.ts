@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Errors, createClient } from "@farcaster/quick-auth";
+import { isFidRestricted } from '@/lib/restricted-fids';
 
 class EasterEggError extends Error {
   constructor(message: string) {
@@ -478,7 +479,12 @@ export async function POST(request: NextRequest) {
       token: authorization.split(" ")[1] as string,
       domain: getUrlHost(request),
     });
-    const fid = payload.sub;
+    const fid = Number(payload.sub);
+
+    if (isFidRestricted(fid)) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
+    }
+
     const { checkKey } = await request.json();
 
     if (!checkKey) {
