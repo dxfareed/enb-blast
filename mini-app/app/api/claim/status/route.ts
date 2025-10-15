@@ -113,9 +113,11 @@ export async function GET(req: NextRequest) {
             resetsAt = new Date(Number(cooldownEndTime) * 1000).toISOString();
             claimsLeft = 0; // Explicitly set to 0 during cooldown
         } else {
-            // Cooldown is over, so claims are replenished.
+            // Cooldown is over, but claims are NOT yet replenished on-chain.
+            // The next claim will reset the cycle. For the UI, we show 0 claims left,
+            // but since isOnCooldown is false, the user is allowed to attempt a claim.
             isOnCooldown = false;
-            claimsLeft = Number(maxClaims);
+            claimsLeft = 0;
         }
     }
 

@@ -6,9 +6,11 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-  title: "Reward Reward Reward",
-  body: "Rewards will be going out every thursday at 4pm UTC!",
+  title: "We're Back!",
+  body: "Bad actors are gone, fair games and real wins are back!",
 };
+
+
 
 const API_URL = process.env.NEXT_PUBLIC_URL
   ? `${process.env.NEXT_PUBLIC_URL}/api/notify`
@@ -27,7 +29,7 @@ async function main() {
   try {
     const usersToNotify = await prisma.user.findMany({
       where: {
-        fid:849768,
+        //registrationStatus: 'ACTIVE',
         notificationToken: { not: null },
       },
       select: {

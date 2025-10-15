@@ -5,11 +5,11 @@ import { isFidRestricted } from '@/lib/restricted-fids';
 
 // Server-side authoritative values
 const ITEM_VALUES = {
-  picture: 2,
-  powerup_point_2: 3,
-  powerup_point_5: 4,
-  powerup_point_10: 5,
-  powerup_pumpkin: 250,
+  picture: 7,
+  powerup_point_2: 8,
+  powerup_point_5: 9,
+  powerup_point_10: 15,
+  powerup_pumpkin: 300,
 };
 
 const GAME_DURATION_SECONDS = 40;
