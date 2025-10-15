@@ -232,6 +232,12 @@ export default function TasksPage() {
   const defaultTasks = tasks.filter(t => t.type === 'DEFAULT');
   const partnerTasks = tasks.filter(t => t.type === 'PARTNER');
 
+  const sortedDefaultTasks = [...defaultTasks].sort((a, b) => {
+    if (a.checkKey === 'X_FOLLOW_ENB_APPS') return -1;
+    if (b.checkKey === 'X_FOLLOW_ENB_APPS') return 1;
+    return 0;
+  });
+
   if (isLoading) return <Loader />;
 
   if (dailyTasks.length === 0 && defaultTasks.length === 0 && partnerTasks.length === 0) {
@@ -285,7 +291,7 @@ export default function TasksPage() {
       {activeTab === 'default' && (
         <section className={styles.taskSection}>
           <div className={styles.taskList}>
-            {defaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
+            {sortedDefaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
           </div>
         </section>
       )}

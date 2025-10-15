@@ -16,27 +16,27 @@ const GAME_DURATION = 30;
 const INITIAL_SPAWN_RATE = 300;
 const INITIAL_BOMB_SPEED = 5.5;
 const INITIAL_PICTURE_SPEED = 5.2;
-const INITIAL_BOMB_CHANCE = 0.3;
+const INITIAL_BOMB_CHANCE = 0.21;
 
 const FINAL_SPAWN_RATE = 250;
 const FINAL_BOMB_SPEED = 8.5;
 const FINAL_PICTURE_SPEED = 9;
-const FINAL_BOMB_CHANCE = 0.6;
+const FINAL_BOMB_CHANCE = 0.48;
 
 const PICTURE_URL = "/Enb_000.png";
-const BASE_PICTURE_VALUE = 6;
+const BASE_PICTURE_VALUE = 2;
+
+const POWER_UP_POINT_2_URL = "/powerup_2.png";
+const POWER_UP_POINT_2_VALUE = 3;
+const POWER_UP_POINT_2_CHANCE = 0.08;
 
 const POWER_UP_POINT_5_URL = "/powerup_5.png";
-const POWER_UP_POINT_5_VALUE = 10;
+const POWER_UP_POINT_5_VALUE = 4;
 const POWER_UP_POINT_5_CHANCE = 0.0109;
 
 const POWER_UP_POINT_10_URL = "/powerup_10.png";
-const POWER_UP_POINT_10_VALUE = 15;
+const POWER_UP_POINT_10_VALUE = 5;
 const POWER_UP_POINT_10_CHANCE = 0.008;
-
-const POWER_UP_POINT_2_URL = "/powerup_2.png";
-const POWER_UP_POINT_2_VALUE = 5;
-const POWER_UP_POINT_2_CHANCE = 0.08;
 
 const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
 const POWER_UP_PUMPKIN_VALUE = 250;
@@ -418,7 +418,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
       </div>
       <div
         ref={gameAreaRef}
-        className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`}
+        className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''} ${(gameState === 'won' || gameState === 'lost') ? gameStyles.gameOverBlur : ''}`}
         onClick={gameState === 'idle' && !isGameLocked && !isClaimStatusLoading ? startGame : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

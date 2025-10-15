@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Errors, createClient } from "@farcaster/quick-auth";
 import prisma from '@/lib/prisma';
+import { isFidRestricted } from '@/lib/restricted-fids';
 
 const client = createClient();
 
@@ -26,6 +27,10 @@ export async function POST(req: NextRequest) {
         domain: getUrlHost(req),
     });
     const fid = BigInt(payload.sub);
+
+    if (isFidRestricted(Number(fid))) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
+    }
 
     const user = await prisma.user.findUnique({
       where: { fid },

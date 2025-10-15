@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Errors, createClient } from "@farcaster/quick-auth";
 import prisma from '@/lib/prisma';
+import { isFidRestricted } from '@/lib/restricted-fids';
 
 // Server-side authoritative values
 const ITEM_VALUES = {
-  picture: 6,
-  powerup_point_2: 5,
-  powerup_point_5: 10,
-  powerup_point_10: 15,
+  picture: 2,
+  powerup_point_2: 3,
+  powerup_point_5: 4,
+  powerup_point_10: 5,
   powerup_pumpkin: 250,
 };
 
@@ -50,6 +51,10 @@ export async function POST(req: NextRequest) {
         domain: getUrlHost(req),
     });
     const fid = BigInt(payload.sub);
+
+    if (isFidRestricted(Number(fid))) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
+    }
 
     const { sessionId, events } = await req.json();
 

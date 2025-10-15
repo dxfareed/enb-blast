@@ -191,17 +191,30 @@
   color: #ff9999;
 }
 
+.gameArea.gameOverBlur > *:not(.overlay) {
+  filter: blur(4px);
+  transition: filter 0.3s ease-in-out;
+}
+
 .muteButton {
-  background-color: rgba(0, 0, 0, 0.2);
-  color: white;
-  border: 1px solid white;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: none;
   padding: 0.5rem;
-  border-radius: 9999px;
-  cursor: pointer;
-  font-size: 0.875rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: color 0.2s ease-in-out;
+}
+
+.muteButton:hover {
+  color: rgba(255, 255, 255, 1);
+}
+
+.muteButton > svg {
+  width: 32px;
+  height: 32px;
 }
 
 .muteButtonContainer {

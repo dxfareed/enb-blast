@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useFeeData } from 'wagmi';
 import { useUser } from '@/app/context/UserContext';
@@ -17,6 +18,7 @@ import { getTokenMarqueeData } from '@/lib/dexscreener';
 
 export default function GamePage() {
     const { address } = useAccount();
+    const router = useRouter();
     
     const [claimsLeft, setClaimsLeft] = useState<number | null>(null);
     const [maxClaims, setMaxClaims] = useState<number | null>(null);
@@ -26,11 +28,19 @@ export default function GamePage() {
     const [showApologyModal, setShowApologyModal] = useState(false);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setShowApologyModal(true);
-        }, 1000); 
-        return () => clearTimeout(timer);
+        const hasSeenModal = localStorage.getItem('hasSeenApologyModal');
+        if (!hasSeenModal) {
+            const timer = setTimeout(() => {
+                setShowApologyModal(true);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
     }, []);
+
+    const handleCloseApologyModal = () => {
+        setShowApologyModal(false);
+        localStorage.setItem('hasSeenApologyModal', 'true');
+    };
 
     const fetchClaimStatus = useCallback(async () => {
         setIsClaimStatusLoading(true);
@@ -81,6 +91,12 @@ export default function GamePage() {
     }, []);
 
     const { userProfile, fid, refetchUserProfile } = useUser();
+
+    useEffect(() => {
+        if (userProfile && userProfile.registrationStatus !== 'ACTIVE') {
+            router.push('/onboarding/register');
+        }
+    }, [userProfile, router]);
 
     useEffect(() => {
         if (fid) {
@@ -429,7 +445,7 @@ Go claim yours now!
 
     return (
         <div className={styles.gameContainer}>
-            {showApologyModal && <ApologyModal onClose={() => setShowApologyModal(false)} />}
+            {showApologyModal && <ApologyModal onClose={handleCloseApologyModal} />}
             {showAddAppBanner && <AddAppBanner onAppAdded={() => setShowAddAppBanner(false)} />}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} duration={toast.duration} />}
             <GameEngine

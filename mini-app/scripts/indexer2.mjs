@@ -64,7 +64,7 @@ async function processEvent(log) {
   const block = await client.getBlock({ blockHash: log.blockHash });
   const timestamp = new Date(Number(block.timestamp) * 1000);
   const amountDecimal = formatUnits(amount, 18);
-  const points = parseFloat(amountDecimal) * 10;
+  const points = parseFloat(amountDecimal) * 1;
 
   // will change later
 

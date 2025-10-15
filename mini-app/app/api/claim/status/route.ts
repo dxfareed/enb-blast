@@ -39,6 +39,23 @@ const GAME_CONTRACT_ABI = [
 
 const client = createClient();
 
+// --- OPTIMIZATION ---
+// These values are constant on the contract, so we fetch them once when the serverless function
+// starts up (or on the first request) and reuse them. This reduces RPC calls by 66%.
+const maxClaimsPromise = publicClient.readContract({
+    address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'maxClaimsPerCycle',
+});
+
+const cooldownPeriodPromise = publicClient.readContract({
+    address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'cooldownPeriod',
+});
+// --------------------
+
+
 function getUrlHost(request: NextRequest): string {
     const origin = request.headers.get("origin");
     if (origin) { try { return new URL(origin).host; } catch (e) { console.warn("Invalid origin:", e); } }
@@ -63,6 +80,7 @@ export async function GET(req: NextRequest) {
     });
     const userFid = BigInt(payload.sub);
 
+    // Now we only need to make ONE call to the RPC for user-specific data.
     const [onChainProfile, maxClaims, cooldownPeriod] = await Promise.all([
         publicClient.readContract({
             address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
@@ -70,16 +88,8 @@ export async function GET(req: NextRequest) {
             functionName: 'getUserProfile',
             args: [userFid]
         }),
-        publicClient.readContract({
-            address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
-            abi: GAME_CONTRACT_ABI,
-            functionName: 'maxClaimsPerCycle',
-        }),
-        publicClient.readContract({
-            address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
-            abi: GAME_CONTRACT_ABI,
-            functionName: 'cooldownPeriod',
-        })
+        maxClaimsPromise, // Reuse the promise from outside the handler
+        cooldownPeriodPromise // Reuse the promise from outside the handler
     ]);
 
     if (!onChainProfile.isRegistered) {
@@ -101,9 +111,12 @@ export async function GET(req: NextRequest) {
         if (onChainProfile.lastClaimTimestamp > 0 && now < cooldownEndTime) {
             isOnCooldown = true;
             resetsAt = new Date(Number(cooldownEndTime) * 1000).toISOString();
+            claimsLeft = 0; // Explicitly set to 0 during cooldown
+        } else {
+            // Cooldown is over, so claims are replenished.
+            isOnCooldown = false;
+            claimsLeft = Number(maxClaims);
         }
-        // Ensure claimsLeft is not negative
-        claimsLeft = 0;
     }
 
     console.log('API Claim Status:', { // DEBUG LOG

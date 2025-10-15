@@ -343,6 +343,10 @@ const taskCheckers = {
     console.log(`Verifying Partner Special Event for user ${user.id}...`);
     return true;
   },
+  X_FOLLOW_ENB_APPS: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying X Follow for enbapps for user ${user.id}...`);
+    return true;
+  },
 };
 
 const ENB_BOUNTY_NFT_CONTRACT_ADDRESS = '0xf0b03a35c4fc40395fd0db8f3661240534d22a00';

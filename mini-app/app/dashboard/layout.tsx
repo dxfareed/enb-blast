@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@/app/context/UserContext';
 import { Home, Trophy, User, ClipboardList, Plus} from 'lucide-react';
 import styles from './layout.module.css';
@@ -38,6 +38,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { userProfile, isLoading } = useUser();
+  const router = useRouter();
   const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
   const pathname = usePathname();
   const [activeTourStep, setActiveTourStep] = useState(-1);
@@ -45,6 +46,12 @@ export default function DashboardLayout({
 
   const [tokenData, setTokenData] = useState<TokenMarqueeRawData | null>(null);
   const [isLoadingTokenData, setIsLoadingTokenData] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading && userProfile?.registrationStatus === 'PENDING') {
+      router.replace('/onboarding/register');
+    }
+  }, [isLoading, userProfile, router]);
 
   useEffect(() => {
     if (!isLoading && userProfile) {

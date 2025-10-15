@@ -125,6 +125,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
+    // [SECURITY FIX] Ensure the user is fully registered and active before proceeding.
+    if (user.registrationStatus !== 'ACTIVE') {
+      return NextResponse.json({ message: 'User is not authorized to claim.' }, { status: 403 });
+    }
+
     const latestSession = user.gameSessions[0];
     if (!latestSession || !latestSession.score) {
       return NextResponse.json({ message: 'No completed game session found to claim' }, { status: 400 });
