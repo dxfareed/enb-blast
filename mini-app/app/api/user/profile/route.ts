@@ -129,7 +129,8 @@ export async function GET(req: NextRequest) {
     const finalUserProfile = {
         ...serializableUser,
         fid: parseInt(serializableUser.fid, 10),
-        weeklyRank: userRank
+        weeklyRank: userRank,
+        verifiedWallets: user.verifiedWallets,
     };
 
     return NextResponse.json(finalUserProfile, { status: 200 });

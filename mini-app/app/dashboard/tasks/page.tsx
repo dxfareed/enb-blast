@@ -99,6 +99,15 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
         <span className={styles.rewardAmount}> +{task.rewardPoints} Points</span>
       </div>
       <div className={styles.buttonContainer}>
+        {task.checkKey === 'HOLD_10K_CAP' && !task.completed && (
+          <button
+            onClick={() => sdk.actions.swapToken({ buyToken: 'eip155:8453/erc20:0xbfa733702305280f066d470afdfa784fa70e2649' })}
+            className={`${styles.goButton} ${isTaskDisabled ? styles.disabledButton : ''}`}
+            disabled={isTaskDisabled}
+          >
+            Buy
+          </button>
+        )}
         {hasActionUrl && !task.completed && (
           <button
             onClick={handleGoClick}
@@ -129,6 +138,7 @@ const fakeVerificationTasks = [
   'X_FOLLOW_ENB',
   'DISCORD_JOIN_ENB',
   'CREATORX_FOLLOW_FOUNDER',
+  'SCORELINE_TOURNAMENT_JOIN',
 ];
 
 export default function TasksPage() {

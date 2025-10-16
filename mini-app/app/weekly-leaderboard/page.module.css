@@ -71,7 +71,7 @@
   width: 72px; /* Further reduced size */
   height: 72px; /* Further reduced size */
   border-radius: 50%;
-  border: 3px solid #3b82f6; /* Thinner border */
+  border: 3px solid rgb(116, 51, 235); /* Thinner border */
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
 }
 
@@ -146,22 +146,22 @@
 }
 
 .continueButton {
-  background-color: #3b82f6;
+  background-color: rgb(116, 51, 235);
   color: #ffffff;
 }
 
 .continueButton:hover {
-  background-color: #2563eb;
+  background-color: rgb(106, 41, 225);
   transform: scale(1.02);
 }
 
 .shareButton {
-  background-color: #1DA1F2; /* Twitter Blue */
+  background-color: rgb(116, 51, 235);
   color: #ffffff;
 }
 
 .shareButton:hover {
-  background-color: #0c85d0;
+  background-color: rgb(106, 41, 225);
   transform: scale(1.02);
 }
 

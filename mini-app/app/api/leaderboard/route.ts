@@ -18,6 +18,7 @@ export async function GET(request: Request) {
         pfpUrl: true,
         weeklyPoints: true,
         totalClaimed: true,
+        walletAddress: true,
       },
     });
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
           weeklyPoints: user.weeklyPoints.toString(),
           totalClaimed: (user.totalClaimed ?? 0).toString(),
           fid: user.fid.toString(),
+          walletAddress: user.walletAddress,
         };
       }
     }
@@ -47,6 +49,7 @@ export async function GET(request: Request) {
       weeklyPoints: user.weeklyPoints.toString(),
       totalClaimed: (user.totalClaimed ?? 0).toString(),
       fid: user.fid.toString(),
+      walletAddress: user.walletAddress,
     }));
     
     // We now return a `currentUser` object instead of just a `rank` number

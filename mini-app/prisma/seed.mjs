@@ -25,6 +25,32 @@ const tasks = [
   { title: 'Mint ENB Bounty NFT', description: 'Mint your exclusive ENB Bounty NFT to mark your participation in the ecosystem.', rewardPoints: 250, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/0GzdUkFK2f7A/enb-bounty', checkKey: 'MINT_ENB_BOUNTY_NFT' },
   { title: 'Follow ENB on X', description: 'Follow the official ENB account on X.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://x.com/EverybNeedsBase', checkKey: 'X_FOLLOW_ENB' },
   { title: 'Follow ENB Apps on X', description: 'Follow the official ENB Apps account on X.', rewardPoints: 1000, type: TaskType.DEFAULT, actionUrl: 'https://x.com/enbapps', checkKey: 'X_FOLLOW_ENB_APPS' },
+  { 
+    title: '1m $ENB tournament on scoreline', 
+    description: 'Join tournament, Predict and Win', 
+    rewardPoints: 3000, 
+    type: TaskType.PARTNER, 
+    actionUrl: 'https://base.scoreline.fun/matches?tournamentId=1&poolId=5',
+    checkKey: 'SCORELINE_TOURNAMENT_JOIN',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+  },
+  { 
+    title: 'Hold 10k+ $CAP', 
+    description: 'Hold at least 10,000 $CAP (Capminal) tokens.', 
+    rewardPoints: 4000, 
+    type: TaskType.PARTNER, 
+    checkKey: 'HOLD_10K_CAP',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+  },
+  { 
+    title: 'Use the Capminal Mini App', 
+    description: 'Engage with the Capminal ecosystem by using their Mini App.', 
+    rewardPoints: 3000, 
+    type: TaskType.PARTNER, 
+    actionUrl: 'https://farcaster.xyz/miniapps/lwBYO_1-Hga8/capminal',
+    checkKey: 'MINI_APP_OPEN_CAPMINAL',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+  },
   /* { 
     title: 'Partner Task: Special Event', 
     description: 'Complete this special event task for a unique reward!', 

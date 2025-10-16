@@ -24,6 +24,7 @@ const FINAL_PICTURE_SPEED = 8.8;
 const FINAL_BOMB_CHANCE = 0.48;
 
 const PICTURE_URL = "/Enb_000.png";
+const CAP_PICTURE_URL = "/cap.jpg";
 const BASE_PICTURE_VALUE = 7;
 
 const POWER_UP_POINT_2_URL = "/powerup_2.png";
@@ -82,6 +83,7 @@ export type GameEngineHandle = { resetGame: () => void; };
 type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin';
 type Item = {
   id: number; type: ItemType; x: number; y: number; speed: number;
+  imageUrl?: string;
   ref: React.RefObject<HTMLDivElement>;
 };
 type GameState = 'idle' | 'playing' | 'won' | 'lost';
@@ -154,7 +156,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useEffect(() => {
     const imageUrls = [
-      '/bomb.png', PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
+      '/bomb.png', PICTURE_URL, CAP_PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
       POWER_UP_POINT_2_URL, avatarPfp
     ];
     imageUrls.forEach(url => {
@@ -302,13 +304,19 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           const rand = Math.random();
           const { bombChance } = gameParamsRef.current;
           let itemType: ItemType = 'picture';
+          let imageUrl: string | undefined = undefined;
           if (rand < bombChance) itemType = 'bomb';
           else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE) itemType = 'powerup_pumpkin';
           else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE) itemType = 'powerup_point_10';
           else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) itemType = 'powerup_point_5';
           else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) itemType = 'powerup_point_2';
+          
+          if (itemType === 'picture') {
+            imageUrl = Math.random() < 0.5 ? PICTURE_URL : CAP_PICTURE_URL;
+          }
+
           const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
-          currentItems.push({ id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef() });
+          currentItems.push({ id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, imageUrl, ref: createRef() });
         }
         let processedItems = currentItems
           .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
@@ -398,7 +406,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const renderItem = (item: Item) => {
     switch (item.type) {
       case 'bomb': return <img src="/bomb.png" alt="Bomb" className={gameStyles.itemImage} />;
-      case 'picture': return <img src={PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
+      case 'picture': return <img src={item.imageUrl || PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
       case 'powerup_point_5': return <img src={POWER_UP_POINT_5_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_10': return <img src={POWER_UP_POINT_10_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_2': return <img src={POWER_UP_POINT_2_URL} alt="Power Up" className={gameStyles.itemImage} />;

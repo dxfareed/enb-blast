@@ -17,27 +17,47 @@ interface CurrentUserStats {
   totalClaimed: string;
 }
 
+const rewards: { [key: string]: number } = {
+  '361688': 37000,
+  '237841': 37000,
+  '1067152': 37000,
+  '302078': 24000,
+  '1027765': 24000,
+  '1028120': 24000,
+  '1051900': 24000,
+  '1064009': 24000,
+  '1028226': 24000,
+  '646397': 24000,
+  '1060895': 10000,
+  '1028609': 10000,
+  '1028738': 10000,
+  '1104823': 10000,
+  '507756': 10000,
+};
+
 export default function WeeklyLeaderboardPage() {
   const router = useRouter();
-  const { fid } = useUser();
+  const { fid, isLoading: isUserLoading } = useUser();
   const [currentUser, setCurrentUser] = useState<CurrentUserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasShared, setHasShared] = useState(false);
 
   useEffect(() => {
-    const weekIdentifier = getWeekIdentifier().toISOString();
-    localStorage.setItem('lastSeenWeeklyLeaderboard', weekIdentifier);
-  }, []);
+  const weekIdentifier = getWeekIdentifier().toISOString();
+  const hasSharedForWeek = localStorage.getItem('hasSharedWeeklyRecap_v4') === weekIdentifier;
+
+  if (hasSharedForWeek) {
+    // If they have shared, redirect them immediately.
+    router.replace("/dashboard/game");
+  } else {
+    // Otherwise, mark that they have at least seen the page for this week.
+    localStorage.setItem('lastSeenWeeklyLeaderboard_v4', weekIdentifier);
+  }
+}, [router]);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      if (!fid) {
-        setIsLoading(false);
-        setError("User not found. Please log in.");
-        return;
-      }
-      
       setIsLoading(true);
       setError(null);
       try {
@@ -47,7 +67,12 @@ export default function WeeklyLeaderboardPage() {
         }
         const data = await response.json();
         if (data.currentUser) {
-            setCurrentUser(data.currentUser);
+            const user = data.currentUser;
+            const reward = fid ? rewards[fid.toString()] : 0;
+            if (reward) {
+              user.totalClaimed = (parseFloat(user.totalClaimed || '0') + reward).toString();
+            }
+            setCurrentUser(user);
         } else {
             setError("You weren't on the leaderboard last week. Keep playing!");
         }
@@ -58,8 +83,15 @@ export default function WeeklyLeaderboardPage() {
       }
     };
 
-    fetchLeaderboard();
-  }, [fid]);
+    if (!isUserLoading) {
+      if (fid) {
+        fetchLeaderboard();
+      } else {
+        setIsLoading(false);
+        setError("User not found. Please log in.");
+      }
+    }
+  }, [fid, isUserLoading]);
 
   const handleContinue = () => {
     router.replace("/dashboard/game");
@@ -88,6 +120,8 @@ export default function WeeklyLeaderboardPage() {
 
         // Check if the cast was successfully published
         if (result?.cast) {
+            const weekIdentifier = getWeekIdentifier().toISOString();
+            localStorage.setItem('hasSharedWeeklyRecap_v4', weekIdentifier);
             setHasShared(true);
         }
 
@@ -112,7 +146,7 @@ export default function WeeklyLeaderboardPage() {
       </div>
 
       {isLoading && <div className={styles.loader}></div>}
-      {error && <p className={styles.error}>{error}</p>}
+      {error && <p className={styles.error}>{error}<br/>Please refresh the page.</p>}
 
       {!isLoading && !error && currentUser && (
         <div className={styles.userCard}>
@@ -145,14 +179,14 @@ export default function WeeklyLeaderboardPage() {
       )}
        
       <div className={styles.buttonContainer}>
-        {!hasShared ? (
-            <button onClick={handleShare} className={styles.shareButton} disabled={!currentUser}>
-                Share Recap
-            </button>
+        {hasShared ? (
+          <button onClick={handleContinue} className={styles.continueButton}>
+            Continue to Game
+          </button>
         ) : (
-            <button onClick={handleContinue} className={styles.continueButton}>
-                Continue to Game
-            </button>
+          <button onClick={handleShare} className={styles.shareButton} disabled={!currentUser}>
+            Share Recap
+          </button>
         )}
       </div>
     </div>

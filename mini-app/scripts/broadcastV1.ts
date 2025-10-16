@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-  title: "New Task Added!",
-  body: "Jump back in and complete your daily tasks to rank up!",
+  title: "New week, More Rewards!",
+  body: "Jump back in and complete your daily tasks to earn 250k $CAP!",
 };
 
 const API_URL = process.env.NEXT_PUBLIC_URL

@@ -9,6 +9,7 @@ import Loader from '@/app/components/Loader';
 import { ChevronDown } from 'lucide-react';
 
 type LeaderboardUser = {
+  fid: number;
   username: string;
   pfpUrl: string;
   weeklyPoints: string;
@@ -25,7 +26,7 @@ const getRankStyling = (rank: number) => {
   return styles.rankDefault;
 };
 
-const prizePoolAmount = 300000;
+const prizePoolAmount = 250000;
 
 export default function LeaderboardPage() {
   const { userProfile } = useUser();
@@ -92,6 +93,15 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, [userProfile?.fid]); // This effect runs only when the FID is available
 
+  const handleViewProfile = async (fid: number) => {
+    try {
+      await sdk.actions.viewProfile({ fid });
+    } catch (error) {
+      console.error('Failed to open profile:', error);
+      // Optionally, show a toast message to the user
+    }
+  };
+
   if (isLoading) {
     return <Loader />;
   }
@@ -103,7 +113,7 @@ export default function LeaderboardPage() {
         <div className={styles.subHeader}>
           <div className={styles.prizePool}>
             <span className={styles.cardLabel}>PRIZE POOL</span>
-            <span className={styles.cardValue}>{prizePoolAmount.toLocaleString()} $ENB</span>
+            <span className={styles.cardValue}>{prizePoolAmount.toLocaleString()} $CAP</span>
           </div>
           <div className={styles.countdown}>
             <span className={styles.cardLabel}>TIME LEFT</span>
@@ -130,15 +140,15 @@ export default function LeaderboardPage() {
               <div className={styles.tabContent}>
                 <div className={styles.tier}>
                   <p className={`${styles.tierRank} ${styles.legendaryText}`}>Legendary 1 - 3</p>
-                  <p className={styles.tierReward}>37k $ENB</p>
+                  <p className={styles.tierReward}>26k $CAP</p>
                 </div>
                 <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.superBasedText}`}>SuperBased 4 - 8</p>
-                  <p className={styles.tierReward}>24k $ENB</p>
+                  <p className={`${styles.tierRank} ${styles.superBasedText}`}>SuperBased 4 - 10</p>
+                  <p className={styles.tierReward}>17k $CAP</p>
                 </div>
                 <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.basedText}`}>Based 9 - 15</p>
-                  <p className={styles.tierReward}>10k $ENB</p>
+                  <p className={`${styles.tierRank} ${styles.basedText}`}>Based 11 - 15</p>
+                  <p className={styles.tierReward}>8k $CAP</p>
                 </div>
               </div>
             )}
@@ -162,6 +172,8 @@ export default function LeaderboardPage() {
             <div
               key={user.rank}
               className={`${styles.userRow} ${user.username === userProfile?.username ? styles.currentUser : ''}`}
+              onClick={() => handleViewProfile(user.fid)}
+              style={{ cursor: 'pointer' }}
             >
               {user.rank && (
                 <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>

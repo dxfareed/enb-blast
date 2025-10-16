@@ -35,9 +35,9 @@ const getWeekId = (date: Date): string => {
 
 // Define the reward tiers to calculate rewardEarned for the snapshot
 const REWARD_TIERS: { [key: number]: number } = {
-  1: 37000, 2: 37000, 3: 37000,
-  4: 24000, 5: 24000, 6: 24000, 7: 24000, 8: 24000,
-  9: 10000, 10: 10000, 11: 10000, 12: 10000, 13: 10000, 14: 10000, 15: 10000,
+  1: 26000, 2: 26000, 3: 26000,
+  4: 17000, 5: 17000, 6: 17000, 7: 17000, 8: 17000, 9: 17000, 10: 17000,
+  11: 8000, 12: 8000, 13: 8000, 14: 8000, 15: 8000,
 };
 
 export async function GET(request: Request) {
