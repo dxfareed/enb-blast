@@ -20,7 +20,7 @@
 }
 
 .title {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: #1f2937;
   margin: 0;
@@ -56,7 +56,7 @@
 
 .cardValue {
   font-family: var(--font-space-mono);
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #16a34a;
 }
@@ -234,7 +234,7 @@
   
 .username {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1rem;
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
@@ -245,7 +245,7 @@
   
 .score {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1rem;
   color: #1f2937;
 }
   

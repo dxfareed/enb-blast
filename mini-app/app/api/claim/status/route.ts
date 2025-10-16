@@ -102,22 +102,23 @@ export async function GET(req: NextRequest) {
     let isOnCooldown = false;
     let resetsAt: string | null = null;
     
-    // Cooldown should only apply when the user has no claims left in the current cycle.
+    // Cooldown logic is applied only when the user has exhausted their claims for the cycle.
     if (claimsLeft <= 0) {
         const now = BigInt(Math.floor(Date.now() / 1000));
         const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
 
-        // Check if the cooldown period is active
+        // Check if the cooldown period is still active.
         if (onChainProfile.lastClaimTimestamp > 0 && now < cooldownEndTime) {
             isOnCooldown = true;
             resetsAt = new Date(Number(cooldownEndTime) * 1000).toISOString();
-            claimsLeft = 0; // Explicitly set to 0 during cooldown
+            claimsLeft = 0; // No claims available during cooldown.
         } else {
-            // Cooldown is over, but claims are NOT yet replenished on-chain.
-            // The next claim will reset the cycle. For the UI, we show 0 claims left,
-            // but since isOnCooldown is false, the user is allowed to attempt a claim.
+            // Cooldown is over. The user's claims are effectively replenished.
+            // The contract will reset the on-chain counter during the next claim transaction.
+            // For a better UX, we tell the frontend the user has all their claims back now.
             isOnCooldown = false;
-            claimsLeft = 0;
+            claimsLeft = Number(maxClaims);
+            resetsAt = null;
         }
     }
 

@@ -36,6 +36,7 @@ model User {
   gameSessions         GameSession[]
   events               UserEvent[]
   taskCompletions      UserTaskCompletion[]
+  leaderboardHistory   WeeklyLeaderboardHistory[]
 }
 
 model Claim {
@@ -86,11 +87,11 @@ model IndexerState {
 model GameSession {
   id        String    @id @default(cuid())
   userId    String
-  startTime DateTime  @default(now())
-  endTime   DateTime?
   score     Int       @default(0)
-  status    String    @default("IN_PROGRESS")
   createdAt DateTime  @default(now())
+  endTime   DateTime?
+  startTime DateTime  @default(now())
+  status    String    @default("IN_PROGRESS")
   user      User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
@@ -105,4 +106,20 @@ enum TaskType {
   DEFAULT
   DAILY
   PARTNER
+}
+
+model WeeklyLeaderboardHistory {
+  id            String   @id @default(cuid())
+  weekId        String // e.g., "2025-42" for 42nd week of 2025
+  userId        String
+  rank          Int
+  weeklyPoints  BigInt
+  rewardEarned  Decimal  @default(0)
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([weekId, userId])
+  @@index([weekId])
+  @@index([userId])
 }

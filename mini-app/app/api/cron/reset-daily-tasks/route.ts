@@ -1,9 +1,8 @@
-
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import util from 'util';
+import { PrismaClient } from '@prisma/client';
+import { withRetry } from '../../../../lib/retry';
 
-const execPromise = util.promisify(exec);
+const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -12,13 +11,32 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { stdout, stderr } = await execPromise('node scripts/reset-daily-tasks.mjs');
-    console.log(`stdout: ${stdout}`);
-    console.error(`stderr: ${stderr}`);
-    return NextResponse.json({ success: true, stdout, stderr });
+    await withRetry(async () => {
+      const dailyTasks = await prisma.task.findMany({
+        where: {
+          type: 'DAILY',
+        },
+      });
+
+      if (dailyTasks.length > 0) {
+        const dailyTaskIds = dailyTasks.map(task => task.id);
+        const result = await prisma.userTaskCompletion.deleteMany({
+          where: {
+            taskId: {
+              in: dailyTaskIds,
+            },
+          },
+        });
+        console.log(`Reset ${result.count} daily task completions.`);
+      } else {
+        console.log('No daily tasks found.');
+      }
+    });
+
+    return NextResponse.json({ success: true, message: 'Daily tasks reset successfully.' });
   } catch (error) {
-    console.error('Error executing script:', error);
-    //@ts-ignore
+    console.error('Error resetting daily tasks after multiple retries:', error);
+    // @ts-ignore
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

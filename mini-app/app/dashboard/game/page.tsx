@@ -187,16 +187,14 @@ export default function GamePage() {
             if (cooldownEnd && cooldownEnd > new Date()) {
                 const now = new Date();
                 const diff = cooldownEnd.getTime() - now.getTime();
-                if (diff > 0) {
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                    setCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-                } else {
-                    setCountdown('00:00:00');
-                    setClaimCooldownEnds(null);
-                    refetchUserProfile();
-                }
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                setCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+            } else if (claimCooldownEnds) { // Checks if a cooldown was active and just ended
+                setCountdown('00:00:00');
+                setClaimCooldownEnds(null);
+                fetchClaimStatus(); // Re-fetch status to show replenished claims
             } else {
                 setCountdown('');
             }
@@ -204,7 +202,7 @@ export default function GamePage() {
         calculateCountdown();
         const intervalId = setInterval(calculateCountdown, 1000);
         return () => clearInterval(intervalId);
-    }, [claimCooldownEnds, refetchUserProfile]);
+    }, [claimCooldownEnds, fetchClaimStatus]);
 
     useEffect(() => {
         if (context && context.client?.added === false) {

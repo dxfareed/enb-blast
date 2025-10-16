@@ -6,11 +6,9 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-  title: "We're Back!",
-  body: "Bad actors are gone, fair games and real wins are back!",
+  title: "New Task Added!",
+  body: "Jump back in and complete your daily tasks to rank up!",
 };
-
-
 
 const API_URL = process.env.NEXT_PUBLIC_URL
   ? `${process.env.NEXT_PUBLIC_URL}/api/notify`
@@ -30,6 +28,7 @@ async function main() {
     const usersToNotify = await prisma.user.findMany({
       where: {
         //registrationStatus: 'ACTIVE',
+        //id: 849768,
         notificationToken: { not: null },
       },
       select: {

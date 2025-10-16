@@ -114,3 +114,54 @@ During this session, the following issues were identified and resolved:
 *   **Refined Mute Button UI:**
     *   **Request:** To make the mute button larger and less obtrusive.
     *   **Solution:** Increased the size of the mute button and its icon, removed the background color to make it transparent, and added a hover effect for better user feedback.
+
+### Feature: Weekly Leaderboard Recap (October 15, 2025)
+
+*   **Functionality:** Created a new standalone page at `/app/weekly-leaderboard/page.tsx` to display a user's individual stats (rank, points, earnings) from the previous week's leaderboard.
+*   **Implementation:**
+    *   Implemented a one-time, full-page redirect managed in `app/rootProvider.tsx`.
+    *   The redirect triggers for users after Thursday 4 PM UTC if they haven't seen the recap for that week.
+    *   Uses `localStorage` (`lastSeenWeeklyLeaderboard`) to ensure the page is only shown once per week.
+    *   A utility function in `app/utils/time.ts` handles the weekly time logic.
+*   **Development Status:**
+    *   The feature is currently in a temporary **testing mode** in `app/utils/time.ts` to force the redirect on every app load for development and review.
+    *   The UI was iteratively refined based on feedback to be a compact, single-card display that shows only the current user's stats, matching the app's existing light-theme style.
+*   **Data Correction & Bug Fix:**
+    *   **Problem 1:** The recap card incorrectly displayed "Weekly Points" as the "Amount Earned".
+    *   **Solution 1:** Modified the `/api/leaderboard` endpoint to include the `totalClaimed` field from the database in its response. Updated the frontend to display this correct value.
+    *   **Problem 2:** The page showed "NaN" for users who had never claimed, as their `totalClaimed` value was `null`.
+    *   **Solution 2:** Made the backend and frontend more robust. The API now defaults `null` values to `0` before sending the response, and the frontend component includes a fallback to prevent parsing errors.
+
+### Feature: Weekly Leaderboard Sharing (October 16, 2025)
+
+*   **Functionality:** Implemented a feature allowing users to share their weekly leaderboard recap directly to their Farcaster feed.
+*   **Implementation:**
+    *   **Share Button:** Added a "Share Recap" button to the `/app/weekly-leaderboard/page.tsx`.
+    *   **Farcaster Frame:** Created a new Farcaster frame page at `/app/share-frame/leaderboard/page.tsx` to generate the appropriate `fc:frame` meta tags.
+    *   **Dynamic Image:** Created a new API endpoint at `/app/api/frame-image/leaderboard/route.tsx` to dynamically generate a 600x400 PNG image for the frame. The image is styled to match a user-provided design, displaying the user's PFP and their total "Amount Earned."
+    *   **In-App Sharing:** The share button utilizes the `@farcaster/miniapp-sdk` to trigger the native Farcaster composer, embedding the frame URL directly in the cast.
+*   **Bug Fixes & Refinements:**
+    *   **Corrected Share Mechanism:** Replaced an incorrect `window.open` implementation with `sdk.actions.composeCast` for a native, in-app sharing experience.
+    *   **Resolved Build Errors:**
+        *   Added the `"use client"` directive to `/app/weekly-leaderboard/page.tsx` to fix errors related to client-side hooks.
+        *   Corrected the font file path in the image generation API to use an absolute URL, fixing a "Module not found" build error.
+    *   **Refined Frame Design:** Iteratively updated the frame image's JSX and styling to precisely match the user's visual specifications, resulting in a cleaner, more focused design.
+
+### Reliability & UX Fix (October 16, 2025)
+
+*   **Post-Cooldown Claims Stuck:**
+    *   **Problem:** After the claim cooldown period ended, the UI would still incorrectly show "0 claims left," preventing the user from playing again. This was because the API was literally reporting the on-chain state, which only resets during the *next* claim transaction.
+    *   **Solution (2-Part):**
+        *   **API Fix:** The `/api/claim/status` endpoint was updated to be more intelligent. It now detects when the cooldown has expired and proactively reports the maximum number of claims to the frontend, effectively unblocking the user.
+        *   **Frontend Fix:** The countdown timer on the game page (`/app/dashboard/game/page.tsx`) was enhanced to automatically call `fetchClaimStatus` the moment it finishes. This ensures the UI immediately updates to show the replenished claims without requiring a manual refresh.
+
+### Feature: Automated Weekly Leaderboard Snapshot & Rewards (October 16, 2025)
+
+*   **Functionality:** Implemented a robust, automated system to handle the end-of-week leaderboard process. This system ensures that a user's weekly recap is based on a permanent, accurate snapshot of the previous week's results and that rewards are distributed reliably.
+*   **Implementation Details:**
+    *   **Database Schema:** Added a new `WeeklyLeaderboardHistory` model to `prisma/schema.prisma`. This table stores an immutable record of the top 15 users' rank, points, and rewards earned for each week.
+    *   **Snapshot & Reset Cron Job:** The existing `/api/cron/reset-weekly-points` job was refactored. It now first captures the final leaderboard state and saves it to the `WeeklyLeaderboardHistory` table before resetting the `weeklyPoints` for all users.
+    *   **Reward Distribution Cron Job:** A new, separate cron job was created at `/api/cron/reward-weekly-leaderboard`. This job reads from the history table and distributes the correct tiered rewards to the top 15 users by sending transactions to their primary `walletAddress`.
+    *   **Scheduling:** Both cron jobs were scheduled in `vercel.json` to run automatically every Thursday. The snapshot/reset job runs at 3:55 PM UTC, and the reward distribution job follows at 3:58 PM UTC.
+    *   **Recap Page Accuracy:** The weekly recap page (`/app/weekly-leaderboard/page.tsx`) was updated to fetch data from a new `/api/leaderboard/history` endpoint, which reads from the snapshot table. This ensures the recap is always accurate.
+    *   **Reliability:** A 3-attempt retry mechanism was added to the database operations within both cron jobs to make them resilient to transient connection errors or timeouts.
