@@ -12,7 +12,7 @@ import { BASE_BLOCKCHAIN_FACTS } from '@/app/utils/constants';
 const GAME_DURATION = 30;
 
 // Game balance constants
-const INITIAL_SPAWN_RATE = 300;
+const INITIAL_SPAWN_RATE = 280;
 const INITIAL_BOMB_SPEED = 5.4;
 const INITIAL_PICTURE_SPEED = 5.6;
 const INITIAL_BOMB_CHANCE = 0.21;
@@ -25,23 +25,22 @@ const FINAL_BOMB_CHANCE = 0.48;
 // Item URLs and values
 const PICTURE_URL = "/Enb_000.png";
 const CAP_PICTURE_URL = "/cap.jpg";
-const BASE_PICTURE_VALUE = 7;
+const BASE_PICTURE_VALUE = 5;
 
 const POWER_UP_POINT_2_URL = "/powerup_2.png";
-const POWER_UP_POINT_2_VALUE = 8;
-const POWER_UP_POINT_2_CHANCE = 0.08;
-
+const POWER_UP_POINT_2_VALUE = 10;
+const POWER_UP_POINT_2_CHANCE = 0.1;
 const POWER_UP_POINT_5_URL = "/powerup_5.png";
-const POWER_UP_POINT_5_VALUE = 9;
-const POWER_UP_POINT_5_CHANCE = 0.0109;
+const POWER_UP_POINT_5_VALUE = 15;
+const POWER_UP_POINT_5_CHANCE = 0.05;
 
 const POWER_UP_POINT_10_URL = "/powerup_10.png";
-const POWER_UP_POINT_10_VALUE = 15;
-const POWER_UP_POINT_10_CHANCE = 0.008;
+const POWER_UP_POINT_10_VALUE = 30;
+const POWER_UP_POINT_10_CHANCE = 0.01;
 
 const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
-const POWER_UP_PUMPKIN_VALUE = 300;
-const POWER_UP_PUMPKIN_CHANCE = 0.0008;
+const POWER_UP_PUMPKIN_VALUE = 500;
+const POWER_UP_PUMPKIN_CHANCE = 0.0005;
 
 export type GameEvent = {
   type: 'collect';
@@ -358,13 +357,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 setIsInvincible(false);
                 isProcessingBombHit.current = false;
               }, 3000);
-              return [];
+              setItems([]); // Clear visual items only, not the event log
             }
           }
           return remainingItems;
         }
         return processedItems;
       });
+
       animationFrameId = requestAnimationFrame(gameLoop);
     };
     animationFrameId = requestAnimationFrame(gameLoop);
@@ -377,7 +377,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useEffect(() => {
     if (gameState === 'won' && !isGameOverSoundPlayed) {
-      onGameWin(gameEventsRef.current);
+      const finalEvents = [...gameEventsRef.current]; // Create a copy to avoid stale refs
+      onGameWin(finalEvents);
       gameOverSoundRef.current?.play().catch(e => console.error(e));
       setIsGameOverSoundPlayed(true);
     }
@@ -444,6 +445,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               <>
                 <div className={gameStyles.spinner}></div>
                 <p>Saving score...</p>
+                <DidYouKnow facts={BASE_BLOCKCHAIN_FACTS} />
               </>
             ) : (
               <>

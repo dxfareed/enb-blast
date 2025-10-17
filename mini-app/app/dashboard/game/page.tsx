@@ -132,6 +132,7 @@ export default function GamePage() {
     };
 
     const handleGameWin = useCallback(async (events: GameEvent[]) => {
+        console.log('Game ended. Events:', JSON.stringify(events, null, 2));
         if (!sessionId) {
             setToast({ message: 'No active game session.', type: 'error' });
             return;
@@ -149,8 +150,11 @@ export default function GamePage() {
                     body: JSON.stringify({ sessionId, events }),
                 });
 
+                const responseData = await response.json();
+                console.log('Server response:', responseData);
+
                 if (response.ok) {
-                    const { score, pumpkinsCollected } = await response.json();
+                    const { score, pumpkinsCollected } = responseData;
                     setFinalScore(score);
                     setPumpkinsCollected(pumpkinsCollected);
                     setIsEndingGame(false);
@@ -170,7 +174,7 @@ export default function GamePage() {
                     continue;
                 }
 
-                throw new Error((await response.json()).message || 'Failed to end game session.');
+                throw new Error(responseData.message || 'Failed to end game session.');
 
             } catch (err) {
                 setToast({ message: (err as Error).message, type: 'error' });

@@ -5,15 +5,15 @@ import { isFidRestricted } from '@/lib/restricted-fids';
 
 // Server-side authoritative values
 const ITEM_VALUES = {
-  picture: 7,
-  powerup_point_2: 8,
-  powerup_point_5: 9,
-  powerup_point_10: 15,
-  powerup_pumpkin: 300,
+  picture: 5,
+  powerup_point_2: 10,
+  powerup_point_5: 15,
+  powerup_point_10: 30,
+  powerup_pumpkin: 500,
 };
 
-const GAME_DURATION_SECONDS = 40;
-const GRACE_PERIOD_SECONDS = 5;
+const GAME_DURATION_SECONDS = 30;
+const GRACE_PERIOD_SECONDS = 20;
 const MAX_EVENTS_PER_SECOND = 5; // Max items a user can plausibly collect per second
 
 const client = createClient();
@@ -125,6 +125,44 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    // --- Daily Streak Logic (Calendar-Based) ---
+    const lastGameSession = await prisma.gameSession.findFirst({
+      where: {
+        userId: user.id,
+        status: 'COMPLETED',
+        id: { not: sessionId }, // Exclude the current session
+      },
+      orderBy: {
+        endTime: 'desc',
+      },
+    });
+
+    let newStreak = user.streak;
+    if (lastGameSession && lastGameSession.endTime) {
+      const lastGameDate = lastGameSession.endTime;
+      
+      // Get the UTC date part (YYYY-MM-DD)
+      const lastGameDay = lastGameDate.toISOString().split('T')[0];
+      const currentDay = endTime.toISOString().split('T')[0];
+
+      if (currentDay > lastGameDay) {
+        // Check if the day is consecutive
+        const lastGameDayDate = new Date(lastGameDay);
+        lastGameDayDate.setUTCDate(lastGameDayDate.getUTCDate() + 1);
+        const consecutiveDay = lastGameDayDate.toISOString().split('T')[0];
+
+        if (currentDay === consecutiveDay) {
+          newStreak += 1; // Increment streak for consecutive days
+        } else {
+          newStreak = 1; // Reset streak if not consecutive
+        }
+      }
+      // If it's the same day, do nothing.
+    } else {
+      // First game ever for this user
+      newStreak = 1;
+    }
+
     // Use a transaction to ensure both session and user are updated
     await prisma.$transaction([
       prisma.gameSession.update({
@@ -140,7 +178,7 @@ export async function POST(req: NextRequest) {
         data: {
           weeklyPoints: { increment: calculatedScore },
           totalPoints: { increment: calculatedScore },
-          gamesPlayed: { increment: 1 },
+          streak: newStreak,
         },
       })
     ]);
