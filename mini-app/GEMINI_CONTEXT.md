@@ -1,5 +1,7 @@
 ### Project Context: ENB Mini App
 
+**Role:** Senior Developer
+
 This document provides a running summary of development and debugging sessions for the ENB Mini App to ensure context is maintained for future work.
 
 ### Session Summary (October 14, 2025)
@@ -207,3 +209,34 @@ During this session, the following issues were identified and resolved:
         *   The UI then dynamically replaces the "Share Recap" button with a "Continue to Game" button.
     *   **Persistence:** If the user has already shared for the week (checked on page load), the UI will immediately show the "Continue to Game" button, providing a seamless experience on subsequent visits within the same week.
     *   **SSR Error Fix:** A `window is not defined` error, caused by an animation component, was resolved by dynamically importing the component with SSR disabled (`dynamic(() => import(...), { ssr: false })`). This was part of an earlier, abandoned modal-based approach but the learning was carried over.
+
+### Session Summary (October 17, 2025)
+
+*   **Game Dashboard UI Overhaul:**
+    *   **Request:** To maximize the game area on the game dashboard page (`/dashboard/game`) by removing the top header (marquee, buy button, token balance). These elements should remain on all other dashboard pages.
+    *   **Implementation:**
+        *   In `app/dashboard/layout.tsx`, the `usePathname` hook was used to conditionally render the `<header>` and `<Marquee>` components, hiding them when the path is `/dashboard/game`.
+        *   The main content area was given a dynamic class to adjust its styling on the game page.
+*   **Tooltip/Tour Fix:**
+    *   **Problem:** The guided tour was breaking on the game page because its first step pointed to the token balance, which was now hidden.
+    *   **Solution:** The tour steps are now dynamically filtered in `app/dashboard/layout.tsx`. The "token-balance" step is removed from the tour when the user is on the game page, ensuring the tour only highlights visible elements.
+*   **Game Area Sizing:**
+    *   **Problem:** The game area itself was not expanding to fill the newly available vertical space.
+    *   **Solution:** After several adjustments, the final fix was to modify the game's own stylesheet (`app/dashboard/game/game.module.css`). The `min-height` of the `.gameArea` class was adjusted to `37rem` to achieve the desired height.
+
+### Session Summary (October 17, 2025) - Part 2
+
+*   **Feature: Free-to-Play Game Conversion:**
+    *   **Request:** To remove all token-claiming mechanics and convert the game into a pure, score-based free-to-play experience.
+    *   **Implementation:**
+        *   **Frontend:** Refactored `app/dashboard/game/page.tsx` and `app/components/GameEngine.tsx` to completely remove wagmi/viem dependencies, claim buttons, cooldown timers, and any UI related to on-chain interactions. The game-over screen was simplified to only show "Play Again" and "Share Score" options.
+        *   **Share Text:** The `handleShareScoreFrame` function was updated to generate a cast that focuses only on the user's score, removing all mentions of tokens or monetary value.
+        *   **Backend:** The `/api/game/end/route.ts` endpoint was modified to save the player's score directly to their user profile in the database. It now increments `weeklyPoints`, `totalPoints`, and `gamesPlayed` in a single transaction, ensuring the score is tracked for the leaderboard.
+
+*   **Bug Fix: Item Spawning Logic:**
+    *   **Problem:** A bug introduced during the refactor caused only "picture" items to spawn, with no bombs or power-ups.
+    *   **Solution:** Corrected the cumulative probability logic in the `gameLoop` function within `GameEngine.tsx`. This restored the intended spawn rates for all item types.
+
+*   **Bug Fix: Missing "Saving Score" Loader:**
+    *   **Problem:** The "Saving score..." loading indicator was not appearing on the game-over screen because the UI would only update after the save operation was complete.
+    *   **Solution:** Modified the `handleGameWin` function in `app/dashboard/game/page.tsx` to set the `isGameWon` state *before* initiating the API call to save the score. This ensures the game-over overlay is rendered immediately, allowing the loading spinner to display correctly.

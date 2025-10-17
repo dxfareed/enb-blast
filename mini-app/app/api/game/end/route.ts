@@ -125,14 +125,25 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    await prisma.gameSession.update({
-      where: { id: sessionId },
-      data: {
-        score: calculatedScore,
-        endTime,
-        status: 'COMPLETED',
-      },
-    });
+    // Use a transaction to ensure both session and user are updated
+    await prisma.$transaction([
+      prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          score: calculatedScore,
+          endTime,
+          status: 'COMPLETED',
+        },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          weeklyPoints: { increment: calculatedScore },
+          totalPoints: { increment: calculatedScore },
+          gamesPlayed: { increment: 1 },
+        },
+      })
+    ]);
 
     return NextResponse.json({ score: calculatedScore, pumpkinsCollected }, { status: 200 });
   } catch (error) {

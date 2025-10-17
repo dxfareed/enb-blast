@@ -47,6 +47,13 @@ export default function DashboardLayout({
   const [tokenData, setTokenData] = useState<TokenMarqueeRawData | null>(null);
   const [isLoadingTokenData, setIsLoadingTokenData] = useState(true);
 
+  const currentTourSteps = useMemo(() => {
+    if (pathname === '/dashboard/game') {
+      return tourSteps.filter(step => step.id !== 'token-balance');
+    }
+    return tourSteps;
+  }, [pathname]);
+
   useEffect(() => {
     if (!isLoading && userProfile?.registrationStatus === 'PENDING') {
       router.replace('/onboarding/register');
@@ -106,7 +113,7 @@ export default function DashboardLayout({
   };
 
   const handleNextStep = () => {
-    if (activeTourStep < tourSteps.length - 1) {
+    if (activeTourStep < currentTourSteps.length - 1) {
       setActiveTourStep(prev => prev + 1);
     }
   };
@@ -122,10 +129,10 @@ export default function DashboardLayout({
 
   const tourContextValue = useMemo(() => ({
     activeTourStep,
-    tourSteps
-  }), [activeTourStep]);
+    tourSteps: currentTourSteps
+  }), [activeTourStep, currentTourSteps]);
 
-  const isLastStep = activeTourStep === tourSteps.length - 1;
+  const isLastStep = activeTourStep === currentTourSteps.length - 1;
 
   const buyFunction = async () => {
     try {
@@ -155,50 +162,54 @@ export default function DashboardLayout({
         )}
 
         <div className={styles.appWrapper}>
-          <header className={styles.header}>
-            {/* START: Added Buy Button */}
-            <div className={styles.headerLeft}>
-              {/* --- MODIFIED CODE START --- */}
-              <button onClick={buyFunction} className={styles.buyButton}>
-                <Plus size={18} strokeWidth={3} /> {/* Added Icon */}
-                <span>BUY $ENB</span> {/* Wrapped text in a span for spacing */}
-              </button>
-              {/* --- MODIFIED CODE END --- */}
-            </div>
-            {/* END: Added Buy Button */}
+          {pathname !== '/dashboard/game' && (
+            <>
+              <header className={styles.header}>
+                {/* START: Added Buy Button */}
+                <div className={styles.headerLeft}>
+                  {/* --- MODIFIED CODE START --- */}
+                  <button onClick={buyFunction} className={styles.buyButton}>
+                    <Plus size={18} strokeWidth={3} /> {/* Added Icon */}
+                    <span>BUY $ENB</span> {/* Wrapped text in a span for spacing */}
+                  </button>
+                  {/* --- MODIFIED CODE END --- */}
+                </div>
+                {/* END: Added Buy Button */}
 
-            {/* The existing TokenBalanceDisplay is now wrapped in a right-aligned container */}
-            <div className={styles.headerRight}>
-              <HighlightTooltip
-                text={tourSteps.find(step => step.id === 'token-balance')?.text || ''}
-                show={tourSteps[activeTourStep]?.id === 'token-balance'}
-                position="bottom"
-                alignment="left"
-                onNext={handleNextStep}
-                isLastStep={false}
-              >
-                <TokenBalanceDisplay />
-              </HighlightTooltip>
-            </div>
-          </header>
+                {/* The existing TokenBalanceDisplay is now wrapped in a right-aligned container */}
+                <div className={styles.headerRight}>
+                  <HighlightTooltip
+                    text={currentTourSteps.find(step => step.id === 'token-balance')?.text || ''}
+                    show={currentTourSteps[activeTourStep]?.id === 'token-balance'}
+                    position="bottom"
+                    alignment="left"
+                    onNext={handleNextStep}
+                    isLastStep={false}
+                  >
+                    <TokenBalanceDisplay />
+                  </HighlightTooltip>
+                </div>
+              </header>
 
-          <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS} />
+              <Marquee data={tokenData} isLoading={isLoadingTokenData} token={TOKEN_ADDRESS} />
+            </>
+          )}
 
-          <main className={styles.main}>
+          <main className={`${styles.main} ${pathname === '/dashboard/game' ? styles.mainGame : ''}`}>
             {children}
           </main>
 
           <nav className={styles.navigation}>
             {navItems.map((item) => {
               const Icon = item.icon;
-              const tourStep = tourSteps.find(step => step.id === item.id);
-              const isThisItemTheLastStep = tourStep?.id === tourSteps[tourSteps.length - 1].id;
+              const tourStep = currentTourSteps.find(step => step.id === item.id);
+              const isThisItemTheLastStep = tourStep?.id === currentTourSteps[currentTourSteps.length - 1].id;
 
               return (
                 <HighlightTooltip
                   key={item.id}
                   text={tourStep?.text || ''}
-                  show={tourSteps[activeTourStep]?.id === item.id}
+                  show={currentTourSteps[activeTourStep]?.id === item.id}
                   position="top"
                   alignment={tourStep?.alignment as any}
                   onNext={isThisItemTheLastStep ? handleFinishTour : handleNextStep}

@@ -45,6 +45,11 @@
   padding-bottom: 80px; 
 }
 
+.mainGame {
+  padding: 0;
+  height: 100vh;
+}
+
 .navigation {
   position: fixed;
   bottom: 0;
