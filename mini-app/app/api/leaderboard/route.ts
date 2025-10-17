@@ -17,6 +17,8 @@ export async function GET(request: Request) {
         username: true,
         pfpUrl: true,
         weeklyPoints: true,
+        totalClaimed: true,
+        walletAddress: true,
       },
     });
 
@@ -34,7 +36,9 @@ export async function GET(request: Request) {
           ...user,
           rank: userIndex + 1, // Add the rank property to the user object
           weeklyPoints: user.weeklyPoints.toString(),
+          totalClaimed: (user.totalClaimed ?? 0).toString(),
           fid: user.fid.toString(),
+          walletAddress: user.walletAddress,
         };
       }
     }
@@ -43,7 +47,9 @@ export async function GET(request: Request) {
     const serializableTopUsers = topUsers.map(user => ({
       ...user,
       weeklyPoints: user.weeklyPoints.toString(),
+      totalClaimed: (user.totalClaimed ?? 0).toString(),
       fid: user.fid.toString(),
+      walletAddress: user.walletAddress,
     }));
     
     // We now return a `currentUser` object instead of just a `rank` number

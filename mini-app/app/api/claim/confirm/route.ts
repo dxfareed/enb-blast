@@ -2,8 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Errors, createClient } from "@farcaster/quick-auth";
 import prisma from '@/lib/prisma';
-import { createPublicClient, http, Hash } from 'viem';
+import { createPublicClient, http, Hash, decodeEventLog } from 'viem';
 import { base } from 'viem/chains';
+import { GAME_CONTRACT_ABI } from '@/app/utils/constants';
 
 const client = createClient();
 
@@ -39,50 +40,107 @@ export async function POST(req: NextRequest) {
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as Hash, timeout: 60_000 });
 
-    if (receipt.status !== 'success') {
-      throw new Error('Transaction failed on-chain.');
+    // --- START OF LOGGING ---
+    console.log("--- Full Transaction Receipt ---");
+    console.log(JSON.stringify(receipt, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value, 2
+    ));
+    console.log("---------------------------------");
+
+    try {
+      // Find the specific log entry for the TokensClaimed event
+      const claimLogEntry = receipt.logs.find(log => {
+        try {
+          const decoded = decodeEventLog({ abi: GAME_CONTRACT_ABI, ...log });
+          return decoded.eventName === 'TokensClaimed';
+        } catch {
+          return false;
+        }
+      });
+
+      if (claimLogEntry) {
+        // Decode the found log to get the arguments
+        const decodedLog = decodeEventLog({ abi: GAME_CONTRACT_ABI, ...claimLogEntry });
+
+        console.log("--- Decoded TokensClaimed Event ---");
+        console.log(JSON.stringify(decodedLog, (key, value) => 
+            typeof value === 'bigint' ? value.toString() : value, 2
+        ));
+        console.log("------------------------------------");
+
+        // --- Additional Verification Logging ---
+        const eventContractAddress = claimLogEntry.address?.toLowerCase();
+        const expectedContractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase();
+        const walletFromEvent = (decodedLog.args as { claimingWallet?: `0x${string}` }).claimingWallet?.toLowerCase();
+        const senderFromReceipt = receipt.from.toLowerCase();
+
+        console.log("--- Event & Receipt Address Verification ---");
+        console.log(`Event emitted by: ${eventContractAddress}`);
+        console.log(`Expected contract:  ${expectedContractAddress}`);
+        console.log(`Wallet from event:  ${walletFromEvent}`);
+        console.log(`Sender from receipt:${senderFromReceipt}`);
+        console.log(`Event contract matches expected? ${eventContractAddress === expectedContractAddress}`);
+        console.log(`Event wallet matches receipt sender? ${walletFromEvent === senderFromReceipt}`);
+        console.log("------------------------------------------");
+        // --- End of Additional Verification ---
+
+      } else {
+        console.log("!!! TokensClaimed event not found in transaction logs. !!!");
+      }
+    } catch (e) {
+      console.error("!!! Error decoding event logs: !!!", e);
+    }
+    // --- END OF LOGGING ---
+
+    // --- Event-Driven Validation ---
+
+    // 1. Find and decode the TokensClaimed event from the transaction logs.
+    const claimLogEntry = receipt.logs.find(log => {
+      try {
+        const decoded = decodeEventLog({ abi: GAME_CONTRACT_ABI, ...log });
+        return decoded.eventName === 'TokensClaimed' && log.address.toLowerCase() === process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase();
+      } catch {
+        return false;
+      }
+    });
+
+    if (!claimLogEntry) {
+      throw new Error('Valid "TokensClaimed" event not found in transaction.');
+    }
+    const decodedLog = decodeEventLog({ abi: GAME_CONTRACT_ABI, ...claimLogEntry });
+    const claimingWallet = (decodedLog.args as { claimingWallet?: `0x${string}` }).claimingWallet?.toLowerCase();
+
+    if (!claimingWallet) {
+        throw new Error('Could not decode the claiming wallet address from the event log.');
     }
 
-    const receiptToAddress = receipt.to?.toLowerCase();
-    const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS?.toLowerCase();
-
-    console.log("Verifying transaction addresses:");
-    console.log("Receipt 'to' address:", receiptToAddress);
-    console.log("Expected contract address from env:", contractAddress);
-
-    if (receiptToAddress !== contractAddress) {
-      throw new Error('Transaction was not sent to the game contract.');
-    }
-
-    // Idempotency check: Ensure this transaction hasn't been processed
+    // 2. Idempotency Check: Ensure this transaction hasn't been processed.
     const existingClaim = await prisma.claim.findUnique({
       where: { txHash: txHash as string },
     });
 
     if (existingClaim) {
-      // It's not an error if it's already processed, just a successful duplicate call.
       return NextResponse.json({ message: 'Transaction already processed' }, { status: 200 });
     }
 
+    // 3. User and Wallet Verification
     const user = await prisma.user.findUnique({ where: { fid } });
     if (!user) {
       throw new Error('User not found in our database');
     }
     
-    // [THE CRITICAL FIX]
-    // Check if the sender of the transaction is one of the user's verified wallets or their primary wallet.
-    const senderWallet = receipt.from.toLowerCase();
-    const isWalletVerified = user.verifiedWallets.includes(senderWallet) || user.walletAddress.toLowerCase() === senderWallet;
+    const isWalletVerified = user.verifiedWallets.includes(claimingWallet) || user.walletAddress.toLowerCase() === claimingWallet;
 
     if (!isWalletVerified) {
-      // This provides a much clearer error message
-      return NextResponse.json({ message: `Transaction was sent from a wallet (${senderWallet}) that is not verified for this Farcaster account.` }, { status: 400 });
+      return NextResponse.json({ 
+        message: `Transaction was initiated by a wallet (${claimingWallet}) that is not verified for this Farcaster account.` 
+      }, { status: 400 });
     }
     
-    // The comment below is key: your indexer will handle the database updates.
-    // This endpoint's only remaining job is to confirm the transaction's validity.
-    // If you wanted to, you could create the `Claim` record here as the final step.
-    // Example: await prisma.claim.create({ data: { txHash, userId: user.id } });
+    // If all checks pass, the claim is valid.
+    // The indexer will handle the database updates based on the event.
+    // You could optionally create the Claim record here as well.
+    // await prisma.claim.create({ data: { txHash, userId: user.id } });
 
     return NextResponse.json({ message: 'Claim transaction confirmed successfully' }, { status: 200 });
 

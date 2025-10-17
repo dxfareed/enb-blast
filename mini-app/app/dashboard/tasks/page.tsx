@@ -99,6 +99,15 @@ function TaskItem({ task, onVerify, isChecking }: TaskItemProps) {
         <span className={styles.rewardAmount}> +{task.rewardPoints} Points</span>
       </div>
       <div className={styles.buttonContainer}>
+        {task.checkKey === 'HOLD_10K_CAP' && !task.completed && (
+          <button
+            onClick={() => sdk.actions.swapToken({ buyToken: 'eip155:8453/erc20:0xbfa733702305280f066d470afdfa784fa70e2649' })}
+            className={`${styles.goButton} ${isTaskDisabled ? styles.disabledButton : ''}`}
+            disabled={isTaskDisabled}
+          >
+            Buy
+          </button>
+        )}
         {hasActionUrl && !task.completed && (
           <button
             onClick={handleGoClick}
@@ -129,6 +138,7 @@ const fakeVerificationTasks = [
   'X_FOLLOW_ENB',
   'DISCORD_JOIN_ENB',
   'CREATORX_FOLLOW_FOUNDER',
+  'SCORELINE_TOURNAMENT_JOIN',
 ];
 
 export default function TasksPage() {
@@ -200,6 +210,15 @@ export default function TasksPage() {
 
         if (!response.ok) {
           const errorData = await response.json();
+          if (response.status === 409) { // Task already completed
+            setTasks(prevTasks =>
+              prevTasks.map(t =>
+                t.id === task.id ? { ...t, completed: true } : t
+              )
+            );
+            setCheckingTaskId(null);
+            return;
+          }
           if (response.status === 418) {
             setToast({ message: errorData.message, type: 'info' });
             setCheckingTaskId(null);
@@ -231,6 +250,12 @@ export default function TasksPage() {
   const dailyTasks = tasks.filter(t => t.type === 'DAILY');
   const defaultTasks = tasks.filter(t => t.type === 'DEFAULT');
   const partnerTasks = tasks.filter(t => t.type === 'PARTNER');
+
+  const sortedDefaultTasks = [...defaultTasks].sort((a, b) => {
+    if (a.checkKey === 'X_FOLLOW_ENB_APPS') return -1;
+    if (b.checkKey === 'X_FOLLOW_ENB_APPS') return 1;
+    return 0;
+  });
 
   if (isLoading) return <Loader />;
 
@@ -285,7 +310,7 @@ export default function TasksPage() {
       {activeTab === 'default' && (
         <section className={styles.taskSection}>
           <div className={styles.taskList}>
-            {defaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
+            {sortedDefaultTasks.map(task => <TaskItem key={task.id} task={task} onVerify={handleVerifyTask} isChecking={checkingTaskId === task.id} />)}
           </div>
         </section>
       )}

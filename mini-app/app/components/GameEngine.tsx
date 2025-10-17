@@ -1,65 +1,70 @@
 'use client';
 
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef, createRef } from 'react';
-import { RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import gameStyles from '@/app/dashboard/game/game.module.css';
 import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
-import { useTour } from '@/app/context/TourContext';
-import HighlightTooltip from './HighlightTooltip';
+import DidYouKnow from './DidYouKnow';
+import { BASE_BLOCKCHAIN_FACTS } from '@/app/utils/constants';
+import NewHighScoreAnimation from './NewHighScoreAnimation';
 
 const GAME_DURATION = 30;
 
-const INITIAL_SPAWN_RATE = 300;
-const INITIAL_BOMB_SPEED = 5.5;
-const INITIAL_PICTURE_SPEED = 5.2;
-const INITIAL_BOMB_CHANCE = 0.4;
+// Game balance constants
+const INITIAL_SPAWN_RATE = 290;
+const INITIAL_BOMB_SPEED = 5;
+const INITIAL_PICTURE_SPEED = 5;
+const INITIAL_BOMB_CHANCE = 0.1;
 
-const FINAL_SPAWN_RATE = 250;
-const FINAL_BOMB_SPEED = 8.5;
-const FINAL_PICTURE_SPEED = 9;
-const FINAL_BOMB_CHANCE = 0.7;
+const FINAL_SPAWN_RATE = 230;
+const FINAL_BOMB_SPEED = 8.6;
+const FINAL_PICTURE_SPEED = 8.8;
+const FINAL_BOMB_CHANCE = 0.31;
 
+// Item URLs and values
 const PICTURE_URL = "/Enb_000.png";
-const BASE_PICTURE_VALUE = 6;
-
-const POWER_UP_POINT_5_URL = "/powerup_5.png";
-const POWER_UP_POINT_5_VALUE = 10;
-const POWER_UP_POINT_5_CHANCE = 0.0109;
-
-const POWER_UP_POINT_10_URL = "/powerup_10.png";
-const POWER_UP_POINT_10_VALUE = 15;
-const POWER_UP_POINT_10_CHANCE = 0.008;
+const CAP_PICTURE_URL = "/cap.jpg";
+const BASE_PICTURE_VALUE = 5;
 
 const POWER_UP_POINT_2_URL = "/powerup_2.png";
-const POWER_UP_POINT_2_VALUE = 5;
-const POWER_UP_POINT_2_CHANCE = 0.08;
+const POWER_UP_POINT_2_VALUE = 10;
+const POWER_UP_POINT_2_CHANCE = 0.1;
+const POWER_UP_POINT_5_URL = "/powerup_5.png";
+const POWER_UP_POINT_5_VALUE = 15;
+const POWER_UP_POINT_5_CHANCE = 0.05;
+
+const POWER_UP_POINT_10_URL = "/powerup_10.png";
+const POWER_UP_POINT_10_VALUE = 30;
+const POWER_UP_POINT_10_CHANCE = 0.01;
 
 const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
-const POWER_UP_PUMPKIN_VALUE = 250;
-const POWER_UP_PUMPKIN_CHANCE = 0.0008;
+const POWER_UP_PUMPKIN_VALUE = 500;
+const POWER_UP_PUMPKIN_CHANCE = 0.0005;
+
+export type GameEvent = {
+  type: 'collect';
+  itemType: ItemType;
+  timestamp: number;
+} | {
+  type: 'bomb_hit';
+  timestamp: number;
+};
 
 type GameEngineProps = {
-  onGameWin: (finalScore: number, pumpkinsCollected: number) => void;
+  onGameWin: (events: GameEvent[]) => void;
+  onStartGame: () => Promise<boolean>;
   displayScore: number;
+  highScore: number;
   isMuted: boolean;
   onToggleMute: () => void;
-  claimCooldownEnds: string | null;
-  countdown: string;
-  claimsLeft: number | null;
-  maxClaims: number | null;
-  // Props for new overlay buttons
-  handleClaim: () => void;
   handleShareScoreFrame: () => void;
   handleTryAgain: () => void;
-  isClaimDisabled: boolean;
-  isSignatureLoading: boolean;
-  isWritePending: boolean;
-  isConfirming: boolean;
-  isConfirmed: boolean;
-  claimButtonText: string;
-  isClaimStatusLoading: boolean;
+  isStartingGame: boolean;
+  isEndingGame: boolean;
+  isGameWon: boolean;
+  onAnimationComplete: () => void;
 };
 
 export type GameEngineHandle = { resetGame: () => void; };
@@ -67,6 +72,7 @@ export type GameEngineHandle = { resetGame: () => void; };
 type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin';
 type Item = {
   id: number; type: ItemType; x: number; y: number; speed: number;
+  imageUrl?: string;
   ref: React.RefObject<HTMLDivElement>;
 };
 type GameState = 'idle' | 'playing' | 'won' | 'lost';
@@ -77,25 +83,19 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
   return !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
 }
 
-const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ 
-  onGameWin, 
-  displayScore, 
-  isMuted, 
-  onToggleMute, 
-  claimCooldownEnds, 
-  countdown, 
-  claimsLeft,
-  maxClaims,
-  handleClaim,
+const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
+  onGameWin,
+  onStartGame,
+  displayScore,
+  highScore,
+  isMuted,
+  onToggleMute,
   handleShareScoreFrame,
   handleTryAgain,
-  isClaimDisabled,
-  isSignatureLoading,
-  isWritePending,
-  isConfirming,
-  isConfirmed,
-  claimButtonText,
-  isClaimStatusLoading
+  isStartingGame,
+  isEndingGame,
+  isGameWon,
+  onAnimationComplete
 }, ref) => {
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
@@ -108,11 +108,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
   const isProcessingBombHit = useRef(false);
+  const [showNewHighScoreAnimation, setShowNewHighScoreAnimation] = useState(false);
+  const [gameAreaDimensions, setGameAreaDimensions] = useState({ width: 0, height: 0 });
 
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
-  const scoreRef = useRef(score);
-  const pumpkinsCollectedRef = useRef(0);
+  const gameEventsRef = useRef<GameEvent[]>([]);
   const lastSpawnTimeRef = useRef(0);
   const coinSoundRef = useRef<HTMLAudioElement | null>(null);
   const bombSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -128,15 +129,31 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   });
 
   const { userProfile } = useUser();
-  const { activeTourStep, tourSteps } = useTour();
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
 
-  const isGameLocked = claimCooldownEnds !== null || claimsLeft === 0;
+  useEffect(() => {
+    if (gameAreaRef.current) {
+      setGameAreaDimensions({
+        width: gameAreaRef.current.offsetWidth,
+        height: gameAreaRef.current.offsetHeight,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (displayScore > highScore) {
+      setShowNewHighScoreAnimation(true);
+      const timer = setTimeout(() => {
+        setShowNewHighScoreAnimation(false);
+      }, 6000); 
+      return () => clearTimeout(timer);
+    }
+  }, [displayScore, highScore]);
 
   useEffect(() => {
     const imageUrls = [
-      '/bomb.png', PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
-      POWER_UP_POINT_2_URL, avatarPfp
+      '/bomb.png', PICTURE_URL, CAP_PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
+      POWER_UP_POINT_2_URL, POWER_UP_PUMPKIN_URL, avatarPfp
     ];
     imageUrls.forEach(url => {
       if (url) { new Image().src = url; }
@@ -144,27 +161,32 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   }, [avatarPfp]);
 
   const isInvincibleRef = useRef(isInvincible);
-
-  useEffect(() => { scoreRef.current = score; }, [score]);
   useEffect(() => { isInvincibleRef.current = isInvincible; }, [isInvincible]);
 
   useEffect(() => {
     coinSoundRef.current = new Audio('/sounds/coin.wav');
-    coinSoundRef.current.load();
-    coinSoundRef.current.volume = 0.7;
     bombSoundRef.current = new Audio('/sounds/bomb.wav');
-    bombSoundRef.current.load();
-    bombSoundRef.current.volume = 0.5;
     backgroundSoundRef.current = new Audio('/sounds/background.mp3');
-    backgroundSoundRef.current.load();
+    gameOverSoundRef.current = new Audio('/sounds/game-over.wav');
+    heartbeatSoundRef.current = new Audio('/sounds/heartbeat.wav');
+
+    coinSoundRef.current.volume = 0.7;
+    bombSoundRef.current.volume = 0.5;
     backgroundSoundRef.current.loop = true;
     backgroundSoundRef.current.volume = 0.3;
-    gameOverSoundRef.current = new Audio('/sounds/game-over.wav');
-    gameOverSoundRef.current.load();
     gameOverSoundRef.current.volume = 0.6;
-    heartbeatSoundRef.current = new Audio('/sounds/heartbeat.wav');
-    heartbeatSoundRef.current.load();
     heartbeatSoundRef.current.volume = 0.8;
+
+    return () => {
+        const sounds = [coinSoundRef, bombSoundRef, backgroundSoundRef, gameOverSoundRef, heartbeatSoundRef];
+        sounds.forEach(soundRef => {
+            if (soundRef.current) {
+                soundRef.current.pause();
+                soundRef.current.src = '';
+                soundRef.current = null;
+            }
+        });
+    };
   }, []);
 
   const resetGame = useCallback(() => {
@@ -176,7 +198,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     setFloatingScores([]);
     setIsDragging(false);
     setIsGameOverSoundPlayed(false);
-    pumpkinsCollectedRef.current = 0;
+    gameEventsRef.current = [];
     gameParamsRef.current = {
       bombSpeed: INITIAL_BOMB_SPEED,
       pictureSpeed: INITIAL_PICTURE_SPEED,
@@ -187,12 +209,15 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useImperativeHandle(ref, () => ({ resetGame }));
 
-  const startGame = () => {
+  const startGame = async () => {
     resetGame();
-    setGameState('playing');
-    if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => {}).then(() => coinSoundRef.current?.pause()); }
-    if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => {}).then(() => bombSoundRef.current?.pause()); }
-    if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => {}).then(() => gameOverSoundRef.current?.pause()); }
+    const success = await onStartGame();
+    if (success) {
+      setGameState('playing');
+      if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => { }).then(() => coinSoundRef.current?.pause()); }
+      if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => { }).then(() => bombSoundRef.current?.pause()); }
+      if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => { }).then(() => gameOverSoundRef.current?.pause()); }
+    }
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -209,7 +234,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     let newX = e.clientX - gameRect.left;
     let newY = e.clientY - gameRect.top;
     newX = Math.max(avatarHalfWidth, Math.min(newX, gameRect.width - avatarHalfWidth));
-    newY = Math.max(avatarHalfHeight, Math.min(newY, gameRect.height - avatarHalfHeight));
+    newY = Math.max(avatarHalfHeight, Math.min(newY, gameRect.height - avatarHalfHeight - 80));
     setAvatarPosition({ x: newX, y: newY });
   };
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -221,14 +246,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     if (isInvincible) {
       heartbeatSoundRef.current?.play().catch(e => console.error("Heartbeat audio play failed:", e));
       if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.08;
-      if (coinSoundRef.current) coinSoundRef.current.volume = 0.7;
     } else {
       if (heartbeatSoundRef.current) {
         heartbeatSoundRef.current.pause();
         heartbeatSoundRef.current.currentTime = 0;
       }
       if (backgroundSoundRef.current) backgroundSoundRef.current.volume = 0.3;
-      if (coinSoundRef.current) coinSoundRef.current.volume = 1.0;
     }
   }, [isInvincible]);
 
@@ -248,6 +271,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useEffect(() => {
     if (gameState !== 'playing') return;
+
     const timerInterval = setInterval(() => {
       setTimeLeft(prevTime => {
         const newTime = prevTime - 1;
@@ -270,95 +294,120 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
     let animationFrameId: number;
     const gameLoop = (timestamp: number) => {
-      if (!lastSpawnTimeRef.current) lastSpawnTimeRef.current = timestamp;
+      if (!lastSpawnTimeRef.current) {
+        lastSpawnTimeRef.current = timestamp;
+      }
+
       const shouldSpawn = timestamp - lastSpawnTimeRef.current > gameParamsRef.current.spawnRate;
-      if (shouldSpawn) lastSpawnTimeRef.current = timestamp;
+      if (shouldSpawn) {
+        lastSpawnTimeRef.current = timestamp;
+      }
 
       setItems(prevItems => {
         let currentItems = [...prevItems];
+
         if (shouldSpawn) {
           const rand = Math.random();
           const { bombChance } = gameParamsRef.current;
           let itemType: ItemType = 'picture';
+          let imageUrl: string | undefined = undefined;
+
+          const pumpkinThreshold = bombChance + POWER_UP_PUMPKIN_CHANCE;
+          const p10Threshold = pumpkinThreshold + POWER_UP_POINT_10_CHANCE;
+          const p5Threshold = p10Threshold + POWER_UP_POINT_5_CHANCE;
+          const p2Threshold = p5Threshold + POWER_UP_POINT_2_CHANCE;
+
           if (rand < bombChance) itemType = 'bomb';
-          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE) itemType = 'powerup_pumpkin';
-          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE) itemType = 'powerup_point_10';
-          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE) itemType = 'powerup_point_5';
-          else if (rand < bombChance + POWER_UP_PUMPKIN_CHANCE + POWER_UP_POINT_10_CHANCE + POWER_UP_POINT_5_CHANCE + POWER_UP_POINT_2_CHANCE) itemType = 'powerup_point_2';
+          else if (rand < pumpkinThreshold) itemType = 'powerup_pumpkin';
+          else if (rand < p10Threshold) itemType = 'powerup_point_10';
+          else if (rand < p5Threshold) itemType = 'powerup_point_5';
+          else if (rand < p2Threshold) itemType = 'powerup_point_2';
+
+          if (itemType === 'picture') {
+            imageUrl = Math.random() < 0.5 ? PICTURE_URL : CAP_PICTURE_URL;
+          }
+
           const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
-          currentItems.push({ id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, ref: createRef() });
+          currentItems.push({ id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, imageUrl, ref: createRef() });
         }
-        let processedItems = currentItems
-          .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
-          .filter(item => item.y < 500);
+
+        // --- FIX: Reverted this line to match the stable version ---
+        let processedItems = currentItems.reduce((acc: Item[], item: Item) => {
+          const newItem = { ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) };
+          if (newItem.y < gameAreaDimensions.height + 60) {
+            acc.push(newItem);
+          }
+          return acc;
+        }, []);
+
         if (avatarRef.current) {
           const avatarRect = avatarRef.current.getBoundingClientRect();
           let bombCollisionItem: Item | null = null;
           const remainingItems = processedItems.filter(item => {
             if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
-            
+
             if (item.type === 'bomb') {
-              if (!isInvincibleRef.current) {
-                bombCollisionItem = item;
-              }
+              if (!isInvincibleRef.current) bombCollisionItem = item;
             } else {
+              gameEventsRef.current.push({ type: 'collect', itemType: item.type, timestamp: Date.now() });
               if (coinSoundRef.current) {
                 coinSoundRef.current.currentTime = 0;
                 coinSoundRef.current.play().catch(e => console.error(e));
               }
-              if (!isInvincibleRef.current) sdk.haptics.impactOccurred('soft');
-              let points = BASE_PICTURE_VALUE;
-              if (item.type === 'powerup_point_2') points = POWER_UP_POINT_2_VALUE;
-              if (item.type === 'powerup_point_5') points = POWER_UP_POINT_5_VALUE;
-              if (item.type === 'powerup_point_10') points = POWER_UP_POINT_10_VALUE;
-              if (item.type === 'powerup_pumpkin') {
-                points = POWER_UP_PUMPKIN_VALUE;
-                pumpkinsCollectedRef.current += 1;
+              sdk.haptics.impactOccurred('soft');
+              let points = 0;
+              switch (item.type) {
+                case 'picture': points = BASE_PICTURE_VALUE; break;
+                case 'powerup_point_2': points = POWER_UP_POINT_2_VALUE; break;
+                case 'powerup_point_5': points = POWER_UP_POINT_5_VALUE; break;
+                case 'powerup_point_10': points = POWER_UP_POINT_10_VALUE; break;
+                case 'powerup_pumpkin': points = POWER_UP_PUMPKIN_VALUE; break;
               }
               setScore(prev => prev + points);
               const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
               setFloatingScores(prev => [...prev, newFloatingScore]);
-              setTimeout(() => setFloatingScores(prev => prev.filter(s => s.id !== newFloatingScore.id)), 1600);
             }
             return false;
           });
 
           if (bombCollisionItem) {
-            if (isProcessingBombHit.current) return [];
-            isProcessingBombHit.current = true;
+            if (!isProcessingBombHit.current) {
+              isProcessingBombHit.current = true;
 
-            bombSoundRef.current?.play().catch(e => console.error(e));
-            sdk.haptics.impactOccurred('heavy');
-            setIsBombHit(true);
-            setTimeout(() => setIsBombHit(false), 500);
-            
-            const { x, y } = bombCollisionItem;
-            setScore(prev => {
-              const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
-              const pointsDeducted = prev - newScore;
-              if (pointsDeducted > 0) {
-                const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
-                setFloatingScores(prevScores => [...prevScores, newFloatingScore]);
-                setTimeout(() => setFloatingScores(prevScores => prevScores.filter(s => s.id !== newFloatingScore.id)), 1600);
-              }
-              return newScore;
-            });
+              gameEventsRef.current.push({ type: 'bomb_hit', timestamp: Date.now() });
+              bombSoundRef.current?.play().catch(e => console.error(e));
+              sdk.haptics.impactOccurred('heavy');
+              setIsBombHit(true);
+              setTimeout(() => setIsBombHit(false), 500);
 
-            pumpkinsCollectedRef.current = 0;
-            setIsInvincible(true);
-            setTimeout(() => {
-              setIsInvincible(false);
-              isProcessingBombHit.current = false;
-            }, 3000);
-            return [];
+              const { x, y } = bombCollisionItem;
+              setScore(prev => {
+                const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
+                const pointsDeducted = prev - newScore;
+                if (pointsDeducted > 0) {
+                  const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
+                  setFloatingScores(prevScores => [...prevScores, newFloatingScore]);
+                }
+                return newScore;
+              });
+
+              setIsInvincible(true);
+              setTimeout(() => {
+                setIsInvincible(false);
+                isProcessingBombHit.current = false;
+              }, 3000);
+              setItems([]); // Clear visual items only, not the event log
+            }
           }
           return remainingItems;
         }
         return processedItems;
       });
+
       animationFrameId = requestAnimationFrame(gameLoop);
     };
     animationFrameId = requestAnimationFrame(gameLoop);
+
     return () => {
       clearInterval(timerInterval);
       cancelAnimationFrame(animationFrameId);
@@ -367,16 +416,21 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useEffect(() => {
     if (gameState === 'won' && !isGameOverSoundPlayed) {
-      onGameWin(scoreRef.current, pumpkinsCollectedRef.current);
+      const finalEvents = [...gameEventsRef.current]; // Create a copy to avoid stale refs
+      onGameWin(finalEvents);
       gameOverSoundRef.current?.play().catch(e => console.error(e));
       setIsGameOverSoundPlayed(true);
     }
   }, [gameState, onGameWin, isGameOverSoundPlayed]);
 
+  const handleFloatingScoreAnimationEnd = (id: number) => {
+    setFloatingScores(prev => prev.filter(s => s.id !== id));
+  };
+
   const renderItem = (item: Item) => {
     switch (item.type) {
       case 'bomb': return <img src="/bomb.png" alt="Bomb" className={gameStyles.itemImage} />;
-      case 'picture': return <img src={PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
+      case 'picture': return <img src={item.imageUrl || PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
       case 'powerup_point_5': return <img src={POWER_UP_POINT_5_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_10': return <img src={POWER_UP_POINT_10_URL} alt="Power Up" className={gameStyles.itemImage} />;
       case 'powerup_point_2': return <img src={POWER_UP_POINT_2_URL} alt="Power Up" className={gameStyles.itemImage} />;
@@ -385,150 +439,86 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     }
   };
 
-  const isSoundButtonTourActive = tourSteps[activeTourStep]?.id === 'sound-toggle';
-  const soundButtonTourStep = tourSteps.find(step => step.id === 'sound-toggle');
-
   return (
     <>
+      {showNewHighScoreAnimation && <NewHighScoreAnimation onAnimationComplete={onAnimationComplete} width={gameAreaDimensions.width} height={gameAreaDimensions.height} />}
       <div className={gameStyles.gameStats}>
-        <span onClick={() => { setScore(0); setItems([]); }} style={{ cursor: 'pointer' }}>Score: <strong>{score.toLocaleString()}</strong></span>
-        <span>Time Left: <strong>{timeLeft}s</strong></span>
+        <span>Score: <strong>{score.toLocaleString()}</strong></span>
+        <span>Time: <strong>{timeLeft}s</strong></span>
+        <span>Best: <strong>{highScore.toLocaleString()}</strong></span>
       </div>
       <div
         ref={gameAreaRef}
-        className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''}`}
-        onClick={gameState === 'idle' && !isGameLocked && !isClaimStatusLoading ? startGame : undefined}
+        className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''} ${isGameWon ? gameStyles.gameOverBlur : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-        {isGameLocked && (
-          <div className={gameStyles.overlay}>
-            <h2>Game on Cooldown</h2>
-            {claimCooldownEnds ? (
-              <p>Next claim in: <br/><strong>{countdown}</strong></p>
-            ) : (
-              <p>You have no claims left today.</p>
-            )}
-          </div>
-        )}
-
-        {gameState === 'idle' && !isGameLocked && (
+        {gameState === 'idle' && (
           <>
-            <HighlightTooltip
-              text={soundButtonTourStep?.text || ''}
-              show={isSoundButtonTourActive}
-              position="bottom"
-              alignment="right"
-              className={`${gameStyles.muteButtonContainer} ${gameStyles.soundButtonTooltipWrapper}`}
-            >
-              <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
-                <button onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleMute();
-                }} className={gameStyles.muteButton}>
-                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-                </button>
-              </div>
-            </HighlightTooltip>
+            <div className={gameStyles.muteButtonContainer} onClick={(e) => e.stopPropagation()}>
+              <button onClick={(e) => { e.stopPropagation(); onToggleMute(); }} className={gameStyles.muteButton}>
+                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+              </button>
+            </div>
             <div className={gameStyles.overlay}>
-              {isClaimStatusLoading ? (
+              {isStartingGame ? (
                 <>
-                  <h2 className={gameStyles.loadingText}>Checking claim status...</h2>
-                  <p>Please wait a moment.</p>
+                  <div className={gameStyles.spinner}></div>
+                  <p>Starting game...</p>
+                  <DidYouKnow facts={BASE_BLOCKCHAIN_FACTS} />
                 </>
               ) : (
                 <>
                   <h2>blast ENBS</h2>
                   <p>
                     Drag your avatar to collect.<br />Avoid the Wormhole ENBs!
-                    <br /><br />
-                    {claimsLeft !== null && maxClaims !== null && (
-                      <>
-                        Claims left: {claimsLeft}/{maxClaims}
-                        <br /><br />
-                      </>
-                    )}
-                    Click to Start
                   </p>
+                  <button onClick={startGame} className={gameStyles.startButton}>
+                    Click to Start
+                  </button>
+                  <div className={gameStyles.powerupsSection}>
+                    <h3 className={gameStyles.powerupsTitle}><del>Power Ups</del></h3>
+                    <div className={gameStyles.powerupsContainer}>
+                      <button className={gameStyles.powerupButton} disabled>🧲</button>
+                      <button className={gameStyles.powerupButton} disabled>🛡️</button>
+                      <button className={gameStyles.powerupButton} disabled>⏰</button>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
           </>
         )}
 
-        {gameState === 'lost' && !isGameLocked && (
+        {isGameWon && (
           <div className={gameStyles.overlay}>
-            <h2>Game Over!</h2>
-            <p>Your final score: {displayScore}</p>
-            <div className={gameStyles.overlayButtonContainer}>
-              {claimsLeft !== null && maxClaims !== null && (
-                <p className={gameStyles.claimsLeftText}>
-                  Claims left: {claimsLeft}/{maxClaims}
-                </p>
-              )}
-              <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                Try Again
-              </button>
-              {displayScore > 0 && (
-                <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
-                  Share Score
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        {gameState === 'won' && !isGameLocked && (
-          <div className={gameStyles.overlay}>
-            <h2>Game Over!</h2>
-            <p>Your final score: {(displayScore).toLocaleString()}</p>
-            <div className={gameStyles.overlayButtonContainer}>
-              {displayScore > 0 ? (
-                <>
-                  {claimsLeft !== null && maxClaims !== null && (
-                    <p className={gameStyles.claimsLeftText}>
-                      Claims left: {claimsLeft}/{maxClaims}
-                    </p>
-                  )}
-                  {!isConfirmed ? (
-                    <button
-                      onClick={handleClaim}
-                      disabled={isClaimDisabled}
-                      className={`${gameStyles.overlayButton} ${gameStyles.claimButtonGreen}`}
-                    >
-                      {claimCooldownEnds ? `On Cooldown` :
-                        claimsLeft === 0 ? 'No Claims Left' :
-                          isSignatureLoading ? 'Preparing...' :
-                            isWritePending ? 'Check Wallet...' :
-                              isConfirming ? 'Confirming...' :
-                                claimButtonText}
-                    </button>
-                  ) : (
-                    <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                      Play Again
-                    </button>
-                  )}
+            {isEndingGame ? (
+              <>
+                <div className={gameStyles.spinner}></div>
+                <p>Saving score...</p>
+                <DidYouKnow facts={BASE_BLOCKCHAIN_FACTS} />
+              </>
+            ) : (
+              <>
+                <h2>Game Over!</h2>
+                <p>Your final score is:</p>
+                <h4><span className={gameStyles.finalScore}>{(displayScore).toLocaleString()}</span></h4>
+                <p>Best Score: {highScore.toLocaleString()}</p>
+                <div className={gameStyles.overlayButtonContainer}>
+                  <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                    Play Again
+                  </button>
                   <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
                     Share Score
                   </button>
-                </>
-              ) : (
-                <>
-                  {claimsLeft !== null && maxClaims !== null && (
-                    <p className={gameStyles.claimsLeftText}>
-                      Claims left: {claimsLeft}/{maxClaims}
-                    </p>
-                  )}
-                  <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                    Try Again
-                  </button>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
-        
+
         {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />}
 
         {items.map(item => (
@@ -545,10 +535,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           <div
             key={score.id}
             className={`${gameStyles.floatingScore} ${score.points < 0 ? gameStyles.floatingScoreNegative : ''}`}
-            style={{ 
-              top: `${score.y}px`, 
-              left: `${score.x}px`
-            }}
+            style={{ top: `${score.y}px`, left: `${score.x}px` }}
+            onAnimationEnd={() => handleFloatingScoreAnimationEnd(score.id)}
           >
             {score.points > 0 ? `+${score.points}` : score.points}
           </div>

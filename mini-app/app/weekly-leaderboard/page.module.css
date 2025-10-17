@@ -1,0 +1,171 @@
+.pageContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background-color: #f9fafb;
+  font-family: var(--font-space-mono);
+}
+
+.headerContainer {
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  margin-bottom: 1.5rem; /* Reduced margin */
+  padding: 1rem;
+  background-color: #ffffff;
+  border-radius: 1.5rem;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.title {
+  font-size: 1.5rem; /* Reduced font size */
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0;
+}
+
+.loader {
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  color: #ef4444;
+  background-color: #fee2e2;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 2px solid #fca5a5;
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.userCard {
+  width: 100%;
+  max-width: 400px;
+  background-color: #ffffff;
+  border-radius: 1.5rem;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  padding: 1.25rem; /* Further reduced padding */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem; /* Further reduced gap */
+}
+
+.pfp {
+  width: 72px; /* Further reduced size */
+  height: 72px; /* Further reduced size */
+  border-radius: 50%;
+  border: 3px solid rgb(116, 51, 235); /* Thinner border */
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+
+.username {
+  font-size: 1.15rem; /* Further reduced font size */
+  font-weight: 700;
+  color: #111827;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem; /* Further reduced gap */
+  width: 100%;
+  text-align: center;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem; /* Reduced gap */
+  padding: 0.6rem; /* Further reduced padding */
+  background-color: #f9fafb;
+  border-radius: 0.75rem; /* Smaller radius */
+  border: 1px solid #e5e7eb; /* Thinner border */
+}
+
+.statLabel {
+  font-size: 0.7rem; /* Further reduced font size */
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.statValue {
+  font-size: 1.15rem; /* Further reduced font size */
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.rankText {
+  color: #1e40af;
+}
+
+.earnedValue {
+  color: #16a34a;
+  font-weight: 800;
+}
+
+.buttonContainer {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 400px;
+  display: flex;
+  justify-content: center;
+}
+
+.continueButton, .shareButton {
+  border: none;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  text-transform: uppercase;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.continueButton {
+  background-color: rgb(116, 51, 235);
+  color: #ffffff;
+}
+
+.continueButton:hover {
+  background-color: rgb(106, 41, 225);
+  transform: scale(1.02);
+}
+
+.shareButton {
+  background-color: rgb(116, 51, 235);
+  color: #ffffff;
+}
+
+.shareButton:hover {
+  background-color: rgb(106, 41, 225);
+  transform: scale(1.02);
+}
+
+.shareButton:disabled {
+  background-color: #aab8c2;
+  cursor: not-allowed;
+}

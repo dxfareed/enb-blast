@@ -20,7 +20,7 @@
 }
 
 .title {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: #1f2937;
   margin: 0;
@@ -56,7 +56,7 @@
 
 .cardValue {
   font-family: var(--font-space-mono);
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #16a34a;
 }
@@ -145,9 +145,9 @@
 }
 
 .tierRank { font-weight: 600; color: #4b5563; }
-.legendaryText { color: #FDE047; }
-.superBasedText { color: #5b21b6; }
-.basedText { color: #1e40af; }
+.legendaryText { color: #000000; }
+.superBasedText { color: #000000; }
+.basedText { color: #000000; }
 .tierReward { font-weight: 700; color: #16a34a; }
 
 .howToEarnItem {
@@ -195,25 +195,45 @@
   border: 2px solid;
 }
 
-.rank1, .rank2, .rank3 {
-  background-color: #FEEF8A;
-  color: #854D0E;
+.rank1 {
+  background-color: #FFD700; /* Gold */
+  color: #fff;
   border-color: #FBBF24;
   box-shadow: 0 0 12px #FDE047;
+  font-size: 1.5rem; /* Make emoji bigger */
+  line-height: 1;
 }
 
-.rankSuperBased {
+.rank2 {
+  background-color: #C0C0C0; /* Silver */
+  color: #fff;
+  border-color: #A9A9A9;
+  box-shadow: 0 0 10px #d1d5db;
+}
+
+.rank3 {
+  background-color: #CD7F32; /* Bronze */
+  color: #fff;
+  border-color: #A0522D;
+  box-shadow: 0 0 10px #e2a478;
+}
+
+.rank4_5_purple {
   background-color: #c4b5fd;
-  color: #5b21b6;
+  color: #6d28d9;
   border-color: #a78bfa;
   box-shadow: 0 0 10px #a78bfa;
 }
 
-.rankBased {
+.rank6_10_blue {
   background-color: #93c5fd;
   color: #1e40af;
   border-color: #60a5fa;
   box-shadow: 0 0 10px #60a5fa;
+}
+
+.rank4_5_text {
+  color: #1e40af;
 }
 
 .rankDefault {
@@ -234,7 +254,7 @@
   
 .username {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1rem;
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
@@ -245,7 +265,7 @@
   
 .score {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1rem;
   color: #1f2937;
 }
   

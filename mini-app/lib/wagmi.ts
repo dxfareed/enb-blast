@@ -7,11 +7,12 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!;
 
 const ws = process.env.NEXT_PUBLIC_WS
 const rpc_url = process.env.NEXT_PUBLIC_HTTPS_RPC_URL
+const in_rpc_url = process.env.NEXT_PUBLIC_HTTPS_IN_URL
 export const config = createConfig({
   chains: [base],
   transports: {
     [base.id]: fallback([
-      http("https://mainnet-preconf.base.org"),
+      http(in_rpc_url),
       webSocket(ws)
     ]),
   },

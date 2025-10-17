@@ -1,5 +1,6 @@
 // app/api/claim/signature/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 import { 
   createPublicClient, 
   http, 
@@ -10,6 +11,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { Errors, createClient } from "@farcaster/quick-auth";
+import { isFidRestricted } from '@/lib/restricted-fids';
 
 // =================================================================================
 //                                  CONFIGURATION
@@ -81,7 +83,7 @@ function getUrlHost(request: NextRequest): string {
     const host = request.headers.get("host");
     if (host) { return host; }
     const vercelUrl = process.env.VERCEL_URL;
-    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://vercelUrl}` : "http://localhost:3000";
+    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
     return new URL(urlValue).host;
 }
 
@@ -103,10 +105,48 @@ export async function POST(req: NextRequest) {
     const userFid = BigInt(payload.sub);
     console.log(`[API LOG] ✅ JWT Verified. Request from FID: ${userFid}`);
 
-    const { amount } = await req.json();
-    if (amount === undefined) {
-      return NextResponse.json({ message: 'amount is required' }, { status: 400 });
+    if (isFidRestricted(Number(userFid))) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
     }
+
+    if (!prisma) {
+      throw new Error("Database client is not available");
+    }
+
+    // [SECURITY CRITICAL] The `amount` is no longer accepted from the client.
+    // Instead, we fetch the server-validated score from the latest completed game session.
+    const user = await prisma.user.findUnique({
+      where: { fid: userFid },
+      include: {
+        gameSessions: {
+          where: { status: 'COMPLETED' },
+          orderBy: { endTime: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // [SECURITY FIX] Ensure the user is fully registered and active before proceeding.
+    if (user.registrationStatus !== 'ACTIVE') {
+      return NextResponse.json({ message: 'User is not authorized to claim.' }, { status: 403 });
+    }
+
+    const latestSession = user.gameSessions[0];
+    if (!latestSession || !latestSession.score) {
+      return NextResponse.json({ message: 'No completed game session found to claim' }, { status: 400 });
+    }
+    
+    const amount = latestSession.score;
+    
+    // Invalidate the session so it cannot be claimed again
+    await prisma.gameSession.update({
+        where: { id: latestSession.id },
+        data: { status: 'CLAIMED' }
+    });
 
     // [CORRECTED] Step 1: Fetch the user's full on-chain profile in one call
     const onChainProfile = await getOnChainProfile(userFid);

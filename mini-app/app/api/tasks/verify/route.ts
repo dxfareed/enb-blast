@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Errors, createClient } from "@farcaster/quick-auth";
+import { isFidRestricted } from '@/lib/restricted-fids';
 
 class EasterEggError extends Error {
   constructor(message: string) {
@@ -298,6 +299,10 @@ const taskCheckers = {
     return !!visitEvent;
   },
 
+  HIGH_SCORE_500_PLUS: async (user: { highScore: number; }) => {
+    return user.highScore >= 500;
+  },
+
   MAX_OUT_DAILY_CLAIMS: async (user: { fid: bigint; }) => {
     try {
       const [onChainProfile, maxClaims] = await Promise.all([
@@ -327,10 +332,11 @@ const taskCheckers = {
     }
   },
 
-  MINT_ENB_BOUNTY_NFT: async (user: { walletAddress: string; }) => checkNftBalance(user.walletAddress),
-  HOLD_100K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 100000),
-  HOLD_500K_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 500000),
-  HOLD_1M_ENB: async (user: { walletAddress: string; }) => checkTokenBalance(user.walletAddress, 1000000),
+  MINT_ENB_BOUNTY_NFT: async (user: { verifiedWallets: string[]; }) => checkNftBalance(user.verifiedWallets),
+  HOLD_100K_ENB: async (user: { verifiedWallets: string[]; }) => checkTokenBalance(user.verifiedWallets, 100000, '0xf73978b3a7d1d4974abae11f696c1b4408c027a0', 18),
+  HOLD_500K_ENB: async (user: { verifiedWallets: string[]; }) => checkTokenBalance(user.verifiedWallets, 500000, '0xf73978b3a7d1d4974abae11f696c1b4408c027a0', 18),
+  HOLD_1M_ENB: async (user: { verifiedWallets: string[]; }) => checkTokenBalance(user.verifiedWallets, 1000000, '0xf73978b3a7d1d4974abae11f696c1b4408c027a0', 18),
+  HOLD_10K_CAP: async (user: { verifiedWallets: string[]; }) => checkTokenBalance(user.verifiedWallets, 10000, '0xbfa733702305280f066d470afdfa784fa70e2649', 18),
   MINI_APP_OPEN_MINING: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying Mini App open (Mining) for user ${user.id}...`);
     return true;
@@ -339,8 +345,20 @@ const taskCheckers = {
     console.log(`Verifying Mini App open (Bounty) for user ${user.id}...`);
     return true;
   },
+  MINI_APP_OPEN_CAPMINAL: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying Mini App open (Capminal) for user ${user.id}...`);
+    return true;
+  },
   PARTNER_SPECIAL_EVENT: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying Partner Special Event for user ${user.id}...`);
+    return true;
+  },
+  X_FOLLOW_ENB_APPS: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying X Follow for enbapps for user ${user.id}...`);
+    return true;
+  },
+  SCORELINE_TOURNAMENT_JOIN: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying Scoreline tournament join for user ${user.id}...`);
     return true;
   },
 };
@@ -369,64 +387,97 @@ const ENB_BOUNTY_NFT_CONTRACT_ABI = [
 ] as const;
 
 
-async function checkNftBalance(walletAddress: string): Promise<boolean> {
-    if (!walletAddress) return false;
-    try {
-        const balance = await publicClient.readContract({
-            address: ENB_BOUNTY_NFT_CONTRACT_ADDRESS,
-            abi: ENB_BOUNTY_NFT_CONTRACT_ABI,
-            functionName: 'balanceOf',
-            args: [walletAddress as `0x${string}`],
-        });
-
-        return Number(balance) > 0;
-    } catch (error) {
-        console.error("Failed to check NFT balance:", error);
+async function checkNftBalance(walletAddresses: string[]): Promise<boolean> {
+    if (!walletAddresses || walletAddresses.length === 0) {
+        console.log('[checkNftBalance] Failed: Wallet address list is empty.');
         return false;
     }
+
+    for (const walletAddress of walletAddresses) {
+        if (!walletAddress) continue;
+
+        try {
+            const balance = await publicClient.readContract({
+                address: ENB_BOUNTY_NFT_CONTRACT_ADDRESS,
+                abi: ENB_BOUNTY_NFT_CONTRACT_ABI,
+                functionName: 'balanceOf',
+                args: [walletAddress as `0x${string}`],
+            });
+
+            if (Number(balance) > 0) {
+                console.log(`[checkNftBalance] Success: Found NFT in wallet ${walletAddress}.`);
+                return true;
+            }
+        } catch (error) {
+            console.error(`[checkNftBalance] Failed to check NFT balance for ${walletAddress}:`, error);
+            // Continue to the next wallet
+        }
+    }
+    
+    console.log('[checkNftBalance] Failed: No wallet found with the NFT.');
+    return false;
 }
 
-async function checkTokenBalance(walletAddress: string, requiredBalance: number): Promise<boolean> {
-  const TOKEN_CONTRACT_ADDRESS = '0xf73978b3a7d1d4974abae11f696c1b4408c027a0';
+async function checkTokenBalance(walletAddresses: string[], requiredBalance: number, contractAddress: string, decimals: number): Promise<boolean> {
+  console.log(`[checkTokenBalance] Starting check for wallets: ${walletAddresses.join(', ')} | Contract: ${contractAddress} | Required: ${requiredBalance}`);
+  if (!walletAddresses || walletAddresses.length === 0) {
+    console.log('[checkTokenBalance] Failed: Wallet address list is empty.');
+    return false;
+  }
+
   const BASE_MAINNET_RPC_URL = process.env.BASE_MAINNET_RPC_URL;
-
   if (!BASE_MAINNET_RPC_URL) {
-    console.error('Missing BASE_MAINNET_RPC_URL');
+    console.error('[checkTokenBalance] Failed: Missing BASE_MAINNET_RPC_URL');
     return false;
   }
 
-  try {
-    const response = await fetch(BASE_MAINNET_RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_call',
-        params: [{
-          to: TOKEN_CONTRACT_ADDRESS,
-          data: `0x70a08231000000000000000000000000${walletAddress.substring(2)}`
-        }, 'latest']
-      })
-    });
+  for (const walletAddress of walletAddresses) {
+    if (!walletAddress) continue; // Skip null or empty addresses
 
-    if (!response.ok) {
-      console.error(`RPC request failed with status ${response.status}`);
-      return false;
+    console.log(`[checkTokenBalance] Checking balance for ${walletAddress}`);
+    try {
+      const response = await fetch(BASE_MAINNET_RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_call',
+          params: [{
+            to: contractAddress,
+            data: `0x70a08231000000000000000000000000${walletAddress.substring(2)}`
+          }, 'latest']
+        })
+      });
+
+      if (!response.ok) {
+        console.error(`[checkTokenBalance] RPC request failed for ${walletAddress} with status ${response.status}`);
+        continue; // Try the next wallet
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        console.error(`[checkTokenBalance] RPC error for ${walletAddress}:`, data.error);
+        continue; // Try the next wallet
+      }
+
+      const balanceInWei = BigInt(data.result);
+      const requiredBalanceInWei = BigInt(requiredBalance) * (BigInt(10) ** BigInt(decimals));
+      
+      console.log(`[checkTokenBalance] Wallet: ${walletAddress} | Balance: ${balanceInWei.toString()} | Required: ${requiredBalanceInWei.toString()}`);
+
+      if (balanceInWei >= requiredBalanceInWei) {
+        console.log(`[checkTokenBalance] Success: Found sufficient balance in ${walletAddress}.`);
+        return true; // Found a wallet with sufficient balance
+      }
+    } catch (error) {
+      console.error(`[checkTokenBalance] Failed to check balance for ${walletAddress} with exception:`, error);
+      continue; // Try the next wallet
     }
-
-    const data = await response.json();
-    if (data.error) {
-      console.error('RPC error:', data.error);
-      return false;
-    }
-
-    const balance = parseInt(data.result, 16) / 1e18;
-    return balance >= requiredBalance;
-  } catch (error) {
-    console.error('Failed to check token balance:', error);
-    return false;
   }
+
+  console.log('[checkTokenBalance] Failed: No wallet with sufficient balance found.');
+  return false; // No wallet met the criteria
 }
 
 const client = createClient();
@@ -474,11 +525,16 @@ export async function POST(request: NextRequest) {
       token: authorization.split(" ")[1] as string,
       domain: getUrlHost(request),
     });
-    const fid = payload.sub;
+    const fid = Number(payload.sub);
+
+    if (isFidRestricted(fid)) {
+      return NextResponse.json({ message: 'User is restricted' }, { status: 403 });
+    }
+
     const { checkKey } = await request.json();
 
     if (!checkKey) {
-      return new NextResponse('Task checkKey is required', { status: 400 });
+      return NextResponse.json({ message: 'Task checkKey is required' }, { status: 400 });
     }
 
     const [user, task] = await Promise.all([
@@ -486,8 +542,8 @@ export async function POST(request: NextRequest) {
       prisma.task.findUnique({ where: { checkKey } }),
     ]);
 
-    if (!user) return new NextResponse('User not found', { status: 404 });
-    if (!task) return new NextResponse('Task not found', { status: 404 });
+    if (!user) return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    if (!task) return NextResponse.json({ message: 'Task not found' }, { status: 404 });
 
     const todayUTC = getStartOfUTCDay();
     const existingCompletion = await prisma.userTaskCompletion.findFirst({
@@ -534,9 +590,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Invalid token" }, { status: 401 });
     }
     if (error instanceof SyntaxError && error.message.includes('Unexpected token')) {
-      return NextResponse.json({ message: 'server error, try again' }, { status: 500 });
+      return NextResponse.json({ message: 'Failed to verify task due to an external service issue. Please try again later.' }, { status: 500 });
     }
     console.error("Failed to verify task:", error);
-    return new NextResponse('Error verifying task', { status: 500 });
+    return NextResponse.json({ message: 'Error verifying task' }, { status: 500 });
   }
 }

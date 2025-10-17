@@ -12,6 +12,7 @@ type UserProfile = {
   pfpUrl: string | null;
   streak: number;
   level: number;
+  highScore: number;
   totalClaimed: string; // Decimal is stringified
   totalPoints: string;   // BigInt is stringified
   weeklyPoints: string;  // BigInt is stringified
@@ -30,7 +31,7 @@ type UserContextType = {
   fid: number | null;
   userProfile: UserProfile | null;
   isLoading: boolean;
-  refetchUserProfile: () => void;
+  refetchUserProfile: () => Promise<UserProfile | null>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -40,12 +41,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUserProfile = useCallback(async (currentFid: number) => {
+  const fetchUserProfile = useCallback(async (currentFid: number, onSuccess?: () => void) => {
     try {
       const response = await fetch(`/api/user/profile?fid=${currentFid}`);
       if (response.ok) {
         const profileData = await response.json();
         setUserProfile(profileData);
+        if (onSuccess) {
+          onSuccess();
+        }
+        return profileData;
       } else {
         console.error("Failed to fetch user profile:", response.statusText);
         setUserProfile(null);
@@ -54,6 +59,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       console.error("Error fetching user profile:", error);
       setUserProfile(null);
     }
+    return null;
   }, []);
 
   useEffect(() => {
@@ -74,16 +80,21 @@ export function UserProvider({ children }: { children: ReactNode }) {
     getFarcasterUser();
   }, [fetchUserProfile]);
 
-  const refetchUserProfile = useCallback(() => {
+  const refetchUserProfile = useCallback(async () => {
     if (fid) {
-      fetchUserProfile(fid);
+      return await fetchUserProfile(fid);
     }
+    return null;
   }, [fid, fetchUserProfile]);
 
   const value = { fid, userProfile, isLoading, refetchUserProfile };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
+
+type UseUserOptions = {
+  onSuccess?: () => void;
+};
 
 export function useUser() {
   const context = useContext(UserContext);

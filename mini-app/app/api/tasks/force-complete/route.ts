@@ -45,8 +45,10 @@ const allowedCheckKeys = [
   'LUMA_FOLLOW_ENB',
   'TELEGRAM_JOIN_ENB',
   'X_FOLLOW_ENB',
+  'X_FOLLOW_ENB_APPS',
   'DISCORD_JOIN_ENB',
   'CREATORX_FOLLOW_FOUNDER',
+  'SCORELINE_TOURNAMENT_JOIN',
 ];
 
 export async function POST(request: NextRequest) {

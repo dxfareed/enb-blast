@@ -27,10 +27,34 @@ const GAME_CONTRACT_ABI = [
         "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
         "stateMutability": "view",
         "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "cooldownPeriod",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
     }
 ] as const;
 
 const client = createClient();
+
+// --- OPTIMIZATION ---
+// These values are constant on the contract, so we fetch them once when the serverless function
+// starts up (or on the first request) and reuse them. This reduces RPC calls by 66%.
+const maxClaimsPromise = publicClient.readContract({
+    address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'maxClaimsPerCycle',
+});
+
+const cooldownPeriodPromise = publicClient.readContract({
+    address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
+    abi: GAME_CONTRACT_ABI,
+    functionName: 'cooldownPeriod',
+});
+// --------------------
+
 
 function getUrlHost(request: NextRequest): string {
     const origin = request.headers.get("origin");
@@ -56,43 +80,57 @@ export async function GET(req: NextRequest) {
     });
     const userFid = BigInt(payload.sub);
 
-    const [onChainProfile, maxClaims] = await Promise.all([
+    // Now we only need to make ONE call to the RPC for user-specific data.
+    const [onChainProfile, maxClaims, cooldownPeriod] = await Promise.all([
         publicClient.readContract({
             address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
             abi: GAME_CONTRACT_ABI,
             functionName: 'getUserProfile',
             args: [userFid]
         }),
-        publicClient.readContract({
-            address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
-            abi: GAME_CONTRACT_ABI,
-            functionName: 'maxClaimsPerCycle',
-        })
+        maxClaimsPromise, // Reuse the promise from outside the handler
+        cooldownPeriodPromise // Reuse the promise from outside the handler
     ]);
 
     if (!onChainProfile.isRegistered) {
         return NextResponse.json({ message: "User not registered onchain" }, { status: 404 });
     }
 
-    const cooldownPeriod = BigInt(12 * 60 * 60); // 12 hours in seconds
-    const claimsLeft = Number(maxClaims) - Number(onChainProfile.claimsInCurrentCycle);
+    const claimsMade = onChainProfile.claimsInCurrentCycle;
+    
+    let claimsLeft = Number(maxClaims) - Number(claimsMade);
     let isOnCooldown = false;
     let resetsAt: string | null = null;
-
-    if (onChainProfile.claimsInCurrentCycle >= maxClaims) {
+    
+    // Cooldown logic is applied only when the user has exhausted their claims for the cycle.
+    if (claimsLeft <= 0) {
         const now = BigInt(Math.floor(Date.now() / 1000));
         const cooldownEndTime = onChainProfile.lastClaimTimestamp + cooldownPeriod;
-        if (now < cooldownEndTime) {
+
+        // Check if the cooldown period is still active.
+        if (onChainProfile.lastClaimTimestamp > 0 && now < cooldownEndTime) {
             isOnCooldown = true;
             resetsAt = new Date(Number(cooldownEndTime) * 1000).toISOString();
+            claimsLeft = 0; // No claims available during cooldown.
+        } else {
+            // Cooldown is over. The user's claims are effectively replenished.
+            // The contract will reset the on-chain counter during the next claim transaction.
+            // For a better UX, we tell the frontend the user has all their claims back now.
+            isOnCooldown = false;
+            claimsLeft = Number(maxClaims);
+            resetsAt = null;
         }
     }
-    
-    // If the cooldown has passed, the number of claims left is the max
-    const finalClaimsLeft = isOnCooldown ? 0 : (claimsLeft > 0 ? claimsLeft : Number(maxClaims));
+
+    console.log('API Claim Status:', { // DEBUG LOG
+        claimsLeft: claimsLeft < 0 ? 0 : claimsLeft,
+        isOnCooldown,
+        resetsAt,
+        maxClaims: Number(maxClaims)
+    });
 
     return NextResponse.json({
-        claimsLeft: finalClaimsLeft,
+        claimsLeft: claimsLeft < 0 ? 0 : claimsLeft, // Ensure claimsLeft isn't negative
         isOnCooldown,
         resetsAt,
         maxClaims: Number(maxClaims)
