@@ -138,30 +138,35 @@ export async function POST(req: NextRequest) {
     });
 
     let newStreak = user.streak;
-    if (lastGameSession && lastGameSession.endTime) {
-      const lastGameDate = lastGameSession.endTime;
-      
-      // Get the UTC date part (YYYY-MM-DD)
-      const lastGameDay = lastGameDate.toISOString().split('T')[0];
-      const currentDay = endTime.toISOString().split('T')[0];
+    const currentDay = endTime.toISOString().split('T')[0];
 
+    if (!lastGameSession?.endTime) {
+      // First game ever for this user
+      newStreak = 1;
+    } else {
+      const lastGameDay = lastGameSession.endTime.toISOString().split('T')[0];
+      
       if (currentDay > lastGameDay) {
-        // Check if the day is consecutive
+        // This is the first game on a new day.
         const lastGameDayDate = new Date(lastGameDay);
         lastGameDayDate.setUTCDate(lastGameDayDate.getUTCDate() + 1);
         const consecutiveDay = lastGameDayDate.toISOString().split('T')[0];
 
         if (currentDay === consecutiveDay) {
-          newStreak += 1; // Increment streak for consecutive days
+          newStreak = user.streak + 1; // Increment streak for consecutive days
         } else {
           newStreak = 1; // Reset streak if not consecutive
         }
+      } else {
+        // This is a subsequent game on the same day.
+        // If the user's streak was 0, this play should make it 1.
+        if (newStreak === 0) {
+            newStreak = 1;
+        }
       }
-      // If it's the same day, do nothing.
-    } else {
-      // First game ever for this user
-      newStreak = 1;
     }
+
+    const isNewHighScore = calculatedScore > user.highScore;
 
     // Use a transaction to ensure both session and user are updated
     await prisma.$transaction([
@@ -179,11 +184,12 @@ export async function POST(req: NextRequest) {
           weeklyPoints: { increment: calculatedScore },
           totalPoints: { increment: calculatedScore },
           streak: newStreak,
+          highScore: isNewHighScore ? calculatedScore : user.highScore,
         },
       })
     ]);
 
-    return NextResponse.json({ score: calculatedScore, pumpkinsCollected }, { status: 200 });
+    return NextResponse.json({ score: calculatedScore, pumpkinsCollected, isNewHighScore }, { status: 200 });
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {
         return NextResponse.json({ message: "Invalid token" }, { status: 401 });

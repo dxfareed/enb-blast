@@ -23,6 +23,7 @@ model User {
   totalClaimed         Decimal              @default(0)
   createdAt            DateTime             @default(now())
   totalPoints          BigInt               @default(0)
+  highScore            Int                  @default(0)
   weeklyPoints         BigInt               @default(0)
   lastClaimedAt        DateTime?
   claimsToday          Int                  @default(0)

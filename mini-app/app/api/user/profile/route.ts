@@ -115,13 +115,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setUTCDate(now.getUTCDate() - 1);
-    if (user.streak > 0 && user.lastClaimedAt && !isSameDay(user.lastClaimedAt, now) && !isSameDay(user.lastClaimedAt, yesterday)) {
-      user = await prisma.user.update({ where: { id: user.id }, data: { streak: 0 } });
-    }
-
     const allUsers = await prisma.user.findMany({ orderBy: { weeklyPoints: 'desc' } });
     const userRank = allUsers.findIndex((u) => u.id === user.id) + 1;
     

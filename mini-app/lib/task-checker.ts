@@ -19,21 +19,25 @@ const checkers: Record<string, Checker> = {
     });
     return !!airdropClaim;
   },
-  has_claimed_tokens: async (fid) => {
+  HIGH_SCORE_500_PLUS: async (fid) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const airdropClaim = await prisma.claim.findFirst({
+    const gameSession = await prisma.gameSession.findFirst({
       where: {
         user: {
           fid,
         },
-        timestamp: {
+        endTime: {
           gte: today,
         },
+        score: {
+          gte: 500,
+        },
+        status: 'COMPLETED',
       },
     });
-    return !!airdropClaim;
+    return !!gameSession;
   },
   has_visited_leaderboard: async (fid) => {
     const today = new Date();

@@ -99,7 +99,7 @@ function getNotificationContent() {
       title = `Rewards go out in 23 hours!`;
       body = `Keep blasting $ENBs for the top of the leaderboard.`;
     } else {
-      title = `ENB Rewards go out in ${daysRemaining} days!`;
+      title = `Rewards go out in ${daysRemaining} days!`;
       body = `Keep blasting $ENBs for the top of the leaderboard.`;
     }
   }

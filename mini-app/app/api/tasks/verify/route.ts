@@ -299,6 +299,10 @@ const taskCheckers = {
     return !!visitEvent;
   },
 
+  HIGH_SCORE_500_PLUS: async (user: { highScore: number; }) => {
+    return user.highScore >= 500;
+  },
+
   MAX_OUT_DAILY_CLAIMS: async (user: { fid: bigint; }) => {
     try {
       const [onChainProfile, maxClaims] = await Promise.all([
@@ -530,7 +534,7 @@ export async function POST(request: NextRequest) {
     const { checkKey } = await request.json();
 
     if (!checkKey) {
-      return new NextResponse('Task checkKey is required', { status: 400 });
+      return NextResponse.json({ message: 'Task checkKey is required' }, { status: 400 });
     }
 
     const [user, task] = await Promise.all([
@@ -538,8 +542,8 @@ export async function POST(request: NextRequest) {
       prisma.task.findUnique({ where: { checkKey } }),
     ]);
 
-    if (!user) return new NextResponse('User not found', { status: 404 });
-    if (!task) return new NextResponse('Task not found', { status: 404 });
+    if (!user) return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    if (!task) return NextResponse.json({ message: 'Task not found' }, { status: 404 });
 
     const todayUTC = getStartOfUTCDay();
     const existingCompletion = await prisma.userTaskCompletion.findFirst({
@@ -589,6 +593,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Failed to verify task due to an external service issue. Please try again later.' }, { status: 500 });
     }
     console.error("Failed to verify task:", error);
-    return new NextResponse('Error verifying task', { status: 500 });
+    return NextResponse.json({ message: 'Error verifying task' }, { status: 500 });
   }
 }

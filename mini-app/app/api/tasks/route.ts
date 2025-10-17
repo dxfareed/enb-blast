@@ -62,9 +62,9 @@ export async function GET(request: Request) {
 
     const tasksWithStatus = allTasks.map(task => {
       let isCompleted = false;
-      if (task.type === 'DEFAULT') {
+      if (task.type === 'DEFAULT' || task.type === 'PARTNER') {
         isCompleted = userCompletions.some(c => c.taskId === task.id);
-      } else {
+      } else { // DAILY tasks
         isCompleted = userCompletions.some(c => 
           c.taskId === task.id && c.completedAt >= todayUTC
         );

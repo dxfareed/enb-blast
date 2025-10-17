@@ -12,6 +12,7 @@ type UserProfile = {
   pfpUrl: string | null;
   streak: number;
   level: number;
+  highScore: number;
   totalClaimed: string; // Decimal is stringified
   totalPoints: string;   // BigInt is stringified
   weeklyPoints: string;  // BigInt is stringified
@@ -30,7 +31,7 @@ type UserContextType = {
   fid: number | null;
   userProfile: UserProfile | null;
   isLoading: boolean;
-  refetchUserProfile: () => void;
+  refetchUserProfile: () => Promise<UserProfile | null>;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -49,6 +50,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (onSuccess) {
           onSuccess();
         }
+        return profileData;
       } else {
         console.error("Failed to fetch user profile:", response.statusText);
         setUserProfile(null);
@@ -57,6 +59,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       console.error("Error fetching user profile:", error);
       setUserProfile(null);
     }
+    return null;
   }, []);
 
   useEffect(() => {
@@ -77,10 +80,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
     getFarcasterUser();
   }, [fetchUserProfile]);
 
-  const refetchUserProfile = useCallback(() => {
+  const refetchUserProfile = useCallback(async () => {
     if (fid) {
-      fetchUserProfile(fid);
+      return await fetchUserProfile(fid);
     }
+    return null;
   }, [fid, fetchUserProfile]);
 
   const value = { fid, userProfile, isLoading, refetchUserProfile };
@@ -92,22 +96,10 @@ type UseUserOptions = {
   onSuccess?: () => void;
 };
 
-export function useUser(options?: UseUserOptions) {
+export function useUser() {
   const context = useContext(UserContext);
   if (context === undefined) {
     throw new Error('useUser must be used within a UserProvider');
   }
-
-  // Re-fetch user profile when the hook is used with an onSuccess callback
-  useEffect(() => {
-    if (options?.onSuccess && context.fid) {
-      // This is a bit of a workaround to trigger a fetch when the component using the hook mounts
-      // and provides an onSuccess callback.
-      // A more robust solution might involve a more complex state management pattern.
-      context.refetchUserProfile();
-    }
-  }, []);
-
-
   return context;
 }

@@ -11,10 +11,27 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { useMiniApp } from '@neynar/react';
 import AddAppBanner from '@/app/components/AddAppBanner';
 import ApologyModal from '@/app/components/ApologyModal';
+import NewHighScoreAnimation from '@/app/components/NewHighScoreAnimation';
 
 export default function GamePage() {
     const router = useRouter();
     const [showApologyModal, setShowApologyModal] = useState(false);
+    const [showHighScoreAnimation, setShowHighScoreAnimation] = useState(false);
+    const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowSize({
+                width: window.innerWidth,
+                height: window.innerHeight,
+            });
+        };
+
+        window.addEventListener('resize', handleResize);
+        handleResize(); // Set initial size
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         const hasSeenModal = localStorage.getItem('hasSeenApologyModal');
@@ -32,6 +49,13 @@ export default function GamePage() {
     };
 
     const { userProfile, fid, refetchUserProfile } = useUser();
+    const [highScore, setHighScore] = useState(0);
+
+    useEffect(() => {
+        if (userProfile) {
+            setHighScore(userProfile.highScore || 0);
+        }
+    }, [userProfile]);
 
     useEffect(() => {
         if (userProfile && userProfile.registrationStatus !== 'ACTIVE') {
@@ -154,13 +178,18 @@ export default function GamePage() {
                 console.log('Server response:', responseData);
 
                 if (response.ok) {
-                    const { score, pumpkinsCollected } = responseData;
+                    const { score, pumpkinsCollected, isNewHighScore } = responseData;
                     setFinalScore(score);
                     setPumpkinsCollected(pumpkinsCollected);
-                    setIsEndingGame(false);
-                    // Invalidate queries to refetch leaderboard data with the new score
+                    
                     queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
-                    refetchUserProfile();
+                    const updatedProfile = await refetchUserProfile();
+                    if (isNewHighScore && updatedProfile?.highScore) {
+                        setHighScore(updatedProfile.highScore);
+                        setShowHighScoreAnimation(true);
+                    }
+                    
+                    setIsEndingGame(false);
                     return; 
                 }
 
@@ -202,6 +231,7 @@ export default function GamePage() {
                 onGameWin={handleGameWin}
                 onStartGame={handleStartGame}
                 displayScore={finalScore}
+                highScore={highScore}
                 isMuted={isMuted}
                 onToggleMute={toggleMute}
                 handleShareScoreFrame={handleShareScoreFrame}
@@ -209,6 +239,7 @@ export default function GamePage() {
                 isStartingGame={isStartingGame}
                 isEndingGame={isEndingGame}
                 isGameWon={isGameWon}
+                onAnimationComplete={() => setShowHighScoreAnimation(false)}
             />
         </div>
     );

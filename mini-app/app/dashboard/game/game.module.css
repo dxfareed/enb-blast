@@ -69,6 +69,7 @@
   justify-content: center;
   text-align: center;
   z-index: 10;
+  padding-top: 1.5rem;
 }
 
 .overlay h2 {
@@ -219,7 +220,7 @@
 
 .muteButtonContainer {
     position: absolute;
-    bottom: 0.7rem;
+    top: 0.5rem;
     right: 0.5rem;
     z-index: 20;
     display: flex;
@@ -263,4 +264,73 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.startButton {
+  background-color: #FBBF24; /* Light yellow */
+  color: #000;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.startButton:active {
+  transform: scale(0.98);
+}
+
+.powerupsSection {
+  margin-top: 3.5rem;
+  width: 100%;
+  padding: 0 1rem;
+}
+
+.powerupsTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.75rem 0;
+  /* text-transform: uppercase; */
+  letter-spacing: 0.05em;
+}
+
+.powerupsContainer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.powerupButton {
+  background-color: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 1rem;
+  width: 60px;
+  height: 60px;
+  font-size: 2rem;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  color: white;
+  line-height: 1;
+}
+
+.powerupButton:active {
+  transform: scale(0.95);
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.powerupButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.finalScore {
+  font-size: 50px;
+  font-weight: 700;
+  margin: 0.5rem 0 1.5rem 0;
+  line-height: 1;
 }

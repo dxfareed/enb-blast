@@ -210,6 +210,15 @@ export default function TasksPage() {
 
         if (!response.ok) {
           const errorData = await response.json();
+          if (response.status === 409) { // Task already completed
+            setTasks(prevTasks =>
+              prevTasks.map(t =>
+                t.id === task.id ? { ...t, completed: true } : t
+              )
+            );
+            setCheckingTaskId(null);
+            return;
+          }
           if (response.status === 418) {
             setToast({ message: errorData.message, type: 'info' });
             setCheckingTaskId(null);

@@ -8,19 +8,20 @@ import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
 import DidYouKnow from './DidYouKnow';
 import { BASE_BLOCKCHAIN_FACTS } from '@/app/utils/constants';
+import NewHighScoreAnimation from './NewHighScoreAnimation';
 
 const GAME_DURATION = 30;
 
 // Game balance constants
-const INITIAL_SPAWN_RATE = 280;
-const INITIAL_BOMB_SPEED = 5.4;
-const INITIAL_PICTURE_SPEED = 5.6;
-const INITIAL_BOMB_CHANCE = 0.21;
+const INITIAL_SPAWN_RATE = 290;
+const INITIAL_BOMB_SPEED = 5;
+const INITIAL_PICTURE_SPEED = 5;
+const INITIAL_BOMB_CHANCE = 0.1;
 
-const FINAL_SPAWN_RATE = 250;
+const FINAL_SPAWN_RATE = 230;
 const FINAL_BOMB_SPEED = 8.6;
 const FINAL_PICTURE_SPEED = 8.8;
-const FINAL_BOMB_CHANCE = 0.48;
+const FINAL_BOMB_CHANCE = 0.31;
 
 // Item URLs and values
 const PICTURE_URL = "/Enb_000.png";
@@ -55,6 +56,7 @@ type GameEngineProps = {
   onGameWin: (events: GameEvent[]) => void;
   onStartGame: () => Promise<boolean>;
   displayScore: number;
+  highScore: number;
   isMuted: boolean;
   onToggleMute: () => void;
   handleShareScoreFrame: () => void;
@@ -62,6 +64,7 @@ type GameEngineProps = {
   isStartingGame: boolean;
   isEndingGame: boolean;
   isGameWon: boolean;
+  onAnimationComplete: () => void;
 };
 
 export type GameEngineHandle = { resetGame: () => void; };
@@ -80,17 +83,19 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
   return !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
 }
 
-const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({ 
-  onGameWin, 
+const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
+  onGameWin,
   onStartGame,
-  displayScore, 
-  isMuted, 
-  onToggleMute, 
+  displayScore,
+  highScore,
+  isMuted,
+  onToggleMute,
   handleShareScoreFrame,
   handleTryAgain,
   isStartingGame,
   isEndingGame,
-  isGameWon
+  isGameWon,
+  onAnimationComplete
 }, ref) => {
   const [items, setItems] = useState<Item[]>([]);
   const [score, setScore] = useState(0);
@@ -103,6 +108,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
   const isProcessingBombHit = useRef(false);
+  const [showNewHighScoreAnimation, setShowNewHighScoreAnimation] = useState(false);
+  const [gameAreaDimensions, setGameAreaDimensions] = useState({ width: 0, height: 0 });
 
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -125,6 +132,25 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
 
   useEffect(() => {
+    if (gameAreaRef.current) {
+      setGameAreaDimensions({
+        width: gameAreaRef.current.offsetWidth,
+        height: gameAreaRef.current.offsetHeight,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (displayScore > highScore) {
+      setShowNewHighScoreAnimation(true);
+      const timer = setTimeout(() => {
+        setShowNewHighScoreAnimation(false);
+      }, 6000); 
+      return () => clearTimeout(timer);
+    }
+  }, [displayScore, highScore]);
+
+  useEffect(() => {
     const imageUrls = [
       '/bomb.png', PICTURE_URL, CAP_PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
       POWER_UP_POINT_2_URL, POWER_UP_PUMPKIN_URL, avatarPfp
@@ -143,13 +169,24 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     backgroundSoundRef.current = new Audio('/sounds/background.mp3');
     gameOverSoundRef.current = new Audio('/sounds/game-over.wav');
     heartbeatSoundRef.current = new Audio('/sounds/heartbeat.wav');
-    
+
     coinSoundRef.current.volume = 0.7;
     bombSoundRef.current.volume = 0.5;
     backgroundSoundRef.current.loop = true;
     backgroundSoundRef.current.volume = 0.3;
     gameOverSoundRef.current.volume = 0.6;
     heartbeatSoundRef.current.volume = 0.8;
+
+    return () => {
+        const sounds = [coinSoundRef, bombSoundRef, backgroundSoundRef, gameOverSoundRef, heartbeatSoundRef];
+        sounds.forEach(soundRef => {
+            if (soundRef.current) {
+                soundRef.current.pause();
+                soundRef.current.src = '';
+                soundRef.current = null;
+            }
+        });
+    };
   }, []);
 
   const resetGame = useCallback(() => {
@@ -177,9 +214,9 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     const success = await onStartGame();
     if (success) {
       setGameState('playing');
-      if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => {}).then(() => coinSoundRef.current?.pause()); }
-      if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => {}).then(() => bombSoundRef.current?.pause()); }
-      if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => {}).then(() => gameOverSoundRef.current?.pause()); }
+      if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => { }).then(() => coinSoundRef.current?.pause()); }
+      if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => { }).then(() => bombSoundRef.current?.pause()); }
+      if (gameOverSoundRef.current?.paused) { gameOverSoundRef.current.play().catch(() => { }).then(() => gameOverSoundRef.current?.pause()); }
     }
   };
 
@@ -197,7 +234,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     let newX = e.clientX - gameRect.left;
     let newY = e.clientY - gameRect.top;
     newX = Math.max(avatarHalfWidth, Math.min(newX, gameRect.width - avatarHalfWidth));
-    newY = Math.max(avatarHalfHeight, Math.min(newY, gameRect.height - avatarHalfHeight));
+    newY = Math.max(avatarHalfHeight, Math.min(newY, gameRect.height - avatarHalfHeight - 80));
     setAvatarPosition({ x: newX, y: newY });
   };
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -274,7 +311,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           const { bombChance } = gameParamsRef.current;
           let itemType: ItemType = 'picture';
           let imageUrl: string | undefined = undefined;
-          
+
           const pumpkinThreshold = bombChance + POWER_UP_PUMPKIN_CHANCE;
           const p10Threshold = pumpkinThreshold + POWER_UP_POINT_10_CHANCE;
           const p5Threshold = p10Threshold + POWER_UP_POINT_5_CHANCE;
@@ -285,7 +322,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           else if (rand < p10Threshold) itemType = 'powerup_point_10';
           else if (rand < p5Threshold) itemType = 'powerup_point_5';
           else if (rand < p2Threshold) itemType = 'powerup_point_2';
-          
+
           if (itemType === 'picture') {
             imageUrl = Math.random() < 0.5 ? PICTURE_URL : CAP_PICTURE_URL;
           }
@@ -295,16 +332,20 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         }
 
         // --- FIX: Reverted this line to match the stable version ---
-        let processedItems = currentItems
-          .map(item => ({ ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) }))
-          .filter(item => item.y < 500);
+        let processedItems = currentItems.reduce((acc: Item[], item: Item) => {
+          const newItem = { ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) };
+          if (newItem.y < gameAreaDimensions.height + 60) {
+            acc.push(newItem);
+          }
+          return acc;
+        }, []);
 
         if (avatarRef.current) {
           const avatarRect = avatarRef.current.getBoundingClientRect();
           let bombCollisionItem: Item | null = null;
           const remainingItems = processedItems.filter(item => {
             if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
-            
+
             if (item.type === 'bomb') {
               if (!isInvincibleRef.current) bombCollisionItem = item;
             } else {
@@ -315,7 +356,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               }
               sdk.haptics.impactOccurred('soft');
               let points = 0;
-              switch(item.type) {
+              switch (item.type) {
                 case 'picture': points = BASE_PICTURE_VALUE; break;
                 case 'powerup_point_2': points = POWER_UP_POINT_2_VALUE; break;
                 case 'powerup_point_5': points = POWER_UP_POINT_5_VALUE; break;
@@ -325,7 +366,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               setScore(prev => prev + points);
               const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
               setFloatingScores(prev => [...prev, newFloatingScore]);
-              setTimeout(() => setFloatingScores(prev => prev.filter(s => s.id !== newFloatingScore.id)), 1600);
             }
             return false;
           });
@@ -333,13 +373,13 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           if (bombCollisionItem) {
             if (!isProcessingBombHit.current) {
               isProcessingBombHit.current = true;
-              
+
               gameEventsRef.current.push({ type: 'bomb_hit', timestamp: Date.now() });
               bombSoundRef.current?.play().catch(e => console.error(e));
               sdk.haptics.impactOccurred('heavy');
               setIsBombHit(true);
               setTimeout(() => setIsBombHit(false), 500);
-              
+
               const { x, y } = bombCollisionItem;
               setScore(prev => {
                 const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
@@ -347,7 +387,6 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 if (pointsDeducted > 0) {
                   const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
                   setFloatingScores(prevScores => [...prevScores, newFloatingScore]);
-                  setTimeout(() => setFloatingScores(prevScores => prevScores.filter(s => s.id !== newFloatingScore.id)), 1600);
                 }
                 return newScore;
               });
@@ -384,6 +423,10 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     }
   }, [gameState, onGameWin, isGameOverSoundPlayed]);
 
+  const handleFloatingScoreAnimationEnd = (id: number) => {
+    setFloatingScores(prev => prev.filter(s => s.id !== id));
+  };
+
   const renderItem = (item: Item) => {
     switch (item.type) {
       case 'bomb': return <img src="/bomb.png" alt="Bomb" className={gameStyles.itemImage} />;
@@ -398,14 +441,15 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   return (
     <>
+      {showNewHighScoreAnimation && <NewHighScoreAnimation onAnimationComplete={onAnimationComplete} width={gameAreaDimensions.width} height={gameAreaDimensions.height} />}
       <div className={gameStyles.gameStats}>
         <span>Score: <strong>{score.toLocaleString()}</strong></span>
-        <span>Time Left: <strong>{timeLeft}s</strong></span>
+        <span>Time: <strong>{timeLeft}s</strong></span>
+        <span>Best: <strong>{highScore.toLocaleString()}</strong></span>
       </div>
       <div
         ref={gameAreaRef}
         className={`${gameStyles.gameArea} ${isBombHit ? gameStyles.bombHitEffect : ''} ${isGameWon ? gameStyles.gameOverBlur : ''}`}
-        onClick={gameState === 'idle' ? startGame : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -430,9 +474,18 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   <h2>blast ENBS</h2>
                   <p>
                     Drag your avatar to collect.<br />Avoid the Wormhole ENBs!
-                    <br /><br />
-                    Click to Start
                   </p>
+                  <button onClick={startGame} className={gameStyles.startButton}>
+                    Click to Start
+                  </button>
+                  <div className={gameStyles.powerupsSection}>
+                    <h3 className={gameStyles.powerupsTitle}><del>Power Ups</del></h3>
+                    <div className={gameStyles.powerupsContainer}>
+                      <button className={gameStyles.powerupButton} disabled>🧲</button>
+                      <button className={gameStyles.powerupButton} disabled>🛡️</button>
+                      <button className={gameStyles.powerupButton} disabled>⏰</button>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
@@ -450,20 +503,22 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
             ) : (
               <>
                 <h2>Game Over!</h2>
-                <p>Your final score: {(displayScore).toLocaleString()}</p>
+                <p>Your final score is:</p>
+                <h4><span className={gameStyles.finalScore}>{(displayScore).toLocaleString()}</span></h4>
+                <p>Best Score: {highScore.toLocaleString()}</p>
                 <div className={gameStyles.overlayButtonContainer}>
-                    <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
-                        Play Again
-                    </button>
-                    <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
-                        Share Score
-                    </button>
+                  <button onClick={handleTryAgain} className={`${gameStyles.overlayButton} ${gameStyles.tryAgainButtonRed}`}>
+                    Play Again
+                  </button>
+                  <button onClick={handleShareScoreFrame} className={`${gameStyles.overlayButton} ${gameStyles.shareButton}`}>
+                    Share Score
+                  </button>
                 </div>
               </>
             )}
           </div>
         )}
-        
+
         {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />}
 
         {items.map(item => (
@@ -481,6 +536,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
             key={score.id}
             className={`${gameStyles.floatingScore} ${score.points < 0 ? gameStyles.floatingScoreNegative : ''}`}
             style={{ top: `${score.y}px`, left: `${score.x}px` }}
+            onAnimationEnd={() => handleFloatingScoreAnimationEnd(score.id)}
           >
             {score.points > 0 ? `+${score.points}` : score.points}
           </div>

@@ -21,8 +21,8 @@ const getRankStyling = (rank: number) => {
   if (rank === 1) return styles.rank1;
   if (rank === 2) return styles.rank2;
   if (rank === 3) return styles.rank3;
-  if (rank >= 4 && rank <= 8) return styles.rankSuperBased;
-  if (rank >= 9 && rank <= 15) return styles.rankBased;
+  if (rank === 4 || rank === 5) return styles.rank4_5_purple;
+  if (rank >= 6 && rank <= 10) return styles.rank6_10_blue;
   return styles.rankDefault;
 };
 
@@ -139,16 +139,24 @@ export default function LeaderboardPage() {
             {activeTab === 'rewards' && (
               <div className={styles.tabContent}>
                 <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.legendaryText}`}>Legendary 1 - 3</p>
-                  <p className={styles.tierReward}>26k $CAP</p>
+                  <p className={`${styles.tierRank} ${styles.legendaryText}`}>1st Place</p>
+                  <p className={styles.tierReward}>90,000 $CAP</p>
                 </div>
                 <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.superBasedText}`}>SuperBased 4 - 10</p>
-                  <p className={styles.tierReward}>17k $CAP</p>
+                  <p className={`${styles.tierRank} ${styles.superBasedText}`}>2nd Place</p>
+                  <p className={styles.tierReward}>60,000 $CAP</p>
                 </div>
                 <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.basedText}`}>Based 11 - 15</p>
-                  <p className={styles.tierReward}>8k $CAP</p>
+                  <p className={`${styles.tierRank} ${styles.basedText}`}>3rd Place</p>
+                  <p className={styles.tierReward}>40,000 $CAP</p>
+                </div>
+                <div className={styles.tier}>
+                  <p className={styles.tierRank}>4th/5th Place</p>
+                  <p className={styles.tierReward}>15,000 $CAP</p>
+                </div>
+                <div className={styles.tier}>
+                  <p className={styles.tierRank}>6th-10th Place</p>
+                  <p className={styles.tierReward}>6,000 $CAP</p>
                 </div>
               </div>
             )}
@@ -177,7 +185,7 @@ export default function LeaderboardPage() {
             >
               {user.rank && (
                 <div className={`${styles.rankCircle} ${getRankStyling(user.rank)}`}>
-                  {user.rank}
+                  {user.rank === 1 ? '🏆' : user.rank}
                 </div>
               )}
               <img
@@ -202,7 +210,7 @@ export default function LeaderboardPage() {
         <div className={styles.currentUserFooter}>
            {myRank.rank && (
               <div className={`${styles.rankCircle} ${getRankStyling(myRank.rank)}`}>
-                  {myRank.rank}
+                  {myRank.rank === 1 ? '🏆' : myRank.rank}
               </div>
             )}
               <img

@@ -1,5 +1,4 @@
 .container {
-  min-height: 100vh;
   display: flex;
   justify-content: center;
   background-color: #1f2937;
@@ -14,6 +13,7 @@
   flex-direction: column;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   position: relative;
+  min-height: 100vh;
 }
 
 .header {
@@ -47,7 +47,9 @@
 
 .mainGame {
   padding: 0;
-  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
 }
 
 .navigation {
