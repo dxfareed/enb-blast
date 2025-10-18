@@ -2,30 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Errors, createClient } from "@farcaster/quick-auth";
 import prisma from '@/lib/prisma';
 import { isFidRestricted } from '@/lib/restricted-fids';
-
-// Server-side authoritative values
-const ITEM_VALUES = {
-  picture: 5,
-  powerup_point_2: 10,
-  powerup_point_5: 15,
-  powerup_point_10: 30,
-  powerup_pumpkin: 500,
-};
-
-const GAME_DURATION_SECONDS = 30;
-const GRACE_PERIOD_SECONDS = 20;
-const MAX_EVENTS_PER_SECOND = 5; // Max items a user can plausibly collect per second
+import * as GameConfig from '@/lib/gameConfig';
 
 const client = createClient();
 
 // Define types locally on the server to avoid dependency on client-side code
-type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin';
+type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin' | 'magnet' | 'shield' | 'time';
 type GameEvent = {
   type: 'collect';
   itemType: ItemType;
   timestamp: number;
 } | {
-  type: 'bomb_hit';
+  type: 'bomb_collision';
+  timestamp: number;
+} | {
+  type: 'time_extend';
+  duration: number;
   timestamp: number;
 };
 
@@ -83,8 +75,33 @@ export async function POST(req: NextRequest) {
     const endTime = new Date();
     const durationSeconds = (endTime.getTime() - startTime.getTime()) / 1000;
 
+    // --- Securely calculate time extensions ---
+    let totalTimeExtended = 0;
+    let timePowerUpsCollected = 0;
+    let timeExtendEvents = 0;
+
+    for (const event of events) {
+      if (event.type === 'collect' && event.itemType === 'time') {
+        timePowerUpsCollected++;
+      }
+      if (event.type === 'time_extend') {
+        // Use server-authoritative value, not client-provided duration
+        totalTimeExtended += GameConfig.TIME_EXTENSION_SECONDS; 
+        timeExtendEvents++;
+      }
+    }
+
+    // --- Security Check: Event Mismatch ---
+    if (timePowerUpsCollected !== timeExtendEvents) {
+      await prisma.gameSession.update({
+        where: { id: sessionId },
+        data: { status: 'INVALID_SCORE', score: 0, endTime },
+      });
+      return NextResponse.json({ message: 'Mismatch between collected time power-ups and time extension events.' }, { status: 400 });
+    }
+
     // --- Security Check: Session Duration ---
-    if (durationSeconds > GAME_DURATION_SECONDS + GRACE_PERIOD_SECONDS) {
+    if (durationSeconds > GameConfig.GAME_DURATION_SECONDS + totalTimeExtended + GameConfig.GRACE_PERIOD_SECONDS) {
       await prisma.gameSession.update({
         where: { id: sessionId },
         data: { status: 'TIMED_OUT', endTime, score: 0 }, // Score is 0 on timeout
@@ -93,8 +110,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ score: 0, pumpkinsCollected: 0, message: 'Game session timed out' }, { status: 200 });
     }
 
+    // --- Security Check: Gameplay Duration from Events ---
+    if (events.length > 0) {
+      const lastEventTimestamp = events.reduce((max, event) => Math.max(max, event.timestamp), 0);
+      const gameplayDurationFromEvents = (lastEventTimestamp - startTime.getTime()) / 1000;
+
+      if (gameplayDurationFromEvents > GameConfig.GAME_DURATION_SECONDS + totalTimeExtended + GameConfig.GRACE_PERIOD_SECONDS) {
+        await prisma.gameSession.update({
+          where: { id: sessionId },
+          data: { status: 'INVALID_SCORE', score: 0, endTime },
+        });
+        return NextResponse.json({ message: 'Gameplay duration based on events is too long.' }, { status: 400 });
+      }
+    }
+
     // --- Security Check: Event Rate ---
-    const maxPossibleEvents = durationSeconds * MAX_EVENTS_PER_SECOND;
+    const maxPossibleEvents = durationSeconds * GameConfig.MAX_EVENTS_PER_SECOND;
     if (events.length > maxPossibleEvents) {
         await prisma.gameSession.update({
             where: { id: sessionId },
@@ -106,22 +137,33 @@ export async function POST(req: NextRequest) {
     // --- Secure Score Calculation ---
     let calculatedScore = 0;
     let pumpkinsCollected = 0;
-    for (const event of events) {
+    let shieldExpiresAt = 0;
+
+    // Sort events by timestamp to process them in order
+    const sortedEvents = events.sort((a, b) => a.timestamp - b.timestamp);
+
+    for (const event of sortedEvents) {
         if (event.type === 'collect') {
-            const itemValue = ITEM_VALUES[event.itemType as keyof typeof ITEM_VALUES];
+            if (event.itemType === 'shield') {
+                shieldExpiresAt = event.timestamp + (GameConfig.SHIELD_DURATION * 1000);
+            }
+
+            const itemValue = GameConfig.ITEM_VALUES[event.itemType as keyof typeof GameConfig.ITEM_VALUES];
             if (itemValue) {
                 calculatedScore += itemValue;
                 if (event.itemType === 'powerup_pumpkin') {
                     pumpkinsCollected += 1;
                 }
             }
-        } else if (event.type === 'bomb_hit') {
-            // Apply the same penalty logic as the client
-            calculatedScore = calculatedScore <= 100 
-                ? Math.floor(calculatedScore * 0.5) 
-                : Math.floor(calculatedScore * 0.4);
-            // On bomb hit, the user loses all pumpkins collected *so far*
-            pumpkinsCollected = 0;
+        } else if (event.type === 'bomb_collision') {
+            // Only apply penalty if the shield is not active at the time of collision
+            if (event.timestamp > shieldExpiresAt) {
+                calculatedScore = calculatedScore <= 100 
+                    ? Math.floor(calculatedScore * 0.5) 
+                    : Math.floor(calculatedScore * 0.4);
+                // On bomb hit, the user loses all pumpkins collected *so far*
+                pumpkinsCollected = 0;
+            }
         }
     }
 

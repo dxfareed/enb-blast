@@ -258,7 +258,14 @@ const taskCheckers = {
   },
 
   GAME_PLAYED: async (user: { id: string; }): Promise<boolean> => {
-    return taskCheckers.TOKEN_CLAIMED(user);
+    const todayUTC = getStartOfUTCDay();
+    const session = await prisma.gameSession.findFirst({
+      where: {
+        userId: user.id,
+        createdAt: { gte: todayUTC },
+      },
+    });
+    return !!session;
   },
 
   TOKEN_CLAIMED: async (user: { id: string; }): Promise<boolean> => {
