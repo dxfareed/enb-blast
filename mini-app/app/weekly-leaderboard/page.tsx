@@ -7,6 +7,7 @@ import styles from "./page.module.css";
 import Image from "next/image";
 import { getWeekIdentifier } from "@/app/utils/time";
 import { sdk } from '@farcaster/miniapp-sdk';
+import { formatScore } from '@/app/utils/format';
 
 interface CurrentUserStats {
   fid: string;
@@ -166,12 +167,12 @@ export default function WeeklyLeaderboardPage() {
                 </div>
                 <div className={styles.statItem}>
                     <span className={styles.statLabel}>Weekly Points</span>
-                    <span className={styles.statValue}>{parseInt(currentUser.weeklyPoints).toLocaleString()}</span>
+                    <span className={styles.statValue}>{formatScore(parseInt(currentUser.weeklyPoints))}</span>
                 </div>
                 <div className={styles.statItem}>
                     <span className={styles.statLabel}>Total Earned</span>
                     <span className={`${styles.statValue} ${styles.earnedValue}`}>
-                        {parseFloat(currentUser.totalClaimed || '0').toLocaleString()} $ENB
+                        {formatScore(parseFloat(currentUser.totalClaimed || '0'))} $ENB
                     </span>
                 </div>
             </div>

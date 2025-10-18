@@ -11,6 +11,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { useMiniApp } from '@neynar/react';
 import AddAppBanner from '@/app/components/AddAppBanner';
 import ApologyModal from '@/app/components/ApologyModal';
+import { formatScore } from '@/app/utils/format';
 import NewHighScoreAnimation from '@/app/components/NewHighScoreAnimation';
 
 export default function GamePage() {
@@ -141,7 +142,7 @@ export default function GamePage() {
             const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&fid=${fid}&revalidate=true`;
             
             const pumpkinText = pumpkinsCollected > 0 ? ' plus a Halloween 🎃 Coin' : '';
-            const castText = `I just scored ${finalScore} points${pumpkinText} in the ENB Blast! Can you beat my score?`;
+            const castText = `I just scored ${formatScore(finalScore)} points${pumpkinText} in the ENB Blast! Can you beat my score?`;
 
             const result = await sdk.actions.composeCast({ text: castText, embeds: [frameUrl] });
 

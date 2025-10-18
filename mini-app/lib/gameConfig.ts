@@ -19,9 +19,11 @@ export const FINAL_PICTURE_SPEED = 8.8;
 export const INITIAL_BOMB_CHANCE = 0.1;
 export const FINAL_BOMB_CHANCE = 0.31;
 export const POWER_UP_PUMPKIN_CHANCE = 0.0005;
-export const POWER_UP_MAGNET_CHANCE = 0.03;
-export const POWER_UP_SHIELD_CHANCE = 0.009;
-export const POWER_UP_TIME_CHANCE = 0.002;
+
+export const POWER_UP_MAGNET_CHANCE = 0//0.009;
+export const POWER_UP_SHIELD_CHANCE = 0//0.009;
+export const POWER_UP_TIME_CHANCE = 0//0.001;
+
 export const POWER_UP_POINT_10_CHANCE = 0.01;
 export const POWER_UP_POINT_5_CHANCE = 0.05;
 export const POWER_UP_POINT_2_CHANCE = 0.1;

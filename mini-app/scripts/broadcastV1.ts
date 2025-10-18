@@ -6,9 +6,10 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-  title: "New week, More Rewards!",
-  body: "Jump back in and complete your daily tasks to earn 250k $CAP!",
+title: "Power ups expires soon!",
+body: "Power ups are active for an hour, Jump back in and set a new high score!",
 };
+
 
 const API_URL = process.env.NEXT_PUBLIC_URL
   ? `${process.env.NEXT_PUBLIC_URL}/api/notify`

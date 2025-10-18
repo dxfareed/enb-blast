@@ -12,6 +12,7 @@ import {
   TOKEN_MEMBERSHIP_LEVELS
 } from '@/app/utils/constants';
 import Loader from '@/app/components/Loader';
+import { formatScore } from '@/app/utils/format';
 import AppListModal from '@/app/components/AppListModal'; // Importing the AppListModal component
 
 type UserProfile = {
@@ -114,7 +115,7 @@ export default function ProfilePage() {
         </div>
         <div className={`${styles.statCard} ${styles.pointsCard}`}>
           <p className={styles.statLabel}>Total Points</p>
-          <p className={styles.statValue}>{Number(userProfile.totalPoints).toLocaleString()}</p>
+          <p className={styles.statValue}>{formatScore(Number(userProfile.totalPoints))}</p>
         </div>
         <div className={`${styles.statCard} ${styles.rankCard}`}>
           <p className={styles.statLabel}>Weekly Rank</p>
@@ -122,7 +123,7 @@ export default function ProfilePage() {
         </div>
         <div className={`${styles.statCard} ${styles.claimedCard}`}>
           <p className={styles.statLabel}>Total Claimed</p>
-          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(userProfile.totalClaimed).toFixed(1)}</p>
+          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {formatScore(Number(userProfile.totalClaimed))}</p>
         </div>
       </div>
 

@@ -13,31 +13,32 @@ datasource db {
 }
 
 model User {
-  id                   String               @id @default(cuid())
-  walletAddress        String               @unique
-  fid                  BigInt               @unique
-  username             String?              @unique
+  id                   String                     @id @default(cuid())
+  walletAddress        String                     @unique
+  fid                  BigInt                     @unique
+  username             String?                    @unique
   pfpUrl               String?
-  streak               Int                  @default(0)
-  level                Int                  @default(1)
-  totalClaimed         Decimal              @default(0)
-  createdAt            DateTime             @default(now())
-  totalPoints          BigInt               @default(0)
-  highScore            Int                  @default(0)
-  weeklyPoints         BigInt               @default(0)
+  streak               Int                        @default(0)
+  level                Int                        @default(1)
+  totalClaimed         Decimal                    @default(0)
+  createdAt            DateTime                   @default(now())
+  totalPoints          BigInt                     @default(0)
+  weeklyPoints         BigInt                     @default(0)
   lastClaimedAt        DateTime?
-  claimsToday          Int                  @default(0)
+  claimsToday          Int                        @default(0)
   lastClaimDate        DateTime?
   claimWindowStart     DateTime?
   lastMultiplierUsedAt DateTime?
-  registrationStatus   RegistrationStatus   @default(PENDING)
+  registrationStatus   RegistrationStatus         @default(PENDING)
   notificationToken    String?
-  verifiedWallets      String[]             @default([])
+  verifiedWallets      String[]                   @default([])
+  highScore            Int                        @default(0)
   claims               Claim[]
   gameSessions         GameSession[]
   events               UserEvent[]
   taskCompletions      UserTaskCompletion[]
   leaderboardHistory   WeeklyLeaderboardHistory[]
+  powerupExpiration    DateTime?
 }
 
 model Claim {
@@ -98,6 +99,21 @@ model GameSession {
   @@index([userId])
 }
 
+model WeeklyLeaderboardHistory {
+  id           String   @id @default(cuid())
+  weekId       String
+  userId       String
+  rank         Int
+  weeklyPoints BigInt
+  rewardEarned Decimal  @default(0)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([weekId, userId])
+  @@index([weekId])
+  @@index([userId])
+}
+
 enum RegistrationStatus {
   PENDING
   ACTIVE
@@ -107,20 +123,4 @@ enum TaskType {
   DEFAULT
   DAILY
   PARTNER
-}
-
-model WeeklyLeaderboardHistory {
-  id            String   @id @default(cuid())
-  weekId        String // e.g., "2025-42" for 42nd week of 2025
-  userId        String
-  rank          Int
-  weeklyPoints  BigInt
-  rewardEarned  Decimal  @default(0)
-  createdAt     DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([weekId, userId])
-  @@index([weekId])
-  @@index([userId])
 }
