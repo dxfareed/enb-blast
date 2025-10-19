@@ -65,8 +65,12 @@ export default function GamePage() {
 
     const queryClient = useQueryClient();
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info', duration?: number } | null>(null);
-    const [finalScore, setFinalScore] = useState(0);
+    const [inGameScore, setInGameScore] = useState(0);
     const [pumpkinsCollected, setPumpkinsCollected] = useState(0);
+
+    const handleScoreUpdate = (score: number) => {
+        setInGameScore(score);
+    };
     const gameEngineRef = useRef<GameEngineHandle>(null);
     const [isMuted, setIsMuted] = useState(false);
     const { context } = useMiniApp();
@@ -138,10 +142,10 @@ export default function GamePage() {
             const pfpUrl = userProfile.pfpUrl || 'https://pbs.twimg.com/profile_images/1734354549496836096/-laoU-C9_400x400.jpg';
             const fid = userProfile.fid;
 
-            const frameUrl = `${appUrl}/share-frame?score=${finalScore}&username=${username}&pfpUrl=${pfpUrl}&fid=${fid}&revalidate=true`;
+            const frameUrl = `${appUrl}/share-frame?score=${inGameScore}&username=${username}&pfpUrl=${pfpUrl}&fid=${fid}&revalidate=true`;
             
             const pumpkinText = pumpkinsCollected > 0 ? ' plus a Halloween 🎃 Coin' : '';
-            const castText = `I just scored ${finalScore} points${pumpkinText} in the ENB Blast! Can you beat my score?`;
+            const castText = `I just scored ${inGameScore} points${pumpkinText} in the ENB Blast! Can you beat my score?`;
 
             const result = await sdk.actions.composeCast({ text: castText, embeds: [frameUrl] });
 
@@ -178,8 +182,7 @@ export default function GamePage() {
                 console.log('Server response:', responseData);
 
                 if (response.ok) {
-                    const { score, pumpkinsCollected, isNewHighScore } = responseData;
-                    setFinalScore(score);
+                    const { pumpkinsCollected, isNewHighScore } = responseData;
                     setPumpkinsCollected(pumpkinsCollected);
                     
                     queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
@@ -216,7 +219,7 @@ export default function GamePage() {
 
     const handleTryAgain = () => {
         if (gameEngineRef.current) gameEngineRef.current.resetGame();
-        setFinalScore(0);
+        setInGameScore(0);
         setPumpkinsCollected(0);
         setIsGameWon(false);
     };
@@ -230,7 +233,8 @@ export default function GamePage() {
                 ref={gameEngineRef}
                 onGameWin={handleGameWin}
                 onStartGame={handleStartGame}
-                displayScore={finalScore}
+                onScoreUpdate={handleScoreUpdate}
+                displayScore={inGameScore}
                 highScore={highScore}
                 isMuted={isMuted}
                 onToggleMute={toggleMute}

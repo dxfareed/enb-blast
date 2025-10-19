@@ -29,29 +29,29 @@ export const POWER_UP_POINT_2_CHANCE = 0.1;
 // --- ITEM VALUES & CONFIG ---
 // Authoritative values used for server-side score calculation
 export const ITEM_VALUES = {
-  picture: 5,
-  powerup_point_2: 10,
-  powerup_point_5: 15,
-  powerup_point_10: 30,
-  powerup_pumpkin: 500,
+  picture: 2.5,
+  powerup_point_2: 5,
+  powerup_point_5: 7.5,
+  powerup_point_10: 15,
+  powerup_pumpkin: 250,
 };
 
 // Client-side URLs and display values
 export const PICTURE_URL = "/Enb_000.png";
 export const CAP_PICTURE_URL = "/cap.jpg";
-export const BASE_PICTURE_VALUE = 5; // Note: Corresponds to ITEM_VALUES.picture
+export const BASE_PICTURE_VALUE = 2.5; // Note: Corresponds to ITEM_VALUES.picture
 
 export const POWER_UP_POINT_2_URL = "/powerup_2.png";
-export const POWER_UP_POINT_2_VALUE = 10; // Note: Corresponds to ITEM_VALUES.powerup_point_2
+export const POWER_UP_POINT_2_VALUE = 5; // Note: Corresponds to ITEM_VALUES.powerup_point_2
 
 export const POWER_UP_POINT_5_URL = "/powerup_5.png";
-export const POWER_UP_POINT_5_VALUE = 15; // Note: Corresponds to ITEM_VALUES.powerup_point_5
+export const POWER_UP_POINT_5_VALUE = 7.5; // Note: Corresponds to ITEM_VALUES.powerup_point_5
 
 export const POWER_UP_POINT_10_URL = "/powerup_10.png";
-export const POWER_UP_POINT_10_VALUE = 30; // Note: Corresponds to ITEM_VALUES.powerup_point_10
+export const POWER_UP_POINT_10_VALUE = 15; // Note: Corresponds to ITEM_VALUES.powerup_point_10
 
 export const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
-export const POWER_UP_PUMPKIN_VALUE = 500; // Note: Corresponds to ITEM_VALUES.powerup_pumpkin
+export const POWER_UP_PUMPKIN_VALUE = 250; // Note: Corresponds to ITEM_VALUES.powerup_pumpkin
 
 // --- POWER-UP DURATIONS (in seconds) ---
 export const MAGNET_DURATION = 5;
@@ -64,4 +64,4 @@ export const POWER_UP_SHIELD_URL = "/shield.jpg";
 
 // --- SERVER-SIDE SECURITY ---
 export const GRACE_PERIOD_SECONDS = 15;
-export const MAX_EVENTS_PER_SECOND = 5; // Max items a user can plausibly collect per second
+export const MAX_EVENTS_PER_SECOND = 10; // Max items a user can plausibly collect per second

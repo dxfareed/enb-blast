@@ -29,6 +29,7 @@ export type GameEvent = {
 type GameEngineProps = {
   onGameWin: (events: GameEvent[]) => void;
   onStartGame: () => Promise<boolean>;
+  onScoreUpdate: (score: number) => void;
   displayScore: number;
   highScore: number;
   isMuted: boolean;
@@ -65,6 +66,7 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
 const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   onGameWin,
   onStartGame,
+  onScoreUpdate,
   displayScore,
   highScore,
   isMuted,
@@ -135,7 +137,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
       setShowNewHighScoreAnimation(true);
       const timer = setTimeout(() => {
         setShowNewHighScoreAnimation(false);
-      }, 6000); 
+      }, 6000);
       return () => clearTimeout(timer);
     }
   }, [displayScore, highScore]);
@@ -168,14 +170,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     heartbeatSoundRef.current.volume = 0.8;
 
     return () => {
-        const sounds = [coinSoundRef, bombSoundRef, backgroundSoundRef, gameOverSoundRef, heartbeatSoundRef];
-        sounds.forEach(soundRef => {
-            if (soundRef.current) {
-                soundRef.current.pause();
-                soundRef.current.src = '';
-                soundRef.current = null;
-            }
-        });
+      const sounds = [coinSoundRef, bombSoundRef, backgroundSoundRef, gameOverSoundRef, heartbeatSoundRef];
+      sounds.forEach(soundRef => {
+        if (soundRef.current) {
+          soundRef.current.pause();
+          soundRef.current.src = '';
+          soundRef.current = null;
+        }
+      });
     };
   }, []);
 
@@ -332,7 +334,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           } else {
             newItem = { type: 'picture', speed: gameParamsRef.current.pictureSpeed, imageUrl: Math.random() < 0.5 ? GameConfig.PICTURE_URL : GameConfig.CAP_PICTURE_URL };
           }
-          
+
           if (newItem) {
             currentItems.push({
               id: nextItemId++,
@@ -391,7 +393,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               if (item.type === 'bomb') {
                 // Always report the collision to the server.
                 gameEventsRef.current.push({ type: 'bomb_collision', timestamp: Date.now() });
-                
+
                 // Handle client-side effects only if not shielded or invincible.
                 if (!isInvincibleRef.current && !isShieldActiveRef.current) {
                   bombCollisionItem = item;
@@ -432,8 +434,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   setTimeLeft(prev => prev + timeExtension);
                   gameEventsRef.current.push({ type: 'time_extend', duration: timeExtension, timestamp: Date.now() });
                 } else {
-                  setScore(prev => prev + points);
-                  const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
+                  const pointsToAdd = points
+                  setScore(prev => {
+                    const newScore = prev + points;
+                   // console.log(`Item collected: Prev: ${prev}, Points: +${pointsToAdd}, New: ${newScore}`);
+                    onScoreUpdate(newScore);
+                    return newScore;
+                  });
+                  const newFloatingScore = { id: nextItemId++, points: pointsToAdd * 2, x: item.x, y: item.y };
                   setFloatingScores(prev => [...prev, newFloatingScore]);
                 }
               }
@@ -455,6 +463,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               setScore(prev => {
                 const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
                 const pointsDeducted = prev - newScore;
+               // console.log(`Bomb hit: Prev: ${prev}, Points: -${pointsDeducted}, New: ${newScore}`);
+                onScoreUpdate(newScore);
                 if (pointsDeducted > 0) {
                   const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
                   setFloatingScores(prevScores => [...prevScores, newFloatingScore]);

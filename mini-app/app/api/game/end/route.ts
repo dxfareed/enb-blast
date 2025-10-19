@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
     let calculatedScore = 0;
     let pumpkinsCollected = 0;
     let shieldExpiresAt = 0;
+    let invincibleUntil = 0; // Invincibility from bomb hits
 
     // Sort events by timestamp to process them in order
     const sortedEvents = events.sort((a, b) => a.timestamp - b.timestamp);
@@ -156,13 +157,14 @@ export async function POST(req: NextRequest) {
                 }
             }
         } else if (event.type === 'bomb_collision') {
-            // Only apply penalty if the shield is not active at the time of collision
-            if (event.timestamp > shieldExpiresAt) {
+            // Only apply penalty if the shield is not active and not invincible
+            if (event.timestamp > shieldExpiresAt && event.timestamp > invincibleUntil) {
                 calculatedScore = calculatedScore <= 100 
                     ? Math.floor(calculatedScore * 0.5) 
                     : Math.floor(calculatedScore * 0.4);
                 // On bomb hit, the user loses all pumpkins collected *so far*
                 pumpkinsCollected = 0;
+                invincibleUntil = event.timestamp + 3000; // Set 3s invincibility
             }
         }
     }
@@ -209,6 +211,13 @@ export async function POST(req: NextRequest) {
     }
 
     const isNewHighScore = calculatedScore > user.highScore;
+
+    console.log('Backend Score Calculation:', {
+      sessionId,
+      sortedEvents,
+      calculatedScore,
+      isNewHighScore,
+    });
 
     // Use a transaction to ensure both session and user are updated
     await prisma.$transaction([
