@@ -41,8 +41,8 @@ export const ITEM_VALUES = {
 // Client-side URLs and display values
 export const PICTURE_URL = "/Enb_000.png";
 export const CAP_PICTURE_URL = "/cap.jpg";
-export const BASE_PICTURE_VALUE = 5; // Note: Corresponds to ITEM_VALUES.picture
 
+export const BASE_PICTURE_VALUE = 5; // Note: Corresponds to ITEM_VALUES.picture
 export const POWER_UP_POINT_2_URL = "/powerup_2.png";
 export const POWER_UP_POINT_2_VALUE = 10; // Note: Corresponds to ITEM_VALUES.powerup_point_2
 
