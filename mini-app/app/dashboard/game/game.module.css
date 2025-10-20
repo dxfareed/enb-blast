@@ -322,9 +322,15 @@
   height: 60px;
   font-size: 2rem;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s, border-color 0.2s;
   color: white;
   line-height: 1;
+  position: relative;
+}
+
+.powerupButton.active {
+  border-color: #22c55e;
+  box-shadow: 0 0 10px 2px #22c55e;
 }
 
 .powerupButton:active {
@@ -333,8 +339,44 @@
 }
 
 .powerupButton:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.powerupLock {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #ef4444; /* red-500 */
+  color: white;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  line-height: 1;
+}
+
+.powerupCheck {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #22c55e; /* green-500 */
+  color: white;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  line-height: 1;
 }
 
 .finalScore {

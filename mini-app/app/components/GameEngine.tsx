@@ -122,6 +122,16 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   const { userProfile } = useUser();
   const avatarPfp = userProfile?.pfpUrl || GameConfig.PICTURE_URL;
+  const [isPowerupActive, setIsPowerupActive] = useState(false);
+
+  useEffect(() => {
+    if (userProfile?.powerupExpiration) {
+      const expirationDate = new Date(userProfile.powerupExpiration);
+      if (expirationDate > new Date()) {
+        setIsPowerupActive(true);
+      }
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     if (gameAreaRef.current) {
@@ -413,7 +423,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   case 'powerup_point_10': points = GameConfig.POWER_UP_POINT_10_VALUE; break;
                   case 'powerup_pumpkin': points = GameConfig.POWER_UP_PUMPKIN_VALUE; break;
                 }
-                if (item.type === 'magnet') {
+                if (item.type === 'magnet' && isPowerupActive) {
                   setIsMagnetActive(true);
                   if (magnetTimerRef.current) {
                     clearTimeout(magnetTimerRef.current);
@@ -421,7 +431,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   magnetTimerRef.current = setTimeout(() => {
                     setIsMagnetActive(false);
                   }, GameConfig.MAGNET_DURATION * 1000);
-                } else if (item.type === 'shield') {
+                } else if (item.type === 'shield' && isPowerupActive) {
                   setIsShieldActive(true);
                   if (shieldTimerRef.current) {
                     clearTimeout(shieldTimerRef.current);
@@ -429,7 +439,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   shieldTimerRef.current = setTimeout(() => {
                     setIsShieldActive(false);
                   }, GameConfig.SHIELD_DURATION * 1000);
-                } else if (item.type === 'time') {
+                } else if (item.type === 'time' && isPowerupActive) {
                   const timeExtension = GameConfig.TIME_EXTENSION_SECONDS;
                   setTimeLeft(prev => prev + timeExtension);
                   gameEventsRef.current.push({ type: 'time_extend', duration: timeExtension, timestamp: Date.now() });
@@ -441,7 +451,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                     onScoreUpdate(newScore);
                     return newScore;
                   });
-                  const newFloatingScore = { id: nextItemId++, points: pointsToAdd * 2, x: item.x, y: item.y };
+                  const newFloatingScore = { id: nextItemId++, points: pointsToAdd, x: item.x, y: item.y };
                   setFloatingScores(prev => [...prev, newFloatingScore]);
                 }
               }
@@ -569,11 +579,20 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                     Click to Start
                   </button>
                   <div className={gameStyles.powerupsSection}>
-                    <h3 className={gameStyles.powerupsTitle}><del>Power Ups</del></h3>
+                    <h3 className={gameStyles.powerupsTitle}>Power Ups</h3>
                     <div className={gameStyles.powerupsContainer}>
-                      <button className={gameStyles.powerupButton} disabled>🧲</button>
-                      <button className={gameStyles.powerupButton} disabled>🛡️</button>
-                      <button className={gameStyles.powerupButton} disabled>⏰</button>
+                      <button className={`${gameStyles.powerupButton} ${isPowerupActive ? gameStyles.active : ''}`} disabled={!isPowerupActive}>
+                        {isPowerupActive ? <span className={gameStyles.powerupCheck}>✓</span> : <span className={gameStyles.powerupLock}>🔒</span>}
+                        🧲
+                      </button>
+                      <button className={`${gameStyles.powerupButton} ${isPowerupActive ? gameStyles.active : ''}`} disabled={!isPowerupActive}>
+                        {isPowerupActive ? <span className={gameStyles.powerupCheck}>✓</span> : <span className={gameStyles.powerupLock}>🔒</span>}
+                        🛡️
+                      </button>
+                      <button className={`${gameStyles.powerupButton} ${isPowerupActive ? gameStyles.active : ''}`} disabled={!isPowerupActive}>
+                        {isPowerupActive ? <span className={gameStyles.powerupCheck}>✓</span> : <span className={gameStyles.powerupLock}>🔒</span>}
+                        ⏰
+                      </button>
                     </div>
                   </div>
                 </>

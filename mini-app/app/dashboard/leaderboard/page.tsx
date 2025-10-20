@@ -5,6 +5,7 @@ import { useUser } from '@/app/context/UserContext';
 import styles from './page.module.css';
 import { sdk } from '@farcaster/miniapp-sdk';
 import WeeklyCountdown from '@/app/components/WeeklyCountdown';
+import { formatPoints } from '@/app/utils/format';
 import Loader from '@/app/components/Loader';
 import { ChevronDown } from 'lucide-react';
 
@@ -199,7 +200,7 @@ export default function LeaderboardPage() {
                 <p className={styles.username}>{user.username}</p>
               </div>
               <div className={styles.scoreInfo}>
-                <p className={styles.score}>{parseInt(user.weeklyPoints, 10).toLocaleString()}</p>
+                <p className={styles.score}>{formatPoints(parseInt(user.weeklyPoints, 10))}</p>
                 <p className={styles.scoreLabel}>points</p>
               </div>
             </div>
@@ -224,7 +225,7 @@ export default function LeaderboardPage() {
                 <p className={styles.username}>Your Rank</p>
               </div>
               <div className={styles.scoreInfo}>
-                <p className={styles.score}>{parseInt(myRank.weeklyPoints, 10).toLocaleString()}</p>
+                <p className={styles.score}>{Number(userProfile?.weeklyPoints).toLocaleString()}</p>
                 <p className={styles.scoreLabel}>points</p>
               </div>
         </div>
