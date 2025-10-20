@@ -11,6 +11,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { useMiniApp } from '@neynar/react';
 import AddAppBanner from '@/app/components/AddAppBanner';
 import ApologyModal from '@/app/components/ApologyModal';
+import { formatPoints } from '@/app/utils/format';
 import NewHighScoreAnimation from '@/app/components/NewHighScoreAnimation';
 
 export default function GamePage() {

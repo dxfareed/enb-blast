@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { formatScore } from '@/app/utils/format';
 
 export const runtime = 'edge';
 
@@ -31,8 +32,8 @@ export async function GET(request: Request) {
   const username = searchParams.get('username') || 'Anonymous';
   const pfpUrl = searchParams.get('pfpUrl') || '';
   const rank = searchParams.get('rank') || 'N/A';
-  const weeklyPoints = parseInt(searchParams.get('weeklyPoints') || '0').toLocaleString();
-  const totalClaimed = parseFloat(searchParams.get('totalClaimed') || '0').toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const weeklyPoints = formatScore(parseInt(searchParams.get('weeklyPoints') || '0'));
+  const totalClaimed = formatScore(parseFloat(searchParams.get('totalClaimed') || '0'));
 
   const spaceMonoBold = fetch(
     new URL('/SpaceMono-Bold.ttf', process.env.NEXT_PUBLIC_URL as string)

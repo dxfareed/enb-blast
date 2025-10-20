@@ -123,7 +123,7 @@ export default function ProfilePage() {
         </div>
         <div className={`${styles.statCard} ${styles.claimedCard}`}>
           <p className={styles.statLabel}>Total Claimed</p>
-          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {Number(userProfile.totalClaimed).toFixed(1)}</p>
+          <p className={styles.statValue}>{/* <Droplets size={28} /> */} {formatPoints(Number(userProfile.totalClaimed))}</p>
         </div>
       </div>
 

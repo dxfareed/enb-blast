@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
                     label={`Streak${displayUserProfile.streak <= 1 ? '' : 's'}`}
                     value={String(displayUserProfile.streak)}
                   />
-                  <StatItem label="Claimed" value={parseFloat(displayUserProfile.totalClaimed).toLocaleString(undefined, { minimumFractionDigits: 1 })} />
+                  <StatItem label="Claimed" value={formatPoints(parseFloat(displayUserProfile.totalClaimed))} />
                 </div>
               </div>
             </div>
