@@ -20,9 +20,9 @@ export const INITIAL_BOMB_CHANCE = 0.1;
 export const FINAL_BOMB_CHANCE = 0.31;
 export const POWER_UP_PUMPKIN_CHANCE = 0.0009;
 
-export const POWER_UP_MAGNET_CHANCE = 0//0.03;
-export const POWER_UP_SHIELD_CHANCE = 0//0.009;
-export const POWER_UP_TIME_CHANCE = 0//0.002;
+export const POWER_UP_MAGNET_CHANCE = 0.03;
+export const POWER_UP_SHIELD_CHANCE = 0.01;
+export const POWER_UP_TIME_CHANCE = 0.005;
 
 export const POWER_UP_POINT_10_CHANCE = 0.05;
 export const POWER_UP_POINT_5_CHANCE = 0.09;
@@ -66,4 +66,4 @@ export const POWER_UP_SHIELD_URL = "/shield.jpg";
 
 // --- SERVER-SIDE SECURITY ---
 export const GRACE_PERIOD_SECONDS = 25;
-export const MAX_EVENTS_PER_SECOND = 10; // Max items a user can plausibly collect per second
+export const MAX_EVENTS_PER_SECOND = 15; // Max items a user can plausibly collect per second

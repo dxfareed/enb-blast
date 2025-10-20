@@ -26,6 +26,13 @@ export type GameEvent = {
   timestamp: number;
 };
 
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { POWERUP_CONTRACT_ADDRESS, POWERUP_CONTRACT_ABI, MINT_POWERUP_NFT_CONTRACT_ADDRESS, MINT_POWERUP_NFT_CONTRACT_ABI } from '@/app/utils/constants';
+import PowerUpCountdown from './PowerUpCountdown';
+import Loader from './Loader';
+import Toast from './Toast';
+import GlobalLoader from './GlobalLoader';
+
 type GameEngineProps = {
   onGameWin: (events: GameEvent[]) => void;
   onStartGame: () => Promise<boolean>;
@@ -96,6 +103,20 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const gameStartTimeRef = useRef<number | null>(null);
   const [showNewHighScoreAnimation, setShowNewHighScoreAnimation] = useState(false);
   const [gameAreaDimensions, setGameAreaDimensions] = useState({ width: 0, height: 0 });
+  const [isActivating, setIsActivating] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
+  const [activationTxHash, setActivationTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
+
+  const { address } = useAccount();
+  const { data: hash, writeContract } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash,
+    });
 
   const isMagnetActiveRef = useRef(isMagnetActive);
   useEffect(() => { isMagnetActiveRef.current = isMagnetActive; }, [isMagnetActive]);
@@ -120,17 +141,159 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     bombChance: GameConfig.INITIAL_BOMB_CHANCE,
   });
 
-  const { userProfile } = useUser();
+  const { userProfile, refetchUserProfile } = useUser();
   const avatarPfp = userProfile?.pfpUrl || GameConfig.PICTURE_URL;
   const [isPowerupActive, setIsPowerupActive] = useState(false);
 
+  const handleMintPowerUp = async () => {
+    if (!userProfile || !address) {
+      setToast({ message: 'User not connected', type: 'error' });
+      return;
+    }
+
+    setIsMinting(true);
+    setActivationError(null);
+
+    try {
+      let response;
+      const maxRetries = 3;
+      for (let i = 0; i < maxRetries; i++) {
+        response = await sdk.quickAuth.fetch('/api/powerup/mint-signature', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fid: userProfile.fid }),
+        });
+
+        if (response.status !== 500) {
+          break; // Exit loop on success or non-500 error
+        }
+
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!response) {
+        throw new Error('Failed to get a response from the server.');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Request failed with status ' + response.status }));
+        throw new Error(errorData.message || 'Failed to get mint signature.');
+      }
+
+      const { signature, nonce, mintPrice } = await response.json();
+      console.log("Mint price is ", mintPrice);
+      console.log("Signature is ", signature);
+      console.log("Nonce is ", nonce);
+
+      writeContract({
+        address: MINT_POWERUP_NFT_CONTRACT_ADDRESS,
+        abi: MINT_POWERUP_NFT_CONTRACT_ABI,
+        functionName: 'mintPowerUp',
+        args: [BigInt(userProfile.fid), BigInt(nonce), signature],
+        value: BigInt(mintPrice),
+      });
+    } catch (error) {
+      //@ts-ignore
+      console.error('Minting error:', error.message);
+      setActivationError((error as Error).message);
+      setIsMinting(false);
+    }
+  };
+
+  const handleActivatePowerUp = async () => {
+    if (!userProfile || !address) {
+      setToast({ message: 'User not connected', type: 'error' });
+      return;
+    }
+
+    setIsActivating(true);
+    setActivationError(null);
+
+    try {
+      let response;
+      const maxRetries = 3;
+      for (let i = 0; i < maxRetries; i++) {
+        response = await sdk.quickAuth.fetch('/api/powerup/signature', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fid: userProfile.fid }),
+        });
+
+        if (response.status !== 500) {
+          break; // Exit loop on success or non-500 error
+        }
+
+        if (i < maxRetries - 1) { // Don't wait after the last attempt
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!response) {
+        throw new Error('Failed to get a response from the server.');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Request failed with status ' + response?.status }));
+        throw new Error(errorData.message || 'Failed to get activation signature.');
+      }
+
+      const { signature, nonce, depositAmount } = await response.json();
+
+      writeContract({
+        address: POWERUP_CONTRACT_ADDRESS,
+        abi: POWERUP_CONTRACT_ABI,
+        functionName: 'activatePowerUp',
+        args: [BigInt(userProfile.fid), BigInt(nonce), signature],
+        value: BigInt(depositAmount),
+      });
+    } catch (error) {
+      console.error('Activation error:', error);
+      setActivationError((error as Error).message);
+      setIsActivating(false);
+    }
+  };
+
   useEffect(() => {
+    if (isConfirming) {
+      setToast({ message: 'Processing transaction...', type: 'info' });
+    } else if (isConfirmed) {
+      setToast({ message: 'Transaction successful! Reloading...', type: 'success' });
+      refetchUserProfile();
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+      setIsActivating(false);
+      setIsMinting(false);
+    }
+  }, [isConfirming, isConfirmed, refetchUserProfile]);
+
+  useEffect(() => {
+
     if (userProfile?.powerupExpiration) {
       const expirationDate = new Date(userProfile.powerupExpiration);
       if (expirationDate > new Date()) {
         setIsPowerupActive(true);
+      } else {
+        setIsPowerupActive(false);
       }
     }
+  }, [userProfile]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (userProfile?.powerupExpiration) {
+        const expirationDate = new Date(userProfile.powerupExpiration);
+        console.log("this is the user expire date ", expirationDate)
+        if (expirationDate < new Date() || expirationDate == null) {
+          setIsReloading(true);
+          window.location.reload();
+        }
+      }
+    }, 1 * (60 * 1000)); // 1 * (60 * 1000) => 1 minute
+
+    return () => clearInterval(interval);
   }, [userProfile]);
 
   useEffect(() => {
@@ -143,14 +306,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   }, []);
 
   useEffect(() => {
-    if (displayScore > highScore) {
+    if (isGameWon && displayScore > highScore) {
       setShowNewHighScoreAnimation(true);
       const timer = setTimeout(() => {
         setShowNewHighScoreAnimation(false);
       }, 6000);
       return () => clearTimeout(timer);
     }
-  }, [displayScore, highScore]);
+  }, [isGameWon, displayScore, highScore]);
 
   useEffect(() => {
     const imageUrls = [
@@ -325,24 +488,65 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           const { bombChance } = gameParamsRef.current;
           let newItem: NewItemProperties | null = null;
 
-          if (rand < bombChance) {
-            newItem = { type: 'bomb', speed: gameParamsRef.current.bombSpeed, imageUrl: '/bomb.png' };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE) {
-            newItem = { type: 'powerup_pumpkin', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_PUMPKIN_URL };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE + GameConfig.POWER_UP_MAGNET_CHANCE) {
-            newItem = { type: 'magnet', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_MAGNET_URL };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE + GameConfig.POWER_UP_MAGNET_CHANCE + GameConfig.POWER_UP_SHIELD_CHANCE) {
-            newItem = { type: 'shield', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_SHIELD_URL };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE + GameConfig.POWER_UP_MAGNET_CHANCE + GameConfig.POWER_UP_SHIELD_CHANCE + GameConfig.POWER_UP_TIME_CHANCE) {
-            newItem = { type: 'time', speed: gameParamsRef.current.pictureSpeed };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE + GameConfig.POWER_UP_MAGNET_CHANCE + GameConfig.POWER_UP_SHIELD_CHANCE + GameConfig.POWER_UP_TIME_CHANCE + GameConfig.POWER_UP_POINT_10_CHANCE) {
-            newItem = { type: 'powerup_point_10', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_10_URL };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE + GameConfig.POWER_UP_MAGNET_CHANCE + GameConfig.POWER_UP_SHIELD_CHANCE + GameConfig.POWER_UP_TIME_CHANCE + GameConfig.POWER_UP_POINT_10_CHANCE + GameConfig.POWER_UP_POINT_5_CHANCE) {
-            newItem = { type: 'powerup_point_5', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_5_URL };
-          } else if (rand < bombChance + GameConfig.POWER_UP_PUMPKIN_CHANCE + GameConfig.POWER_UP_MAGNET_CHANCE + GameConfig.POWER_UP_SHIELD_CHANCE + GameConfig.POWER_UP_TIME_CHANCE + GameConfig.POWER_UP_POINT_10_CHANCE + GameConfig.POWER_UP_POINT_5_CHANCE + GameConfig.POWER_UP_POINT_2_CHANCE) {
-            newItem = { type: 'powerup_point_2', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_2_URL };
+          // These chances are used in both scenarios
+          const powerupMultiplier = isPowerupActive ? 1.7 : 0.2;
+          const powerUpPumpkinChance = GameConfig.POWER_UP_PUMPKIN_CHANCE * powerupMultiplier;
+          const powerUpPoint10Chance = GameConfig.POWER_UP_POINT_10_CHANCE * powerupMultiplier;
+          const powerUpPoint5Chance = GameConfig.POWER_UP_POINT_5_CHANCE * powerupMultiplier;
+          const powerUpPoint2Chance = GameConfig.POWER_UP_POINT_2_CHANCE * powerupMultiplier;
+
+          if (isPowerupActive) {
+            // --- Logic for ACTIVE power-up users (includes magnet, shield, time) ---
+            const p_bomb = bombChance;
+            const p_pumpkin = p_bomb + powerUpPumpkinChance;
+            const p_magnet = p_pumpkin + GameConfig.POWER_UP_MAGNET_CHANCE;
+            const p_shield = p_magnet + GameConfig.POWER_UP_SHIELD_CHANCE;
+            const p_time = p_shield + GameConfig.POWER_UP_TIME_CHANCE;
+            const p_10 = p_time + powerUpPoint10Chance;
+            const p_5 = p_10 + powerUpPoint5Chance;
+            const p_2 = p_5 + powerUpPoint2Chance;
+
+            if (rand < p_bomb) {
+              newItem = { type: 'bomb', speed: gameParamsRef.current.bombSpeed, imageUrl: '/bomb.png' };
+            } else if (rand < p_pumpkin) {
+              newItem = { type: 'powerup_pumpkin', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_PUMPKIN_URL };
+            } else if (rand < p_magnet) {
+              newItem = { type: 'magnet', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_MAGNET_URL };
+            } else if (rand < p_shield) {
+              newItem = { type: 'shield', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_SHIELD_URL };
+            } else if (rand < p_time) {
+              newItem = { type: 'time', speed: gameParamsRef.current.pictureSpeed };
+            } else if (rand < p_10) {
+              newItem = { type: 'powerup_point_10', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_10_URL };
+            } else if (rand < p_5) {
+              newItem = { type: 'powerup_point_5', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_5_URL };
+            } else if (rand < p_2) {
+              newItem = { type: 'powerup_point_2', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_2_URL };
+            } else {
+              newItem = { type: 'picture', speed: gameParamsRef.current.pictureSpeed, imageUrl: Math.random() < 0.5 ? GameConfig.PICTURE_URL : GameConfig.CAP_PICTURE_URL };
+            }
           } else {
-            newItem = { type: 'picture', speed: gameParamsRef.current.pictureSpeed, imageUrl: Math.random() < 0.5 ? GameConfig.PICTURE_URL : GameConfig.CAP_PICTURE_URL };
+            // --- Logic for INACTIVE power-up users (excludes magnet, shield, time) ---
+            const p_bomb = bombChance;
+            const p_pumpkin = p_bomb + powerUpPumpkinChance;
+            // Note: We skip magnet, shield, and time in the probability stack
+            const p_10 = p_pumpkin + powerUpPoint10Chance;
+            const p_5 = p_10 + powerUpPoint5Chance;
+            const p_2 = p_5 + powerUpPoint2Chance;
+
+            if (rand < p_bomb) {
+              newItem = { type: 'bomb', speed: gameParamsRef.current.bombSpeed, imageUrl: '/bomb.png' };
+            } else if (rand < p_pumpkin) {
+              newItem = { type: 'powerup_pumpkin', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_PUMPKIN_URL };
+            } else if (rand < p_10) {
+              newItem = { type: 'powerup_point_10', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_10_URL };
+            } else if (rand < p_5) {
+              newItem = { type: 'powerup_point_5', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_5_URL };
+            } else if (rand < p_2) {
+              newItem = { type: 'powerup_point_2', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_2_URL };
+            } else {
+              newItem = { type: 'picture', speed: gameParamsRef.current.pictureSpeed, imageUrl: Math.random() < 0.5 ? GameConfig.PICTURE_URL : GameConfig.CAP_PICTURE_URL };
+            }
           }
 
           if (newItem) {
@@ -359,7 +563,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         let processedItems = currentItems.map(item => {
           let newItem = { ...item, y: item.y + item.speed };
           const nonMagneticTypes: ItemType[] = ['bomb', 'shield', 'time'];
-          if (isMagnetActiveRef.current && !nonMagneticTypes.includes(item.type) && avatarRef.current && gameAreaRef.current) {
+          if (isMagnetActive && !nonMagneticTypes.includes(item.type) && avatarRef.current && gameAreaRef.current) {
             const gameRect = gameAreaRef.current.getBoundingClientRect();
             const avatarCenterX = avatarPositionRef.current.x;
             const avatarCenterY = avatarPositionRef.current.y;
@@ -447,7 +651,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   const pointsToAdd = points
                   setScore(prev => {
                     const newScore = prev + points;
-                   // console.log(`Item collected: Prev: ${prev}, Points: +${pointsToAdd}, New: ${newScore}`);
+                    // console.log(`Item collected: Prev: ${prev}, Points: +${pointsToAdd}, New: ${newScore}`);
                     onScoreUpdate(newScore);
                     return newScore;
                   });
@@ -473,7 +677,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               setScore(prev => {
                 const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
                 const pointsDeducted = prev - newScore;
-               // console.log(`Bomb hit: Prev: ${prev}, Points: -${pointsDeducted}, New: ${newScore}`);
+                // console.log(`Bomb hit: Prev: ${prev}, Points: -${pointsDeducted}, New: ${newScore}`);
                 onScoreUpdate(newScore);
                 if (pointsDeducted > 0) {
                   const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
@@ -539,8 +743,13 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     }
   };
 
+  if (isReloading) {
+    return <GlobalLoader message="Power-up expired, reloading..." />;
+  }
+
   return (
     <>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {showNewHighScoreAnimation && <NewHighScoreAnimation onAnimationComplete={onAnimationComplete} width={gameAreaDimensions.width} height={gameAreaDimensions.height} />}
       <div className={gameStyles.gameStats}>
         <span>Score: <strong>{score.toLocaleString()}</strong></span>
@@ -594,6 +803,31 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                         ⏰
                       </button>
                     </div>
+                    {isPowerupActive && userProfile?.powerupExpiration ? (
+                      <PowerUpCountdown expiration={userProfile.powerupExpiration} />
+                    ) : (
+                      <button onClick={handleMintPowerUp} className={gameStyles.activateButton} disabled={isMinting || isConfirming} style={{ marginTop: '10px' }}>
+                        {isMinting || isConfirming ? (
+                          <>
+                            <Loader />
+                            Minting...
+                          </>
+                        ) : (
+                          'Mint PowerUps'
+                        )}
+                      </button>
+                    )}
+                    {/*                       <button onClick={handleActivatePowerUp} className={gameStyles.activateButton} disabled={isActivating || isConfirming}>
+                        {isActivating || isConfirming ? (
+                          <>
+                            <Loader />
+                            Activating...
+                          </>
+                        ) : (
+                          'Activate Power Ups'
+                        )}
+                      </button> */}
+                    {activationError && <p className={gameStyles.errorMessage}>{activationError}</p>}
                   </div>
                 </>
               )}

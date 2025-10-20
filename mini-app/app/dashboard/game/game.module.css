@@ -3,7 +3,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0 1rem;
-  font-size: 1.125rem;
+  font-size: 0.945rem;
   color: #4b5563;
   font-family: 'Space Mono', monospace;
 }
@@ -276,8 +276,8 @@
 }
 
 .startButton {
-  background-color: #FBBF24; /* Light yellow */
-  color: #000;
+  background-color: #8b5cf6; /* Light yellow */
+  color: #000000;
   font-weight: 700;
   padding: 0.75rem 1.5rem;
   border-radius: 9999px;
@@ -384,4 +384,31 @@
   font-weight: 700;
   margin: 0.5rem 0 1.5rem 0;
   line-height: 1;
+}
+
+.activateButton {
+  margin-top: 10px;
+  background-color: #FFC107;
+  color: #000;
+  font-weight: bold;
+  padding: 10px 20px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.activateButton:hover {
+  background-color: #f8d97b;
+}
+
+.activateButton:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.errorMessage {
+  color: #ef4444;
+  margin-top: 10px;
+  font-size: 14px;
 }

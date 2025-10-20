@@ -39,7 +39,6 @@ model User {
   events               UserEvent[]
   taskCompletions      UserTaskCompletion[]
   leaderboardHistory   WeeklyLeaderboardHistory[]
-  powerupExpiration    DateTime?
 }
 
 model Claim {

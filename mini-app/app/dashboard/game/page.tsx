@@ -161,7 +161,7 @@ export default function GamePage() {
     };
 
     const handleGameWin = useCallback(async (events: GameEvent[]) => {
-        console.log('Game ended. Events:', JSON.stringify(events, null, 2));
+       // console.log('Game ended. Events:', JSON.stringify(events, null, 2));
         if (!sessionId) {
             setToast({ message: 'No active game session.', type: 'error' });
             return;
@@ -180,7 +180,7 @@ export default function GamePage() {
                 });
 
                 const responseData = await response.json();
-                console.log('Server response:', responseData);
+               // console.log('Server response:', responseData);
 
                 if (response.ok) {
                     const { pumpkinsCollected, isNewHighScore } = responseData;

@@ -22,13 +22,13 @@ type GameEvent = {
 };
 
 function getUrlHost(request: NextRequest): string {
-    const origin = request.headers.get("origin");
-    if (origin) { try { return new URL(origin).host; } catch (e) { console.warn("Invalid origin:", e); } }
-    const host = request.headers.get("host");
-    if (host) { return host; }
-    const vercelUrl = process.env.VERCEL_URL;
-    const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
-    return new URL(urlValue).host;
+  const origin = request.headers.get("origin");
+  if (origin) { try { return new URL(origin).host; } catch (e) { console.warn("Invalid origin:", e); } }
+  const host = request.headers.get("host");
+  if (host) { return host; }
+  const vercelUrl = process.env.VERCEL_URL;
+  const urlValue = process.env.VERCEL_ENV === "production" ? process.env.NEXT_PUBLIC_URL! : vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
+  return new URL(urlValue).host;
 }
 
 export async function POST(req: NextRequest) {
@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = await client.verifyJwt({
-        token: authorization.split(" ")[1] as string,
-        domain: getUrlHost(req),
+      token: authorization.split(" ")[1] as string,
+      domain: getUrlHost(req),
     });
     const fid = BigInt(payload.sub);
 
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
+    const isPowerupActive = user.powerupExpiration && new Date(user.powerupExpiration) > new Date();
     const session = await prisma.gameSession.findFirst({
       where: {
         id: sessionId,
@@ -86,8 +87,12 @@ export async function POST(req: NextRequest) {
       }
       if (event.type === 'time_extend') {
         // Use server-authoritative value, not client-provided duration
-        totalTimeExtended += GameConfig.TIME_EXTENSION_SECONDS; 
-        timeExtendEvents++;
+        /* totalTimeExtended += GameConfig.TIME_EXTENSION_SECONDS; 
+        timeExtendEvents++; */
+        if (isPowerupActive) {
+          totalTimeExtended += GameConfig.TIME_EXTENSION_SECONDS;
+          timeExtendEvents++;
+        }
       }
     }
 
@@ -127,11 +132,11 @@ export async function POST(req: NextRequest) {
     // --- Security Check: Event Rate ---
     const maxPossibleEvents = durationSeconds * GameConfig.MAX_EVENTS_PER_SECOND;
     if (events.length > maxPossibleEvents) {
-        await prisma.gameSession.update({
-            where: { id: sessionId },
-            data: { status: 'INVALID_SCORE', score: 0, endTime },
-        });
-        return NextResponse.json({ message: 'Event count is too high for the session duration' }, { status: 400 });
+      await prisma.gameSession.update({
+        where: { id: sessionId },
+        data: { status: 'INVALID_SCORE', score: 0, endTime },
+      });
+      return NextResponse.json({ message: 'Event count is too high for the session duration' }, { status: 400 });
     }
 
     // --- Secure Score Calculation ---
@@ -144,29 +149,29 @@ export async function POST(req: NextRequest) {
     const sortedEvents = events.sort((a, b) => a.timestamp - b.timestamp);
 
     for (const event of sortedEvents) {
-        if (event.type === 'collect') {
-            if (event.itemType === 'shield') {
-                shieldExpiresAt = event.timestamp + (GameConfig.SHIELD_DURATION * 1000);
-            }
-
-            const itemValue = GameConfig.ITEM_VALUES[event.itemType as keyof typeof GameConfig.ITEM_VALUES];
-            if (itemValue) {
-                calculatedScore += itemValue;
-                if (event.itemType === 'powerup_pumpkin') {
-                    pumpkinsCollected += 1;
-                }
-            }
-        } else if (event.type === 'bomb_collision') {
-            // Only apply penalty if the shield is not active and not invincible
-            if (event.timestamp > shieldExpiresAt && event.timestamp > invincibleUntil) {
-                calculatedScore = calculatedScore <= 100 
-                    ? Math.floor(calculatedScore * 0.5) 
-                    : Math.floor(calculatedScore * 0.4);
-                // On bomb hit, the user loses all pumpkins collected *so far*
-                pumpkinsCollected = 0;
-                invincibleUntil = event.timestamp + 3000; // Set 3s invincibility
-            }
+      if (event.type === 'collect') {
+        if (event.itemType === 'shield' && isPowerupActive) {
+          shieldExpiresAt = event.timestamp + (GameConfig.SHIELD_DURATION * 1000);
         }
+
+        const itemValue = GameConfig.ITEM_VALUES[event.itemType as keyof typeof GameConfig.ITEM_VALUES];
+        if (itemValue) {
+          calculatedScore += itemValue;
+          if (event.itemType === 'powerup_pumpkin') {
+            pumpkinsCollected += 1;
+          }
+        }
+      } else if (event.type === 'bomb_collision') {
+        // Only apply penalty if the shield is not active and not invincible
+        if (event.timestamp > shieldExpiresAt && event.timestamp > invincibleUntil) {
+          calculatedScore = calculatedScore <= 100
+            ? Math.floor(calculatedScore * 0.5)
+            : Math.floor(calculatedScore * 0.4);
+          // On bomb hit, the user loses all pumpkins collected *so far*
+          pumpkinsCollected = 0;
+          invincibleUntil = event.timestamp + 3000; // Set 3s invincibility
+        }
+      }
     }
 
     // --- Daily Streak Logic (Calendar-Based) ---
@@ -189,7 +194,7 @@ export async function POST(req: NextRequest) {
       newStreak = 1;
     } else {
       const lastGameDay = lastGameSession.endTime.toISOString().split('T')[0];
-      
+
       if (currentDay > lastGameDay) {
         // This is the first game on a new day.
         const lastGameDayDate = new Date(lastGameDay);
@@ -205,7 +210,7 @@ export async function POST(req: NextRequest) {
         // This is a subsequent game on the same day.
         // If the user's streak was 0, this play should make it 1.
         if (newStreak === 0) {
-            newStreak = 1;
+          newStreak = 1;
         }
       }
     }
@@ -243,7 +248,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ score: calculatedScore, pumpkinsCollected, isNewHighScore }, { status: 200 });
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {
-        return NextResponse.json({ message: "Invalid token" }, { status: 401 });
+      return NextResponse.json({ message: "Invalid token" }, { status: 401 });
     }
     console.error('Failed to end game session:', error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
