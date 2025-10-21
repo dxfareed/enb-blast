@@ -25,3 +25,8 @@ This session focused on overhauling the application's cron jobs, refactoring the
 
 ### 4. Bug Fixes
 - **Resolved Build Error:** Fixed a critical build error on the leaderboard page caused by a misplaced `import` statement during the reward tier refactoring.
+
+### 5. Cron Job Security Enhancement
+- **Diagnosed 401 Errors:** Investigated and resolved persistent "Unauthorized" errors on all Vercel cron jobs.
+- **Corrected Auth Method:** Discovered through logging that Vercel sends its cron secret via the `Authorization: Bearer <secret><random-suffix>` header, not the `x-vercel-cron-secret` header as previously implemented.
+- **Implemented Robust Check:** Updated all three cron jobs (`reset-daily-tasks`, `broadcast`, `reset-weekly-points`) to correctly parse the `Authorization` header and use a `startsWith` check to validate the secret. This accommodates Vercel's security feature of appending a random suffix to the secret, ensuring reliable and secure cron execution.

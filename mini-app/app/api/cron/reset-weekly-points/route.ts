@@ -1,11 +1,11 @@
-
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getWeek } from 'date-fns';
+import { REWARD_AMOUNTS } from '@/lib/rewardTiers';
+import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
-// --- Utility for retrying failed operations ---
 const withRetry = async <T>(
   operation: () => Promise<T>,
   retries = 3,
@@ -33,16 +33,20 @@ const getWeekId = (date: Date): string => {
   return `${year}-${week.toString().padStart(2, '0')}`;
 };
 
-import { REWARD_AMOUNTS } from '@/lib/rewardTiers';
-
-// ...
-
 // Define the reward tiers to calculate rewardEarned for the snapshot
 const REWARD_TIERS = REWARD_AMOUNTS;
 
 export async function GET(request: Request) {
-  const secret = request.headers.get('x-vercel-cron-secret');
-  if (secret !== process.env.CRON_SECRET) {
+  const headersList = headers();
+  const authHeader = (await headersList).get('authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const secret = authHeader.substring(7); // Remove "Bearer " prefix
+
+  if (!process.env.CRON_SECRET || !secret.startsWith(process.env.CRON_SECRET)) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
@@ -79,7 +83,6 @@ export async function GET(request: Request) {
         console.log(`Successfully created leaderboard snapshot for week ${weekId} with ${historyData.length} users.`);
       }
 
-      // --- 2. Reset weekly points for all users ---
       const result = await prisma.user.updateMany({
         data: {
           weeklyPoints: 0,

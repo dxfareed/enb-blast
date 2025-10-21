@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { withRetry } from '../../../../lib/retry';
+import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
-  const secret = request.headers.get('x-vercel-cron-secret');
-  if (secret !== process.env.CRON_SECRET) {
+  const headersList = headers();
+  const authHeader = (await headersList).get('authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const secret = authHeader.substring(7); // Remove "Bearer " prefix
+
+  if (!process.env.CRON_SECRET || !secret.startsWith(process.env.CRON_SECRET)) {
+    console.log('Secret mismatch. Received:', secret);
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 

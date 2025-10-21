@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { REWARD_AMOUNTS, TOKEN_NAME } from '@/lib/rewardTiers';
 import { formatPoints } from '@/app/utils/format';
 import { withRetry } from '@/lib/retry';
+import { headers } from 'next/headers';
 
 export const maxDuration = 300;
 
@@ -22,7 +23,6 @@ async function sendNotifications(
     apiUrl: string,
     apiSecret: string
 ) {
-    // This function remains the same as before
     if (usersToNotify.length === 0) {
         console.log("No users to notify.");
         return { success: 0, failed: 0 };
@@ -106,8 +106,16 @@ function getReminderNotificationContent() {
 }
 
 export async function GET(request: Request) {
-    const secret = request.headers.get('x-vercel-cron-secret');
-    if (secret !== process.env.CRON_SECRET) {
+    const headersList = headers();
+    const authHeader = (await headersList).get('authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const secret = authHeader.substring(7); // Remove "Bearer " prefix
+
+    if (!process.env.CRON_SECRET || !secret.startsWith(process.env.CRON_SECRET)) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
