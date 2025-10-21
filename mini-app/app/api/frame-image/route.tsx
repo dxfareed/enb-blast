@@ -1,4 +1,5 @@
 // This is your user stats frame route, e.g., /app/share-frame/route.ts
+import { formatPoints } from '@/app/utils/format';
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 
@@ -172,12 +173,12 @@ export async function GET(request: NextRequest) {
                 </span>
                 {/* Updated stats row with text-only labels */}
                 <div style={{ display: 'flex', width: '100%', gap: '15px' }}>
-                  <StatItem label="Points" value={parseFloat(displayUserProfile.weeklyPoints).toLocaleString()} />
+                  <StatItem label="Points" value={formatPoints(parseFloat(displayUserProfile.weeklyPoints))} />
                   <StatItem
                     label={`Streak${displayUserProfile.streak <= 1 ? '' : 's'}`}
                     value={String(displayUserProfile.streak)}
                   />
-                  <StatItem label="Claimed" value={parseFloat(displayUserProfile.totalClaimed).toLocaleString(undefined, { minimumFractionDigits: 1 })} />
+                  <StatItem label="Claimed" value={formatPoints(parseFloat(displayUserProfile.totalClaimed))} />
                 </div>
               </div>
             </div>

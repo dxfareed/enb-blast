@@ -1,11 +1,11 @@
-
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getWeek } from 'date-fns';
+import { REWARD_AMOUNTS } from '@/lib/rewardTiers';
+import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
 
-// --- Utility for retrying failed operations ---
 const withRetry = async <T>(
   operation: () => Promise<T>,
   retries = 3,
@@ -34,15 +34,19 @@ const getWeekId = (date: Date): string => {
 };
 
 // Define the reward tiers to calculate rewardEarned for the snapshot
-const REWARD_TIERS: { [key: number]: number } = {
-  1: 26000, 2: 26000, 3: 26000,
-  4: 17000, 5: 17000, 6: 17000, 7: 17000, 8: 17000, 9: 17000, 10: 17000,
-  11: 8000, 12: 8000, 13: 8000, 14: 8000, 15: 8000,
-};
+const REWARD_TIERS = REWARD_AMOUNTS;
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const headersList = headers();
+  const authHeader = (await headersList).get('authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const secret = authHeader.substring(7); // Remove "Bearer " prefix
+
+  if (!process.env.CRON_SECRET || !secret.startsWith(process.env.CRON_SECRET)) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
@@ -79,7 +83,6 @@ export async function GET(request: Request) {
         console.log(`Successfully created leaderboard snapshot for week ${weekId} with ${historyData.length} users.`);
       }
 
-      // --- 2. Reset weekly points for all users ---
       const result = await prisma.user.updateMany({
         data: {
           weeklyPoints: 0,

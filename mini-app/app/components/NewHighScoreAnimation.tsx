@@ -14,10 +14,14 @@ const NewHighScoreAnimation: React.FC<NewHighScoreAnimationProps> = ({ onAnimati
       <Confetti
         width={width}
         height={height}
-        numberOfPieces={500}
+        numberOfPieces={400}
         recycle={false}
         run={true}
         onConfettiComplete={onAnimationComplete}
+        gravity={0.3}
+        initialVelocityX={{ min: -10, max: 10 }}
+        initialVelocityY={{ min: 15, max: 30 }}
+        colors={['#ffc700', '#ffdd57', '#ffefa1', '#ffffff', '#f39c12', '#e67e22']}
       />
       <div className={styles.newHighScoreText}>New High Score!</div>
     </div>

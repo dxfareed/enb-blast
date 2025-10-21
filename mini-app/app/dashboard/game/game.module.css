@@ -3,7 +3,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0 1rem;
-  font-size: 1.125rem;
+  font-size: 0.945rem;
   color: #4b5563;
   font-family: 'Space Mono', monospace;
 }
@@ -53,6 +53,15 @@
   height: 100%;
   pointer-events: none;
   border-radius: 50%;
+}
+
+.itemEmoji {
+  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .overlay {
@@ -267,8 +276,8 @@
 }
 
 .startButton {
-  background-color: #FBBF24; /* Light yellow */
-  color: #000;
+  background-color: #8b5cf6; /* Light yellow */
+  color: #000000;
   font-weight: 700;
   padding: 0.75rem 1.5rem;
   border-radius: 9999px;
@@ -313,9 +322,15 @@
   height: 60px;
   font-size: 2rem;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s, border-color 0.2s;
   color: white;
   line-height: 1;
+  position: relative;
+}
+
+.powerupButton.active {
+  border-color: #22c55e;
+  box-shadow: 0 0 10px 2px #22c55e;
 }
 
 .powerupButton:active {
@@ -324,8 +339,44 @@
 }
 
 .powerupButton:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.powerupLock {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #ef4444; /* red-500 */
+  color: white;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  line-height: 1;
+}
+
+.powerupCheck {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #22c55e; /* green-500 */
+  color: white;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  line-height: 1;
 }
 
 .finalScore {
@@ -333,4 +384,31 @@
   font-weight: 700;
   margin: 0.5rem 0 1.5rem 0;
   line-height: 1;
+}
+
+.activateButton {
+  margin-top: 10px;
+  background-color: #FFC107;
+  color: #000;
+  font-weight: bold;
+  padding: 10px 20px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.activateButton:hover {
+  background-color: #f8d97b;
+}
+
+.activateButton:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.errorMessage {
+  color: #ef4444;
+  margin-top: 10px;
+  font-size: 14px;
 }

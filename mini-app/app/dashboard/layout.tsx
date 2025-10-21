@@ -10,6 +10,7 @@ import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 import HighlightTooltip from '@/app/components/HighlightTooltip';
 import { TourProvider } from '@/app/context/TourContext';
 import GameInfoModal from '@/app/components/GameInfoModal';
+import PowerUpInfoModal from '@/app/components/PowerUpInfoModal';
 import Marquee from '@/app/components/Marquee';
 import { getTokenMarqueeData, TokenMarqueeRawData } from '@/lib/dexscreener';
 import { TOKEN_ADDRESS } from '../utils/constants';
@@ -153,7 +154,6 @@ export default function DashboardLayout({
 
   return (
     <TourProvider value={tourContextValue}>
-      <GameInfoModal show={isInfoModalVisible} onClose={handleCloseModal} />
       <div className={styles.container}>
         {activeTourStep > -1 && (
           <button onClick={handleDismissTour} className={styles.skipButton}>
@@ -196,6 +196,11 @@ export default function DashboardLayout({
           )}
 
           <main className={`${styles.main} ${pathname === '/dashboard/game' ? styles.mainGame : ''}`}>
+            <GameInfoModal
+              show={isInfoModalVisible}
+              onClose={handleCloseModal}
+            />
+            <PowerUpInfoModal />
             {children}
           </main>
 

@@ -258,7 +258,14 @@ const taskCheckers = {
   },
 
   GAME_PLAYED: async (user: { id: string; }): Promise<boolean> => {
-    return taskCheckers.TOKEN_CLAIMED(user);
+    const todayUTC = getStartOfUTCDay();
+    const session = await prisma.gameSession.findFirst({
+      where: {
+        userId: user.id,
+        createdAt: { gte: todayUTC },
+      },
+    });
+    return !!session;
   },
 
   TOKEN_CLAIMED: async (user: { id: string; }): Promise<boolean> => {
@@ -297,6 +304,14 @@ const taskCheckers = {
       },
     });
     return !!visitEvent;
+  },
+
+  HAS_USED_POWERUP: async (user: { powerupExpiration?: Date | null }) => {
+    if (!user.powerupExpiration) {
+      return false;
+    }
+    const todayUTC = getStartOfUTCDay();
+    return user.powerupExpiration >= todayUTC;
   },
 
   HIGH_SCORE_500_PLUS: async (user: { highScore: number; }) => {

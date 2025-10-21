@@ -9,52 +9,34 @@ import { useUser } from '@/app/context/UserContext';
 import DidYouKnow from './DidYouKnow';
 import { BASE_BLOCKCHAIN_FACTS } from '@/app/utils/constants';
 import NewHighScoreAnimation from './NewHighScoreAnimation';
+import * as GameConfig from '@/lib/gameConfig';
 
-const GAME_DURATION = 30;
-
-// Game balance constants
-const INITIAL_SPAWN_RATE = 290;
-const INITIAL_BOMB_SPEED = 5;
-const INITIAL_PICTURE_SPEED = 5;
-const INITIAL_BOMB_CHANCE = 0.1;
-
-const FINAL_SPAWN_RATE = 230;
-const FINAL_BOMB_SPEED = 8.6;
-const FINAL_PICTURE_SPEED = 8.8;
-const FINAL_BOMB_CHANCE = 0.31;
-
-// Item URLs and values
-const PICTURE_URL = "/Enb_000.png";
-const CAP_PICTURE_URL = "/cap.jpg";
-const BASE_PICTURE_VALUE = 5;
-
-const POWER_UP_POINT_2_URL = "/powerup_2.png";
-const POWER_UP_POINT_2_VALUE = 10;
-const POWER_UP_POINT_2_CHANCE = 0.1;
-const POWER_UP_POINT_5_URL = "/powerup_5.png";
-const POWER_UP_POINT_5_VALUE = 15;
-const POWER_UP_POINT_5_CHANCE = 0.05;
-
-const POWER_UP_POINT_10_URL = "/powerup_10.png";
-const POWER_UP_POINT_10_VALUE = 30;
-const POWER_UP_POINT_10_CHANCE = 0.01;
-
-const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
-const POWER_UP_PUMPKIN_VALUE = 500;
-const POWER_UP_PUMPKIN_CHANCE = 0.0005;
+const GAME_DURATION = GameConfig.GAME_DURATION_SECONDS;
 
 export type GameEvent = {
   type: 'collect';
   itemType: ItemType;
   timestamp: number;
 } | {
-  type: 'bomb_hit';
+  type: 'bomb_collision';
+  timestamp: number;
+} | {
+  type: 'time_extend';
+  duration: number;
   timestamp: number;
 };
+
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { POWERUP_CONTRACT_ADDRESS, POWERUP_CONTRACT_ABI, MINT_POWERUP_NFT_CONTRACT_ADDRESS, MINT_POWERUP_NFT_CONTRACT_ABI } from '@/app/utils/constants';
+import PowerUpCountdown from './PowerUpCountdown';
+import Loader from './Loader';
+import Toast from './Toast';
+import GlobalLoader from './GlobalLoader';
 
 type GameEngineProps = {
   onGameWin: (events: GameEvent[]) => void;
   onStartGame: () => Promise<boolean>;
+  onScoreUpdate: (score: number) => void;
   displayScore: number;
   highScore: number;
   isMuted: boolean;
@@ -69,11 +51,16 @@ type GameEngineProps = {
 
 export type GameEngineHandle = { resetGame: () => void; };
 
-type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin';
+type ItemType = 'bomb' | 'picture' | 'powerup_point_2' | 'powerup_point_5' | 'powerup_point_10' | 'powerup_pumpkin' | 'magnet' | 'shield' | 'time';
 type Item = {
   id: number; type: ItemType; x: number; y: number; speed: number;
   imageUrl?: string;
   ref: React.RefObject<HTMLDivElement>;
+};
+type NewItemProperties = {
+  type: ItemType;
+  speed: number;
+  imageUrl?: string;
 };
 type GameState = 'idle' | 'playing' | 'won' | 'lost';
 let nextItemId = 0;
@@ -86,6 +73,7 @@ function isColliding(rect1: DOMRect, rect2: DOMRect): boolean {
 const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   onGameWin,
   onStartGame,
+  onScoreUpdate,
   displayScore,
   highScore,
   isMuted,
@@ -107,10 +95,35 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
+  const [isMagnetActive, setIsMagnetActive] = useState(false);
+  const magnetTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isShieldActive, setIsShieldActive] = useState(false);
+  const shieldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingBombHit = useRef(false);
+  const gameStartTimeRef = useRef<number | null>(null);
   const [showNewHighScoreAnimation, setShowNewHighScoreAnimation] = useState(false);
   const [gameAreaDimensions, setGameAreaDimensions] = useState({ width: 0, height: 0 });
+  const [isActivating, setIsActivating] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
+  const [activationTxHash, setActivationTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
 
+  const { address } = useAccount();
+  const { data: hash, writeContract } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+    useWaitForTransactionReceipt({
+      hash,
+    });
+
+  const isMagnetActiveRef = useRef(isMagnetActive);
+  useEffect(() => { isMagnetActiveRef.current = isMagnetActive; }, [isMagnetActive]);
+  const isShieldActiveRef = useRef(isShieldActive);
+  useEffect(() => { isShieldActiveRef.current = isShieldActive; }, [isShieldActive]);
+  const avatarPositionRef = useRef(avatarPosition);
+  useEffect(() => { avatarPositionRef.current = avatarPosition; }, [avatarPosition]);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const gameEventsRef = useRef<GameEvent[]>([]);
@@ -122,14 +135,163 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const heartbeatSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const gameParamsRef = useRef({
-    bombSpeed: INITIAL_BOMB_SPEED,
-    pictureSpeed: INITIAL_PICTURE_SPEED,
-    spawnRate: INITIAL_SPAWN_RATE,
-    bombChance: INITIAL_BOMB_CHANCE,
+    bombSpeed: GameConfig.INITIAL_BOMB_SPEED,
+    pictureSpeed: GameConfig.INITIAL_PICTURE_SPEED,
+    spawnRate: GameConfig.INITIAL_SPAWN_RATE,
+    bombChance: GameConfig.INITIAL_BOMB_CHANCE,
   });
 
-  const { userProfile } = useUser();
-  const avatarPfp = userProfile?.pfpUrl || PICTURE_URL;
+  const { userProfile, refetchUserProfile } = useUser();
+  const avatarPfp = userProfile?.pfpUrl || GameConfig.PICTURE_URL;
+  const [isPowerupActive, setIsPowerupActive] = useState(false);
+
+  const handleMintPowerUp = async () => {
+    if (!userProfile || !address) {
+      setToast({ message: 'User not connected', type: 'error' });
+      return;
+    }
+
+    setIsMinting(true);
+    setActivationError(null);
+
+    try {
+      let response;
+      const maxRetries = 3;
+      for (let i = 0; i < maxRetries; i++) {
+        response = await sdk.quickAuth.fetch('/api/powerup/mint-signature', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fid: userProfile.fid }),
+        });
+
+        if (response.status !== 500) {
+          break; // Exit loop on success or non-500 error
+        }
+
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!response) {
+        throw new Error('Failed to get a response from the server.');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Request failed with status ' + response.status }));
+        throw new Error(errorData.message || 'Failed to get mint signature.');
+      }
+
+      const { signature, nonce, mintPrice } = await response.json();
+      console.log("Mint price is ", mintPrice);
+      console.log("Signature is ", signature);
+      console.log("Nonce is ", nonce);
+
+      writeContract({
+        address: MINT_POWERUP_NFT_CONTRACT_ADDRESS,
+        abi: MINT_POWERUP_NFT_CONTRACT_ABI,
+        functionName: 'mintPowerUp',
+        args: [BigInt(userProfile.fid), BigInt(nonce), signature],
+        value: BigInt(mintPrice),
+      });
+    } catch (error) {
+      //@ts-ignore
+      console.error('Minting error:', error.message);
+      setActivationError((error as Error).message);
+      setIsMinting(false);
+    }
+  };
+
+  const handleActivatePowerUp = async () => {
+    if (!userProfile || !address) {
+      setToast({ message: 'User not connected', type: 'error' });
+      return;
+    }
+
+    setIsActivating(true);
+    setActivationError(null);
+
+    try {
+      let response;
+      const maxRetries = 3;
+      for (let i = 0; i < maxRetries; i++) {
+        response = await sdk.quickAuth.fetch('/api/powerup/signature', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fid: userProfile.fid }),
+        });
+
+        if (response.status !== 500) {
+          break; // Exit loop on success or non-500 error
+        }
+
+        if (i < maxRetries - 1) { // Don't wait after the last attempt
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!response) {
+        throw new Error('Failed to get a response from the server.');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Request failed with status ' + response?.status }));
+        throw new Error(errorData.message || 'Failed to get activation signature.');
+      }
+
+      const { signature, nonce, depositAmount } = await response.json();
+
+      writeContract({
+        address: POWERUP_CONTRACT_ADDRESS,
+        abi: POWERUP_CONTRACT_ABI,
+        functionName: 'activatePowerUp',
+        args: [BigInt(userProfile.fid), BigInt(nonce), signature],
+        value: BigInt(depositAmount),
+      });
+    } catch (error) {
+      console.error('Activation error:', error);
+      setActivationError((error as Error).message);
+      setIsActivating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isConfirming) {
+      setToast({ message: 'Processings...', type: 'info' });
+    } else if (isConfirmed) {
+      setToast({ message: 'successful! Reloading...', type: 'success' });
+      refetchUserProfile();
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+      setIsActivating(false);
+      setIsMinting(false);
+    }
+  }, [isConfirming, isConfirmed, refetchUserProfile]);
+
+  useEffect(() => {
+    if (userProfile?.powerupExpiration) {
+      const expirationDate = new Date(userProfile.powerupExpiration);
+      const now = new Date();
+
+      if (expirationDate > now) {
+        setIsPowerupActive(true);
+        const timeUntilExpiration = expirationDate.getTime() - now.getTime();
+        
+        const timer = setTimeout(() => {
+          setIsPowerupActive(false);
+          setToast({ message: 'Your Power-Up has expired!', type: 'info' });
+          refetchUserProfile();
+        }, timeUntilExpiration);
+
+        return () => clearTimeout(timer);
+      } else {
+        setIsPowerupActive(false);
+      }
+    } else {
+      setIsPowerupActive(false);
+    }
+  }, [userProfile, refetchUserProfile]);
 
   useEffect(() => {
     if (gameAreaRef.current) {
@@ -141,19 +303,19 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   }, []);
 
   useEffect(() => {
-    if (displayScore > highScore) {
+    if (isGameWon && displayScore > highScore) {
       setShowNewHighScoreAnimation(true);
       const timer = setTimeout(() => {
         setShowNewHighScoreAnimation(false);
-      }, 6000); 
+      }, 6000);
       return () => clearTimeout(timer);
     }
-  }, [displayScore, highScore]);
+  }, [isGameWon, displayScore, highScore]);
 
   useEffect(() => {
     const imageUrls = [
-      '/bomb.png', PICTURE_URL, CAP_PICTURE_URL, POWER_UP_POINT_5_URL, POWER_UP_POINT_10_URL,
-      POWER_UP_POINT_2_URL, POWER_UP_PUMPKIN_URL, avatarPfp
+      '/bomb.png', GameConfig.PICTURE_URL, GameConfig.CAP_PICTURE_URL, GameConfig.POWER_UP_POINT_5_URL, GameConfig.POWER_UP_POINT_10_URL,
+      GameConfig.POWER_UP_POINT_2_URL, GameConfig.POWER_UP_PUMPKIN_URL, GameConfig.POWER_UP_MAGNET_URL, GameConfig.POWER_UP_SHIELD_URL, avatarPfp
     ];
     imageUrls.forEach(url => {
       if (url) { new Image().src = url; }
@@ -178,14 +340,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     heartbeatSoundRef.current.volume = 0.8;
 
     return () => {
-        const sounds = [coinSoundRef, bombSoundRef, backgroundSoundRef, gameOverSoundRef, heartbeatSoundRef];
-        sounds.forEach(soundRef => {
-            if (soundRef.current) {
-                soundRef.current.pause();
-                soundRef.current.src = '';
-                soundRef.current = null;
-            }
-        });
+      const sounds = [coinSoundRef, bombSoundRef, backgroundSoundRef, gameOverSoundRef, heartbeatSoundRef];
+      sounds.forEach(soundRef => {
+        if (soundRef.current) {
+          soundRef.current.pause();
+          soundRef.current.src = '';
+          soundRef.current = null;
+        }
+      });
     };
   }, []);
 
@@ -198,12 +360,20 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     setFloatingScores([]);
     setIsDragging(false);
     setIsGameOverSoundPlayed(false);
+    setIsMagnetActive(false);
+    if (magnetTimerRef.current) {
+      clearTimeout(magnetTimerRef.current);
+    }
+    setIsShieldActive(false);
+    if (shieldTimerRef.current) {
+      clearTimeout(shieldTimerRef.current);
+    }
     gameEventsRef.current = [];
     gameParamsRef.current = {
-      bombSpeed: INITIAL_BOMB_SPEED,
-      pictureSpeed: INITIAL_PICTURE_SPEED,
-      spawnRate: INITIAL_SPAWN_RATE,
-      bombChance: INITIAL_BOMB_CHANCE,
+      bombSpeed: GameConfig.INITIAL_BOMB_SPEED,
+      pictureSpeed: GameConfig.INITIAL_PICTURE_SPEED,
+      spawnRate: GameConfig.INITIAL_SPAWN_RATE,
+      bombChance: GameConfig.INITIAL_BOMB_CHANCE,
     };
   }, []);
 
@@ -213,6 +383,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     resetGame();
     const success = await onStartGame();
     if (success) {
+      gameStartTimeRef.current = Date.now();
       setGameState('playing');
       if (coinSoundRef.current?.paused) { coinSoundRef.current.play().catch(() => { }).then(() => coinSoundRef.current?.pause()); }
       if (bombSoundRef.current?.paused) { bombSoundRef.current.play().catch(() => { }).then(() => bombSoundRef.current?.pause()); }
@@ -280,16 +451,19 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           setGameState('won');
           return 0;
         }
-        const timeElapsed = GAME_DURATION - newTime;
-        const progress = Math.min(timeElapsed / (GAME_DURATION - 15), 1);
-        gameParamsRef.current = {
-          bombSpeed: INITIAL_BOMB_SPEED + (FINAL_BOMB_SPEED - INITIAL_BOMB_SPEED) * progress,
-          pictureSpeed: INITIAL_PICTURE_SPEED + (FINAL_PICTURE_SPEED - INITIAL_PICTURE_SPEED) * progress,
-          spawnRate: INITIAL_SPAWN_RATE - (INITIAL_SPAWN_RATE - FINAL_SPAWN_RATE) * progress,
-          bombChance: INITIAL_BOMB_CHANCE + (FINAL_BOMB_CHANCE - INITIAL_BOMB_CHANCE) * progress,
-        };
         return newTime;
       });
+
+      if (gameStartTimeRef.current) {
+        const timeElapsed = (Date.now() - gameStartTimeRef.current) / 1000;
+        const progress = Math.min(timeElapsed / (GAME_DURATION - 15), 1);
+        gameParamsRef.current = {
+          bombSpeed: GameConfig.INITIAL_BOMB_SPEED + (GameConfig.FINAL_BOMB_SPEED - GameConfig.INITIAL_BOMB_SPEED) * progress,
+          pictureSpeed: GameConfig.INITIAL_PICTURE_SPEED + (GameConfig.FINAL_PICTURE_SPEED - GameConfig.INITIAL_PICTURE_SPEED) * progress,
+          spawnRate: GameConfig.INITIAL_SPAWN_RATE - (GameConfig.INITIAL_SPAWN_RATE - GameConfig.FINAL_SPAWN_RATE) * progress,
+          bombChance: GameConfig.INITIAL_BOMB_CHANCE + (GameConfig.FINAL_BOMB_CHANCE - GameConfig.INITIAL_BOMB_CHANCE) * progress,
+        };
+      }
     }, 1000);
 
     let animationFrameId: number;
@@ -309,72 +483,188 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         if (shouldSpawn) {
           const rand = Math.random();
           const { bombChance } = gameParamsRef.current;
-          let itemType: ItemType = 'picture';
-          let imageUrl: string | undefined = undefined;
+          let newItem: NewItemProperties | null = null;
 
-          const pumpkinThreshold = bombChance + POWER_UP_PUMPKIN_CHANCE;
-          const p10Threshold = pumpkinThreshold + POWER_UP_POINT_10_CHANCE;
-          const p5Threshold = p10Threshold + POWER_UP_POINT_5_CHANCE;
-          const p2Threshold = p5Threshold + POWER_UP_POINT_2_CHANCE;
+          // These chances are used in both scenarios
+          const powerupMultiplier = isPowerupActive ? 1.7 : 0.2;
+          const powerUpPumpkinChance = GameConfig.POWER_UP_PUMPKIN_CHANCE * powerupMultiplier;
+          const powerUpPoint10Chance = GameConfig.POWER_UP_POINT_10_CHANCE * powerupMultiplier;
+          const powerUpPoint5Chance = GameConfig.POWER_UP_POINT_5_CHANCE * powerupMultiplier;
+          const powerUpPoint2Chance = GameConfig.POWER_UP_POINT_2_CHANCE * powerupMultiplier;
 
-          if (rand < bombChance) itemType = 'bomb';
-          else if (rand < pumpkinThreshold) itemType = 'powerup_pumpkin';
-          else if (rand < p10Threshold) itemType = 'powerup_point_10';
-          else if (rand < p5Threshold) itemType = 'powerup_point_5';
-          else if (rand < p2Threshold) itemType = 'powerup_point_2';
+          if (isPowerupActive) {
+            // --- Logic for ACTIVE power-up users (includes magnet, shield, time) ---
+            const p_bomb = bombChance;
+            const p_pumpkin = p_bomb + powerUpPumpkinChance;
+            const p_magnet = p_pumpkin + GameConfig.POWER_UP_MAGNET_CHANCE;
+            const p_shield = p_magnet + GameConfig.POWER_UP_SHIELD_CHANCE;
+            const p_time = p_shield + GameConfig.POWER_UP_TIME_CHANCE;
+            const p_10 = p_time + powerUpPoint10Chance;
+            const p_5 = p_10 + powerUpPoint5Chance;
+            const p_2 = p_5 + powerUpPoint2Chance;
 
-          if (itemType === 'picture') {
-            imageUrl = Math.random() < 0.5 ? PICTURE_URL : CAP_PICTURE_URL;
+            if (rand < p_bomb) {
+              newItem = { type: 'bomb', speed: gameParamsRef.current.bombSpeed, imageUrl: '/bomb.png' };
+            } else if (rand < p_pumpkin) {
+              newItem = { type: 'powerup_pumpkin', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_PUMPKIN_URL };
+            } else if (rand < p_magnet) {
+              newItem = { type: 'magnet', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_MAGNET_URL };
+            } else if (rand < p_shield) {
+              newItem = { type: 'shield', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_SHIELD_URL };
+            } else if (rand < p_time) {
+              newItem = { type: 'time', speed: gameParamsRef.current.pictureSpeed };
+            } else if (rand < p_10) {
+              newItem = { type: 'powerup_point_10', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_10_URL };
+            } else if (rand < p_5) {
+              newItem = { type: 'powerup_point_5', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_5_URL };
+            } else if (rand < p_2) {
+              newItem = { type: 'powerup_point_2', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_2_URL };
+            } else {
+              newItem = { type: 'picture', speed: gameParamsRef.current.pictureSpeed, imageUrl: Math.random() < 0.5 ? GameConfig.PICTURE_URL : GameConfig.CAP_PICTURE_URL };
+            }
+          } else {
+            // --- Logic for INACTIVE power-up users (excludes magnet, shield, time) ---
+            const p_bomb = bombChance;
+            const p_pumpkin = p_bomb + powerUpPumpkinChance;
+            // Note: We skip magnet, shield, and time in the probability stack
+            const p_10 = p_pumpkin + powerUpPoint10Chance;
+            const p_5 = p_10 + powerUpPoint5Chance;
+            const p_2 = p_5 + powerUpPoint2Chance;
+
+            if (rand < p_bomb) {
+              newItem = { type: 'bomb', speed: gameParamsRef.current.bombSpeed, imageUrl: '/bomb.png' };
+            } else if (rand < p_pumpkin) {
+              newItem = { type: 'powerup_pumpkin', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_PUMPKIN_URL };
+            } else if (rand < p_10) {
+              newItem = { type: 'powerup_point_10', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_10_URL };
+            } else if (rand < p_5) {
+              newItem = { type: 'powerup_point_5', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_5_URL };
+            } else if (rand < p_2) {
+              newItem = { type: 'powerup_point_2', speed: gameParamsRef.current.pictureSpeed, imageUrl: GameConfig.POWER_UP_POINT_2_URL };
+            } else {
+              newItem = { type: 'picture', speed: gameParamsRef.current.pictureSpeed, imageUrl: Math.random() < 0.5 ? GameConfig.PICTURE_URL : GameConfig.CAP_PICTURE_URL };
+            }
           }
 
-          const speed = itemType === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed;
-          currentItems.push({ id: nextItemId++, type: itemType, x: Math.random() * 90 + 5, y: -10, speed, imageUrl, ref: createRef() });
+          if (newItem) {
+            currentItems.push({
+              id: nextItemId++,
+              ...newItem,
+              x: Math.random() * 90 + 5,
+              y: -10,
+              ref: createRef()
+            });
+          }
         }
 
-        // --- FIX: Reverted this line to match the stable version ---
-        let processedItems = currentItems.reduce((acc: Item[], item: Item) => {
-          const newItem = { ...item, y: item.y + (item.type === 'bomb' ? gameParamsRef.current.bombSpeed : gameParamsRef.current.pictureSpeed) };
-          if (newItem.y < gameAreaDimensions.height + 60) {
-            acc.push(newItem);
+        let processedItems = currentItems.map(item => {
+          let newItem = { ...item, y: item.y + item.speed };
+          const nonMagneticTypes: ItemType[] = ['bomb', 'shield', 'time'];
+          if (isMagnetActive && !nonMagneticTypes.includes(item.type) && avatarRef.current && gameAreaRef.current) {
+            const gameRect = gameAreaRef.current.getBoundingClientRect();
+            const avatarCenterX = avatarPositionRef.current.x;
+            const avatarCenterY = avatarPositionRef.current.y;
+
+            const itemRect = item.ref.current?.getBoundingClientRect();
+            if (itemRect) {
+              const itemXPixels = (item.x / 100) * gameRect.width;
+              const itemCenterX = itemXPixels + (itemRect.width / 2);
+              const itemCenterY = newItem.y + (itemRect.height / 2);
+
+              const dx = avatarCenterX - itemCenterX;
+              const dy = avatarCenterY - itemCenterY;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+
+              if (distance > 1) {
+                const pullStrength = 5;
+                const pullX = (dx / distance) * pullStrength;
+                const pullY = (dy / distance) * pullStrength;
+
+                const newXPixels = itemXPixels + pullX;
+                newItem.x = (newXPixels / gameRect.width) * 100;
+                newItem.y += pullY;
+              }
+            }
           }
-          return acc;
-        }, []);
+          return newItem;
+        }).filter(item => item.y < gameAreaDimensions.height + 60);
+
 
         if (avatarRef.current) {
           const avatarRect = avatarRef.current.getBoundingClientRect();
+          const collectedItemIds = new Set<number>();
           let bombCollisionItem: Item | null = null;
-          const remainingItems = processedItems.filter(item => {
-            if (!item.ref.current || !isColliding(avatarRect, item.ref.current.getBoundingClientRect())) return true;
 
-            if (item.type === 'bomb') {
-              if (!isInvincibleRef.current) bombCollisionItem = item;
-            } else {
-              gameEventsRef.current.push({ type: 'collect', itemType: item.type, timestamp: Date.now() });
-              if (coinSoundRef.current) {
-                coinSoundRef.current.currentTime = 0;
-                coinSoundRef.current.play().catch(e => console.error(e));
+          processedItems.forEach(item => {
+            if (collectedItemIds.has(item.id) || !item.ref.current) return;
+
+            if (isColliding(avatarRect, item.ref.current.getBoundingClientRect())) {
+              collectedItemIds.add(item.id);
+
+              if (item.type === 'bomb') {
+                // Always report the collision to the server.
+                gameEventsRef.current.push({ type: 'bomb_collision', timestamp: Date.now() });
+
+                // Handle client-side effects only if not shielded or invincible.
+                if (!isInvincibleRef.current && !isShieldActiveRef.current) {
+                  bombCollisionItem = item;
+                }
+              } else {
+                gameEventsRef.current.push({ type: 'collect', itemType: item.type, timestamp: Date.now() });
+                if (coinSoundRef.current) {
+                  coinSoundRef.current.currentTime = 0;
+                  coinSoundRef.current.play().catch(e => console.error(e));
+                }
+                sdk.haptics.impactOccurred('soft');
+                let points = 0;
+                switch (item.type) {
+                  case 'picture': points = GameConfig.BASE_PICTURE_VALUE; break;
+                  case 'powerup_point_2': points = GameConfig.POWER_UP_POINT_2_VALUE; break;
+                  case 'powerup_point_5': points = GameConfig.POWER_UP_POINT_5_VALUE; break;
+                  case 'powerup_point_10': points = GameConfig.POWER_UP_POINT_10_VALUE; break;
+                  case 'powerup_pumpkin': points = GameConfig.POWER_UP_PUMPKIN_VALUE; break;
+                }
+                if (item.type === 'magnet' && isPowerupActive) {
+                  setIsMagnetActive(true);
+                  if (magnetTimerRef.current) {
+                    clearTimeout(magnetTimerRef.current);
+                  }
+                  magnetTimerRef.current = setTimeout(() => {
+                    setIsMagnetActive(false);
+                  }, GameConfig.MAGNET_DURATION * 1000);
+                } else if (item.type === 'shield' && isPowerupActive) {
+                  setIsShieldActive(true);
+                  if (shieldTimerRef.current) {
+                    clearTimeout(shieldTimerRef.current);
+                  }
+                  shieldTimerRef.current = setTimeout(() => {
+                    setIsShieldActive(false);
+                  }, GameConfig.SHIELD_DURATION * 1000);
+                } else if (item.type === 'time' && isPowerupActive) {
+                  const timeExtension = GameConfig.TIME_EXTENSION_SECONDS;
+                  setTimeLeft(prev => prev + timeExtension);
+                  gameEventsRef.current.push({ type: 'time_extend', duration: timeExtension, timestamp: Date.now() });
+                } else {
+                  const pointsToAdd = points
+                  setScore(prev => {
+                    const newScore = prev + points;
+                    // console.log(`Item collected: Prev: ${prev}, Points: +${pointsToAdd}, New: ${newScore}`);
+                    onScoreUpdate(newScore);
+                    return newScore;
+                  });
+                  const newFloatingScore = { id: nextItemId++, points: pointsToAdd, x: item.x, y: item.y };
+                  setFloatingScores(prev => [...prev, newFloatingScore]);
+                }
               }
-              sdk.haptics.impactOccurred('soft');
-              let points = 0;
-              switch (item.type) {
-                case 'picture': points = BASE_PICTURE_VALUE; break;
-                case 'powerup_point_2': points = POWER_UP_POINT_2_VALUE; break;
-                case 'powerup_point_5': points = POWER_UP_POINT_5_VALUE; break;
-                case 'powerup_point_10': points = POWER_UP_POINT_10_VALUE; break;
-                case 'powerup_pumpkin': points = POWER_UP_PUMPKIN_VALUE; break;
-              }
-              setScore(prev => prev + points);
-              const newFloatingScore = { id: nextItemId++, points, x: item.x, y: item.y };
-              setFloatingScores(prev => [...prev, newFloatingScore]);
             }
-            return false;
           });
 
           if (bombCollisionItem) {
             if (!isProcessingBombHit.current) {
               isProcessingBombHit.current = true;
 
-              gameEventsRef.current.push({ type: 'bomb_hit', timestamp: Date.now() });
+              // Note: A 'bomb_collision' event is already sent above.
+              // This block now only handles the immediate client-side feedback.
               bombSoundRef.current?.play().catch(e => console.error(e));
               sdk.haptics.impactOccurred('heavy');
               setIsBombHit(true);
@@ -384,6 +674,8 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               setScore(prev => {
                 const newScore = prev <= 100 ? Math.floor(prev * 0.5) : Math.floor(prev * 0.4);
                 const pointsDeducted = prev - newScore;
+                // console.log(`Bomb hit: Prev: ${prev}, Points: -${pointsDeducted}, New: ${newScore}`);
+                onScoreUpdate(newScore);
                 if (pointsDeducted > 0) {
                   const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
                   setFloatingScores(prevScores => [...prevScores, newFloatingScore]);
@@ -396,10 +688,10 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 setIsInvincible(false);
                 isProcessingBombHit.current = false;
               }, 3000);
-              setItems([]); // Clear visual items only, not the event log
+              setItems([]);
             }
           }
-          return remainingItems;
+          return processedItems.filter(item => !collectedItemIds.has(item.id));
         }
         return processedItems;
       });
@@ -411,6 +703,12 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     return () => {
       clearInterval(timerInterval);
       cancelAnimationFrame(animationFrameId);
+      if (magnetTimerRef.current) {
+        clearTimeout(magnetTimerRef.current);
+      }
+      if (shieldTimerRef.current) {
+        clearTimeout(shieldTimerRef.current);
+      }
     };
   }, [gameState]);
 
@@ -430,17 +728,25 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const renderItem = (item: Item) => {
     switch (item.type) {
       case 'bomb': return <img src="/bomb.png" alt="Bomb" className={gameStyles.itemImage} />;
-      case 'picture': return <img src={item.imageUrl || PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
-      case 'powerup_point_5': return <img src={POWER_UP_POINT_5_URL} alt="Power Up" className={gameStyles.itemImage} />;
-      case 'powerup_point_10': return <img src={POWER_UP_POINT_10_URL} alt="Power Up" className={gameStyles.itemImage} />;
-      case 'powerup_point_2': return <img src={POWER_UP_POINT_2_URL} alt="Power Up" className={gameStyles.itemImage} />;
-      case 'powerup_pumpkin': return <img src={POWER_UP_PUMPKIN_URL} alt="Power Up" className={gameStyles.itemImage} />;
+      case 'picture': return <img src={item.imageUrl || GameConfig.PICTURE_URL} alt="Target" className={gameStyles.itemImage} />;
+      case 'powerup_point_5': return <img src={GameConfig.POWER_UP_POINT_5_URL} alt="Power Up" className={gameStyles.itemImage} />;
+      case 'powerup_point_10': return <img src={GameConfig.POWER_UP_POINT_10_URL} alt="Power Up" className={gameStyles.itemImage} />;
+      case 'powerup_point_2': return <img src={GameConfig.POWER_UP_POINT_2_URL} alt="Power Up" className={gameStyles.itemImage} />;
+      case 'powerup_pumpkin': return <img src={GameConfig.POWER_UP_PUMPKIN_URL} alt="Power Up" className={gameStyles.itemImage} />;
+      case 'magnet': return <img src={GameConfig.POWER_UP_MAGNET_URL} alt="Magnet" className={gameStyles.itemImage} />;
+      case 'shield': return <img src={GameConfig.POWER_UP_SHIELD_URL} alt="Shield" className={gameStyles.itemImage} />;
+      case 'time': return <span className={gameStyles.itemEmoji}>⏰</span>;
       default: return null;
     }
   };
 
+  if (isReloading) {
+    return <GlobalLoader message="Power-up expired, reloading..." />;
+  }
+
   return (
     <>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {showNewHighScoreAnimation && <NewHighScoreAnimation onAnimationComplete={onAnimationComplete} width={gameAreaDimensions.width} height={gameAreaDimensions.height} />}
       <div className={gameStyles.gameStats}>
         <span>Score: <strong>{score.toLocaleString()}</strong></span>
@@ -479,12 +785,46 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                     Click to Start
                   </button>
                   <div className={gameStyles.powerupsSection}>
-                    <h3 className={gameStyles.powerupsTitle}><del>Power Ups</del></h3>
+                    <h3 className={gameStyles.powerupsTitle}>Power Ups</h3>
                     <div className={gameStyles.powerupsContainer}>
-                      <button className={gameStyles.powerupButton} disabled>🧲</button>
-                      <button className={gameStyles.powerupButton} disabled>🛡️</button>
-                      <button className={gameStyles.powerupButton} disabled>⏰</button>
+                      <button className={`${gameStyles.powerupButton} ${isPowerupActive ? gameStyles.active : ''}`} disabled={!isPowerupActive}>
+                        {isPowerupActive ? <span className={gameStyles.powerupCheck}>✓</span> : <span className={gameStyles.powerupLock}>🔒</span>}
+                        🧲
+                      </button>
+                      <button className={`${gameStyles.powerupButton} ${isPowerupActive ? gameStyles.active : ''}`} disabled={!isPowerupActive}>
+                        {isPowerupActive ? <span className={gameStyles.powerupCheck}>✓</span> : <span className={gameStyles.powerupLock}>🔒</span>}
+                        🛡️
+                      </button>
+                      <button className={`${gameStyles.powerupButton} ${isPowerupActive ? gameStyles.active : ''}`} disabled={!isPowerupActive}>
+                        {isPowerupActive ? <span className={gameStyles.powerupCheck}>✓</span> : <span className={gameStyles.powerupLock}>🔒</span>}
+                        ⏰
+                      </button>
                     </div>
+                    {isPowerupActive && userProfile?.powerupExpiration ? (
+                      <PowerUpCountdown expiration={userProfile.powerupExpiration} />
+                    ) : (
+                      <button onClick={handleMintPowerUp} className={gameStyles.activateButton} disabled={isMinting || isConfirming} style={{ marginTop: '10px' }}>
+                        {isMinting || isConfirming ? (
+                          <>
+                            <Loader />
+                            Minting...
+                          </>
+                        ) : (
+                          'Mint PowerUps'
+                        )}
+                      </button>
+                    )}
+                    {/*                       <button onClick={handleActivatePowerUp} className={gameStyles.activateButton} disabled={isActivating || isConfirming}>
+                        {isActivating || isConfirming ? (
+                          <>
+                            <Loader />
+                            Activating...
+                          </>
+                        ) : (
+                          'Activate Power Ups'
+                        )}
+                      </button> */}
+                    {activationError && <p className={gameStyles.errorMessage}>{activationError}</p>}
                   </div>
                 </>
               )}
@@ -519,7 +859,33 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
           </div>
         )}
 
-        {gameState === 'playing' && <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />}
+        {gameState === 'playing' && (
+          <>
+            <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />
+            {isMagnetActive && (
+              <span style={{
+                position: 'absolute',
+                top: avatarPosition.y - 10,
+                left: avatarPosition.x + 30,
+                fontSize: '28px',
+                zIndex: 100,
+              }}>
+                🧲
+              </span>
+            )}
+            {isShieldActive && (
+              <span style={{
+                position: 'absolute',
+                top: avatarPosition.y - 40,
+                left: avatarPosition.x + 30,
+                fontSize: '28px',
+                zIndex: 100,
+              }}>
+                🛡️
+              </span>
+            )}
+          </>
+        )}
 
         {items.map(item => (
           <div

@@ -1,17 +1,14 @@
-
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { getWeek } from 'date-fns';
 
-const prisma = new PrismaClient();
-
-// Helper to get the week ID for the *previous* week
+// Helper to get the week ID for the *previous* week to ensure we reward the correct snapshot.
 const getLastWeekId = (): string => {
   const now = new Date();
-  // Go back 7 days to ensure we are in the previous week
-  const lastWeek = new Date(now.setDate(now.getDate() - 7));
-  const year = lastWeek.getUTCFullYear();
-  const week = getWeek(lastWeek, { weekStartsOn: 1 }); // Assuming week starts on Monday
+  // Go back 7 days to ensure we are safely in the previous week's snapshot period.
+  const lastWeekDate = new Date(now.setDate(now.getDate() - 7));
+  const year = lastWeekDate.getUTCFullYear();
+  const week = getWeek(lastWeekDate, { weekStartsOn: 1 }); // Assuming week starts on Monday
   return `${year}-${week.toString().padStart(2, '0')}`;
 };
 
@@ -25,44 +22,40 @@ export async function GET(request: Request) {
 
   try {
     const weekId = getLastWeekId();
-
-    // Find the user first to get their ID
-    const user = await prisma.user.findUnique({
-      where: { fid: BigInt(fid) },
-    });
-
-    if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
-    }
-
-    // Now, fetch the history for that user for the last week
-    const history = await prisma.weeklyLeaderboardHistory.findUnique({
+    
+    const userHistory = await prisma.weeklyLeaderboardHistory.findFirst({
       where: {
-        weekId_userId: {
-          weekId: weekId,
-          userId: user.id,
+        weekId: weekId,
+        user: {
+          fid: BigInt(fid),
+        },
+      },
+      include: {
+        user: {
+          select: {
+            username: true,
+            pfpUrl: true,
+          },
         },
       },
     });
 
-    if (!history) {
-      return NextResponse.json({ currentUserHistory: null, message: 'No history found for last week.' });
+    if (!userHistory) {
+      return NextResponse.json({ message: "You weren't on the leaderboard last week. Keep playing!" }, { status: 404 });
     }
-    
-    // To keep the response structure similar, we can format it like this
-    const currentUserHistory = {
-        username: user.username,
-        pfpUrl: user.pfpUrl,
-        weeklyPoints: history.weeklyPoints.toString(),
-        rank: history.rank,
-        rewardEarned: history.rewardEarned.toString(),
+
+    const response = {
+      fid: fid,
+      username: userHistory.user.username,
+      pfpUrl: userHistory.user.pfpUrl,
+      weeklyPoints: userHistory.weeklyPoints.toString(),
+      rank: userHistory.rank,
+      rewardEarned: userHistory.rewardEarned.toString(),
     };
 
-    return NextResponse.json({ currentUserHistory });
-
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching leaderboard history:', error);
-    // @ts-ignore
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Error fetching weekly leaderboard history:', error);
+    return NextResponse.json({ message: 'An error occurred while fetching weekly stats.' }, { status: 500 });
   }
 }

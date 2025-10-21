@@ -5,12 +5,12 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/reset-weekly-points",
-      "schedule": "55 15 * * 4"
+      "path": "/api/cron/broadcast",
+      "schedule": "0 16 * * *"
     },
     {
-      "path": "/api/cron/reward-weekly-leaderboard",
-      "schedule": "58 15 * * 4"
+      "path": "/api/cron/reset-weekly-points",
+      "schedule": "5 16 * * 4"
     }
   ]
 }
