@@ -803,7 +803,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                     {isPowerupActive && userProfile?.powerupExpiration ? (
                       <PowerUpCountdown expiration={userProfile.powerupExpiration} />
                     ) : (
-                      <button onClick={handleMintPowerUp} className={gameStyles.activateButton} disabled={true/* isMinting || isConfirming */} style={{ marginTop: '10px' }}>
+                      <button onClick={handleMintPowerUp} className={gameStyles.activateButton} disabled={isMinting || isConfirming} style={{ marginTop: '10px' }}>
                         {isMinting || isConfirming ? (
                           <>
                             <Loader />
