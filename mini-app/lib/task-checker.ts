@@ -56,6 +56,22 @@ const checkers: Record<string, Checker> = {
     });
     return !!visit;
   },
+  HAS_USED_POWERUP: async (fid) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const user = await prisma.user.findUnique({
+      where: {
+        fid,
+      },
+    });
+
+    if (!user || !user.powerupExpiration) {
+      return false;
+    }
+
+    return user.powerupExpiration >= today;
+  },
 };
 
 export const checkTask = async (

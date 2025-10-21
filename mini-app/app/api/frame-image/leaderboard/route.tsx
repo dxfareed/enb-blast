@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { formatScore } from '@/app/utils/format';
+import { formatPoints } from '@/app/utils/format';
 
 export const runtime = 'edge';
 
@@ -32,8 +32,8 @@ export async function GET(request: Request) {
   const username = searchParams.get('username') || 'Anonymous';
   const pfpUrl = searchParams.get('pfpUrl') || '';
   const rank = searchParams.get('rank') || 'N/A';
-  const weeklyPoints = formatScore(parseInt(searchParams.get('weeklyPoints') || '0'));
-  const totalClaimed = formatScore(parseFloat(searchParams.get('totalClaimed') || '0'));
+  const weeklyPoints = formatPoints(parseInt(searchParams.get('weeklyPoints') || '0'));
+  const totalClaimed = formatPoints(parseFloat(searchParams.get('totalClaimed') || '0'));
 
   const spaceMonoBold = fetch(
     new URL('/SpaceMono-Bold.ttf', process.env.NEXT_PUBLIC_URL as string)
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
           textAlign: 'center',
           fontWeight: 'bold'
         }}>
-          Let's gooo, blast some ENBs!
+          Let's gooo blast em!
         </div>
       </div>
     ),

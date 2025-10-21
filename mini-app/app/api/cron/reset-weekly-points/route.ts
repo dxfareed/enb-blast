@@ -33,16 +33,16 @@ const getWeekId = (date: Date): string => {
   return `${year}-${week.toString().padStart(2, '0')}`;
 };
 
+import { REWARD_AMOUNTS } from '@/lib/rewardTiers';
+
+// ...
+
 // Define the reward tiers to calculate rewardEarned for the snapshot
-const REWARD_TIERS: { [key: number]: number } = {
-  1: 26000, 2: 26000, 3: 26000,
-  4: 17000, 5: 17000, 6: 17000, 7: 17000, 8: 17000, 9: 17000, 10: 17000,
-  11: 8000, 12: 8000, 13: 8000, 14: 8000, 15: 8000,
-};
+const REWARD_TIERS = REWARD_AMOUNTS;
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = request.headers.get('x-vercel-cron-secret');
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 

@@ -306,6 +306,14 @@ const taskCheckers = {
     return !!visitEvent;
   },
 
+  HAS_USED_POWERUP: async (user: { powerupExpiration?: Date | null }) => {
+    if (!user.powerupExpiration) {
+      return false;
+    }
+    const todayUTC = getStartOfUTCDay();
+    return user.powerupExpiration >= todayUTC;
+  },
+
   HIGH_SCORE_500_PLUS: async (user: { highScore: number; }) => {
     return user.highScore >= 500;
   },

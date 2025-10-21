@@ -8,6 +8,7 @@ import WeeklyCountdown from '@/app/components/WeeklyCountdown';
 import { formatPoints } from '@/app/utils/format';
 import Loader from '@/app/components/Loader';
 import { ChevronDown } from 'lucide-react';
+import { REWARD_TIERS } from '@/lib/rewardTiers';
 
 type LeaderboardUser = {
   fid: number;
@@ -139,26 +140,12 @@ export default function LeaderboardPage() {
             </div>
             {activeTab === 'rewards' && (
               <div className={styles.tabContent}>
-                <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.legendaryText}`}>1st Place</p>
-                  <p className={styles.tierReward}>90,000 $CAP</p>
-                </div>
-                <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.superBasedText}`}>2nd Place</p>
-                  <p className={styles.tierReward}>60,000 $CAP</p>
-                </div>
-                <div className={styles.tier}>
-                  <p className={`${styles.tierRank} ${styles.basedText}`}>3rd Place</p>
-                  <p className={styles.tierReward}>40,000 $CAP</p>
-                </div>
-                <div className={styles.tier}>
-                  <p className={styles.tierRank}>4th/5th Place</p>
-                  <p className={styles.tierReward}>15,000 $CAP</p>
-                </div>
-                <div className={styles.tier}>
-                  <p className={styles.tierRank}>6th-10th Place</p>
-                  <p className={styles.tierReward}>6,000 $CAP</p>
-                </div>
+                {REWARD_TIERS.map((tier) => (
+                  <div className={styles.tier} key={tier.rank}>
+                    <p className={`${styles.tierRank} ${tier.style ? styles[tier.style] : ''}`}>{tier.rank}</p>
+                    <p className={styles.tierReward}>{tier.reward}</p>
+                  </div>
+                ))}
               </div>
             )}
             {activeTab === 'earn' && (

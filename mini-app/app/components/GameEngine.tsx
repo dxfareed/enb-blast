@@ -257,9 +257,9 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
   useEffect(() => {
     if (isConfirming) {
-      setToast({ message: 'Processing transaction...', type: 'info' });
+      setToast({ message: 'Processings...', type: 'info' });
     } else if (isConfirmed) {
-      setToast({ message: 'Transaction successful! Reloading...', type: 'success' });
+      setToast({ message: 'successful! Reloading...', type: 'success' });
       refetchUserProfile();
       setTimeout(() => {
         window.location.reload();
@@ -270,31 +270,28 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   }, [isConfirming, isConfirmed, refetchUserProfile]);
 
   useEffect(() => {
-
     if (userProfile?.powerupExpiration) {
       const expirationDate = new Date(userProfile.powerupExpiration);
-      if (expirationDate > new Date()) {
+      const now = new Date();
+
+      if (expirationDate > now) {
         setIsPowerupActive(true);
+        const timeUntilExpiration = expirationDate.getTime() - now.getTime();
+        
+        const timer = setTimeout(() => {
+          setIsPowerupActive(false);
+          setToast({ message: 'Your Power-Up has expired!', type: 'info' });
+          refetchUserProfile();
+        }, timeUntilExpiration);
+
+        return () => clearTimeout(timer);
       } else {
         setIsPowerupActive(false);
       }
+    } else {
+      setIsPowerupActive(false);
     }
-  }, [userProfile]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (userProfile?.powerupExpiration) {
-        const expirationDate = new Date(userProfile.powerupExpiration);
-        console.log("this is the user expire date ", expirationDate)
-        if (expirationDate < new Date() || expirationDate == null) {
-          setIsReloading(true);
-          window.location.reload();
-        }
-      }
-    }, 1 * (60 * 1000)); // 1 * (60 * 1000) => 1 minute
-
-    return () => clearInterval(interval);
-  }, [userProfile]);
+  }, [userProfile, refetchUserProfile]);
 
   useEffect(() => {
     if (gameAreaRef.current) {
@@ -806,7 +803,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                     {isPowerupActive && userProfile?.powerupExpiration ? (
                       <PowerUpCountdown expiration={userProfile.powerupExpiration} />
                     ) : (
-                      <button onClick={handleMintPowerUp} className={gameStyles.activateButton} disabled={isMinting || isConfirming} style={{ marginTop: '10px' }}>
+                      <button onClick={handleMintPowerUp} className={gameStyles.activateButton} disabled={true/* isMinting || isConfirming */} style={{ marginTop: '10px' }}>
                         {isMinting || isConfirming ? (
                           <>
                             <Loader />

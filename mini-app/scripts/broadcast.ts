@@ -7,76 +7,76 @@ interface NotificationDetails {
 }
 
 type UserToNotify = {
-    fid: bigint;
-    notificationToken: string | null;
-    walletAddress?: string;
+  fid: bigint;
+  notificationToken: string | null;
+  walletAddress?: string;
 };
 
 async function sendNotifications(
-    usersToNotify: UserToNotify[], 
-    notificationConfig: { title: string; body: string; },
-    apiUrl: string,
-    apiSecret: string
+  usersToNotify: UserToNotify[],
+  notificationConfig: { title: string; body: string; },
+  apiUrl: string,
+  apiSecret: string
 ) {
-    if (usersToNotify.length === 0) {
-        console.log("No users to notify.");
-        return;
+  if (usersToNotify.length === 0) {
+    console.log("No users to notify.");
+    return;
+  }
+
+  console.log(`Found ${usersToNotify.length} user(s) to notify.`);
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const user of usersToNotify) {
+    const fid = Number(user.fid);
+
+    try {
+      const rawToken = user.notificationToken;
+
+      if (!rawToken || rawToken.trim() === '') {
+        console.log(`Skipping FID ${fid} due to empty token.`);
+        errorCount++;
+        continue;
+      }
+
+      const sanitizedToken = rawToken.trim().replace(/\0/g, '');
+      const notificationDetails = JSON.parse(sanitizedToken) as NotificationDetails;
+
+      const payload = {
+        fid,
+        notification: {
+          ...notificationConfig,
+          notificationDetails,
+        },
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiSecret}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        console.log(`Successfully sent notification to FID: ${fid}`);
+        successCount++;
+      } else {
+        const errorResult = await response.json();
+        console.error(`Failed to send to FID: ${fid}. Status: ${response.status}. Reason:`, errorResult.error || 'Unknown');
+        errorCount++;
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error(`Error processing FID: ${fid}. The token might be malformed.`, message);
+      errorCount++;
     }
+  }
 
-    console.log(`Found ${usersToNotify.length} user(s) to notify.`);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const user of usersToNotify) {
-        const fid = Number(user.fid);
-
-        try {
-            const rawToken = user.notificationToken;
-
-            if (!rawToken || rawToken.trim() === '') {
-                console.log(`Skipping FID ${fid} due to empty token.`);
-                errorCount++;
-                continue;
-            }
-
-            const sanitizedToken = rawToken.trim().replace(/\0/g, '');
-            const notificationDetails = JSON.parse(sanitizedToken) as NotificationDetails;
-
-            const payload = {
-                fid,
-                notification: {
-                    ...notificationConfig,
-                    notificationDetails,
-                },
-            };
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiSecret}`,
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (response.ok) {
-                console.log(`Successfully sent notification to FID: ${fid}`);
-                successCount++;
-            } else {
-                const errorResult = await response.json();
-                console.error(`Failed to send to FID: ${fid}. Status: ${response.status}. Reason:`, errorResult.error || 'Unknown');
-                errorCount++;
-            }
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            console.error(`Error processing FID: ${fid}. The token might be malformed.`, message);
-            errorCount++;
-        }
-    }
-
-    console.log("\n--- Broadcast Complete ---");
-    console.log(`Successful sends: ${successCount}`);
-    console.log(`Failed sends:     ${errorCount}`);
+  console.log("\n--- Broadcast Complete ---");
+  console.log(`Successful sends: ${successCount}`);
+  console.log(`Failed sends:     ${errorCount}`);
 }
 
 
@@ -94,7 +94,7 @@ function getNotificationContent() {
     body = `You earned ${rewardAmount} $ENB in ENB Blast rewards this week.`;
   } else {
     const daysRemaining = (REWARD_DAY_UTC - currentDayUTC + 7) % 7;
-    
+
     if (daysRemaining === 1) {
       title = `Rewards go out in 23 hours!`;
       body = `Keep blasting $ENBs for the top of the leaderboard.`;
@@ -135,7 +135,7 @@ async function main() {
       const response = await fetch(leaderboardUrl);
       const leaderboard = await response.json();
       console.log("Leaderboard data fetched.");
-      
+
       if (!leaderboard.topUsers || leaderboard.topUsers.length === 0) {
         console.log("No users found on the leaderboard. Exiting.");
         return;
@@ -162,7 +162,7 @@ async function main() {
         const totalRewardAmount = rewardAmountPerUser * recipientAddresses.length;
 
         console.log(`Attempting to send ${totalRewardAmount} $ENB to ${recipientAddresses.length} users.`);
-        
+
         try {
           const txHash = await sendRewards(recipientAddresses, totalRewardAmount);
           console.log(`Rewards transaction successful! Hash: ${txHash}`);

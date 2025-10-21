@@ -5,8 +5,8 @@ import { withRetry } from '../../../../lib/retry';
 const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = request.headers.get('x-vercel-cron-secret');
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
