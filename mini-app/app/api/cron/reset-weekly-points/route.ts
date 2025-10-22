@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getWeek } from 'date-fns';
-import { REWARD_AMOUNTS } from '@/lib/rewardTiers';
+import { REWARD_AMOUNTS, TOKEN_NAME } from '@/lib/rewardTiers';
 import { headers } from 'next/headers';
 
 const prisma = new PrismaClient();
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         orderBy: {
           weeklyPoints: 'desc',
         },
-        take: 15,
+        take: 100,
       });
 
       if (topUsers.length > 0) {
@@ -73,6 +73,7 @@ export async function GET(request: Request) {
             rank,
             weeklyPoints: user.weeklyPoints,
             rewardEarned,
+            rewardToken: TOKEN_NAME,
           };
         });
 

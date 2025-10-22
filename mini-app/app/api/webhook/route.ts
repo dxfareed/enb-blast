@@ -87,8 +87,8 @@ export async function POST(request: Request) {
         await setUserNotificationDetails(fid, event.notificationDetails);
         await sendMiniAppNotification({
           fid,
-          title: `Welcome to ENB Blast`,
-          body: `Get ready to blast $ENB and earn $ENB`,
+          title: `Hello from test`,
+          body: `this is a test notification`,
         });
       } else {
         await deleteUserNotificationDetails(fid);
@@ -109,8 +109,8 @@ export async function POST(request: Request) {
         await setUserNotificationDetails(fid, event.notificationDetails);
         await sendFrameNotification({
           fid,
-          title: `Welcome to ENB Blast`,
-          body: `Get ready to blast $ENB and earn $ENB`,
+          title: `Hello from test`,
+          body: `this is a test notification`,
         });
       } else {
         await deleteUserNotificationDetails(fid);
@@ -127,8 +127,8 @@ export async function POST(request: Request) {
       await setUserNotificationDetails(fid, event.notificationDetails);
       await sendFrameNotification({
         fid,
-        title: `Welcome to ENB Blast`,
-        body: `Get ready to blast $ENB and earn $ENB`,
+        title: `Hello from test`,
+        body: `this is a test notification`,
       });
 
       break;

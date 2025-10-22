@@ -7,7 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "mint":"tsx scripts/mint-power-up-indexer.ts",
+    "mint": "tsx scripts/mint-power-up-indexer.ts",
     "notify": "tsx scripts/broadcast.ts",
     "notify:v1": "tsx scripts/broadcastV1.ts",
     "notify:claim-reset": "tsx scripts/notify-claim-reset-onchain.ts"
@@ -33,6 +33,7 @@
     "date-fns-tz": "^3.2.0",
     "eruda": "^3.4.3",
     "ethers": "^6.15.0",
+    "html-to-image": "^1.11.13",
     "lucide-react": "^0.544.0",
     "mint.club-v2-sdk": "^1.4.10",
     "next": "15.3.4",

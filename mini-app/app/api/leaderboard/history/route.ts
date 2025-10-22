@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       weeklyPoints: userHistory.weeklyPoints.toString(),
       rank: userHistory.rank,
       rewardEarned: userHistory.rewardEarned.toString(),
+      rewardToken: userHistory.rewardToken,
     };
 
     return NextResponse.json(response);

@@ -89,15 +89,17 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<GameState>('idle');
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
-  const [floatingScores, setFloatingScores] = useState<{ id: number; points: number; x: number; y: number; }[]>([]);
+  const [floatingScores, setFloatingScores] = useState<{ id: number; text: string; x: number; y: number; isTime?: boolean; isPenalty?: boolean; }[]>([]);
   const [isBombHit, setIsBombHit] = useState(false);
   const [avatarPosition, setAvatarPosition] = useState({ x: 150, y: 400 });
   const [isDragging, setIsDragging] = useState(false);
   const [isGameOverSoundPlayed, setIsGameOverSoundPlayed] = useState(false);
   const [isInvincible, setIsInvincible] = useState(false);
   const [isMagnetActive, setIsMagnetActive] = useState(false);
+  const [magnetTimeLeft, setMagnetTimeLeft] = useState(0);
   const magnetTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isShieldActive, setIsShieldActive] = useState(false);
+  const [shieldTimeLeft, setShieldTimeLeft] = useState(0);
   const shieldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingBombHit = useRef(false);
   const gameStartTimeRef = useRef<number | null>(null);
@@ -361,12 +363,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
     setIsDragging(false);
     setIsGameOverSoundPlayed(false);
     setIsMagnetActive(false);
+    setMagnetTimeLeft(0);
     if (magnetTimerRef.current) {
-      clearTimeout(magnetTimerRef.current);
+      clearInterval(magnetTimerRef.current);
     }
     setIsShieldActive(false);
+    setShieldTimeLeft(0);
     if (shieldTimerRef.current) {
-      clearTimeout(shieldTimerRef.current);
+      clearInterval(shieldTimerRef.current);
     }
     gameEventsRef.current = [];
     gameParamsRef.current = {
@@ -560,30 +564,32 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
         let processedItems = currentItems.map(item => {
           let newItem = { ...item, y: item.y + item.speed };
           const nonMagneticTypes: ItemType[] = ['bomb', 'shield', 'time'];
-          if (isMagnetActive && !nonMagneticTypes.includes(item.type) && avatarRef.current && gameAreaRef.current) {
+          
+          if (isMagnetActiveRef.current && !nonMagneticTypes.includes(item.type) && avatarRef.current && gameAreaRef.current) {
             const gameRect = gameAreaRef.current.getBoundingClientRect();
-            const avatarCenterX = avatarPositionRef.current.x;
+            const avatarRect = avatarRef.current.getBoundingClientRect();
+            const avatarCenterX = avatarPositionRef.current.x; // This is already centered from pointer
             const avatarCenterY = avatarPositionRef.current.y;
 
-            const itemRect = item.ref.current?.getBoundingClientRect();
-            if (itemRect) {
-              const itemXPixels = (item.x / 100) * gameRect.width;
-              const itemCenterX = itemXPixels + (itemRect.width / 2);
-              const itemCenterY = newItem.y + (itemRect.height / 2);
+            // Use a fixed size for items to avoid unreliable getBoundingClientRect on off-screen elements
+            const ITEM_DIMENSIONS = 40; // Approximate item size in pixels
+            const itemXPixels = (item.x / 100) * gameRect.width;
+            const itemCenterX = itemXPixels + (ITEM_DIMENSIONS / 2);
+            const itemCenterY = newItem.y + (ITEM_DIMENSIONS / 2);
 
-              const dx = avatarCenterX - itemCenterX;
-              const dy = avatarCenterY - itemCenterY;
-              const distance = Math.sqrt(dx * dx + dy * dy);
+            const dx = avatarCenterX - itemCenterX;
+            const dy = avatarCenterY - itemCenterY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
 
-              if (distance > 1) {
-                const pullStrength = 5;
-                const pullX = (dx / distance) * pullStrength;
-                const pullY = (dy / distance) * pullStrength;
+            // Magnet attraction logic
+            if (distance > 1) { // Check distance to prevent jittering
+              const pullStrength = 5; // How strongly the magnet pulls
+              const pullX = (dx / distance) * pullStrength;
+              const pullY = (dy / distance) * pullStrength;
 
-                const newXPixels = itemXPixels + pullX;
-                newItem.x = (newXPixels / gameRect.width) * 100;
-                newItem.y += pullY;
-              }
+              const newXPixels = itemXPixels + pullX;
+              newItem.x = (newXPixels / gameRect.width) * 100; // Convert back to percentage
+              newItem.y += pullY;
             }
           }
           return newItem;
@@ -625,25 +631,39 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                   case 'powerup_pumpkin': points = GameConfig.POWER_UP_PUMPKIN_VALUE; break;
                 }
                 if (item.type === 'magnet' && isPowerupActive) {
+                  if (magnetTimerRef.current) clearInterval(magnetTimerRef.current);
                   setIsMagnetActive(true);
-                  if (magnetTimerRef.current) {
-                    clearTimeout(magnetTimerRef.current);
-                  }
-                  magnetTimerRef.current = setTimeout(() => {
-                    setIsMagnetActive(false);
-                  }, GameConfig.MAGNET_DURATION * 1000);
+                  setMagnetTimeLeft(GameConfig.MAGNET_DURATION);
+                  magnetTimerRef.current = setInterval(() => {
+                    setMagnetTimeLeft(prev => {
+                      if (prev <= 1) {
+                        clearInterval(magnetTimerRef.current!);
+                        setIsMagnetActive(false);
+                        return 0;
+                      }
+                      return prev - 1;
+                    });
+                  }, 1000);
                 } else if (item.type === 'shield' && isPowerupActive) {
+                  if (shieldTimerRef.current) clearInterval(shieldTimerRef.current);
                   setIsShieldActive(true);
-                  if (shieldTimerRef.current) {
-                    clearTimeout(shieldTimerRef.current);
-                  }
-                  shieldTimerRef.current = setTimeout(() => {
-                    setIsShieldActive(false);
-                  }, GameConfig.SHIELD_DURATION * 1000);
+                  setShieldTimeLeft(GameConfig.SHIELD_DURATION);
+                  shieldTimerRef.current = setInterval(() => {
+                    setShieldTimeLeft(prev => {
+                      if (prev <= 1) {
+                        clearInterval(shieldTimerRef.current!);
+                        setIsShieldActive(false);
+                        return 0;
+                      }
+                      return prev - 1;
+                    });
+                  }, 1000);
                 } else if (item.type === 'time' && isPowerupActive) {
                   const timeExtension = GameConfig.TIME_EXTENSION_SECONDS;
                   setTimeLeft(prev => prev + timeExtension);
                   gameEventsRef.current.push({ type: 'time_extend', duration: timeExtension, timestamp: Date.now() });
+                  const newFloatingText = { id: nextItemId++, text: `+${timeExtension}s`, x: item.x, y: item.y, isTime: true };
+                  setFloatingScores(prev => [...prev, newFloatingText]);
                 } else {
                   const pointsToAdd = points
                   setScore(prev => {
@@ -652,7 +672,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                     onScoreUpdate(newScore);
                     return newScore;
                   });
-                  const newFloatingScore = { id: nextItemId++, points: pointsToAdd, x: item.x, y: item.y };
+                  const newFloatingScore = { id: nextItemId++, text: `+${pointsToAdd}`, x: item.x, y: item.y };
                   setFloatingScores(prev => [...prev, newFloatingScore]);
                 }
               }
@@ -677,7 +697,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 // console.log(`Bomb hit: Prev: ${prev}, Points: -${pointsDeducted}, New: ${newScore}`);
                 onScoreUpdate(newScore);
                 if (pointsDeducted > 0) {
-                  const newFloatingScore = { id: nextItemId++, points: -pointsDeducted, x, y };
+                  const newFloatingScore = { id: nextItemId++, text: `-${pointsDeducted}`, x, y, isPenalty: true };
                   setFloatingScores(prevScores => [...prevScores, newFloatingScore]);
                 }
                 return newScore;
@@ -861,6 +881,20 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
 
         {gameState === 'playing' && (
           <>
+            <div className={gameStyles.powerupStatusContainer}>
+              {isMagnetActive && magnetTimeLeft > 0 && (
+                <div className={gameStyles.powerupStatus}>
+                  <span>🧲</span>
+                  <span>{magnetTimeLeft}s</span>
+                </div>
+              )}
+              {isShieldActive && shieldTimeLeft > 0 && (
+                <div className={gameStyles.powerupStatus}>
+                  <span>🛡️</span>
+                  <span>{shieldTimeLeft}s</span>
+                </div>
+              )}
+            </div>
             <Avatar ref={avatarRef} position={avatarPosition} pfpUrl={avatarPfp} isInvincible={isInvincible} />
             {isMagnetActive && (
               <span style={{
@@ -897,14 +931,14 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
             {renderItem(item)}
           </div>
         ))}
-        {floatingScores.map(score => (
+        {floatingScores.map(fscore => (
           <div
-            key={score.id}
-            className={`${gameStyles.floatingScore} ${score.points < 0 ? gameStyles.floatingScoreNegative : ''}`}
-            style={{ top: `${score.y}px`, left: `${score.x}px` }}
-            onAnimationEnd={() => handleFloatingScoreAnimationEnd(score.id)}
+            key={fscore.id}
+            className={`${gameStyles.floatingScore} ${fscore.isPenalty ? gameStyles.floatingScoreNegative : ''} ${fscore.isTime ? gameStyles.floatingScoreTime : ''}`}
+            style={{ top: `${fscore.y}px`, left: `${fscore.x}px` }}
+            onAnimationEnd={() => handleFloatingScoreAnimationEnd(fscore.id)}
           >
-            {score.points > 0 ? `+${score.points}` : score.points}
+            {fscore.text}
           </div>
         ))}
       </div>

@@ -106,6 +106,7 @@ model WeeklyLeaderboardHistory {
   rank         Int
   weeklyPoints BigInt
   rewardEarned Decimal  @default(0)
+  rewardToken  String   @default("$ENB")
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id])
 
