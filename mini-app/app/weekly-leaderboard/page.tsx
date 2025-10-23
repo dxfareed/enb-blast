@@ -9,6 +9,7 @@ import { getWeekIdentifier } from "@/app/utils/time";
 import { sdk } from '@farcaster/miniapp-sdk';
 import { formatPoints } from '@/app/utils/format';
 import { TOKEN_NAME } from "@/lib/rewardTiers";
+import { withRetry } from "@/lib/retry";
 
 interface WeeklyStats {
   fid: string;
@@ -30,12 +31,12 @@ export default function WeeklyLeaderboardPage() {
 
   useEffect(() => {
     const weekIdentifier = getWeekIdentifier().toISOString();
-    const hasSharedForWeek = localStorage.getItem('hasSharedWeeklyRecap_v4') === weekIdentifier;
+    const hasSharedForWeek = localStorage.getItem('hasSharedWeeklyRecap_v6') === weekIdentifier;
 
     if (hasSharedForWeek) {
       router.replace("/dashboard/game");
     } else {
-      localStorage.setItem('lastSeenWeeklyLeaderboard_v4', weekIdentifier);
+      localStorage.setItem('lastSeenWeeklyLeaderboard_v6', weekIdentifier);
     }
   }, [router]);
 
@@ -50,11 +51,23 @@ export default function WeeklyLeaderboardPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/leaderboard/history?fid=${fid}`);
+        const operation = async () => {
+          const response = await fetch(`/api/leaderboard/history?fid=${fid}`);
+          if (response.status >= 500) {
+            // Throw to trigger retry for server errors
+            throw new Error(`Server error: ${response.status}. Retrying...`);
+          }
+          return response;
+        };
+
+        const response = await withRetry(operation);
+
         if (!response.ok) {
+          // Handle non-retryable client errors
           const errorData = await response.json();
           throw new Error(errorData.message || "Failed to fetch your weekly stats");
         }
+
         const data = await response.json();
         setStats(data);
       } catch (err) {
@@ -96,7 +109,7 @@ export default function WeeklyLeaderboardPage() {
 
         if (result?.cast) {
             const weekIdentifier = getWeekIdentifier().toISOString();
-            localStorage.setItem('hasSharedWeeklyRecap_v4', weekIdentifier);
+            localStorage.setItem('hasSharedWeeklyRecap_v6', weekIdentifier);
             setHasShared(true);
         }
 

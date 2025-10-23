@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-title: "Powerups are fully active!",
-body: "Powerups are now enabled in the game. Get ready to blast to the Top!",
+title: "New Round, More Rewards!",
+body: "New round has started. Blast ENBs to earn more rewards!",
 };
 
 

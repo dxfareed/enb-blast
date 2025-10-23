@@ -28,7 +28,7 @@ function WeeklyLeaderboardRedirect() {
       const now = new Date();
       const currentWeekIdentifier = getWeekIdentifier(now);
       const lastSeenIdentifier = localStorage.getItem(
-        'lastSeenWeeklyLeaderboard_v4'
+        'lastSeenWeeklyLeaderboard_v6'
       );
 
       console.log('--- WeeklyLeaderboardRedirect (delayed) ---');
@@ -46,7 +46,7 @@ function WeeklyLeaderboardRedirect() {
       if (shouldShowLeaderboard) {
         if (pathname !== '/weekly-leaderboard') {
           console.log('Redirecting to /weekly-leaderboard');
-         // router.replace('/weekly-leaderboard');
+          router.replace('/weekly-leaderboard');
         } else {
           console.log('Already on /weekly-leaderboard, not redirecting.');
         }
