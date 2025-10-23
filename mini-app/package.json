@@ -10,7 +10,8 @@
     "mint": "tsx scripts/mint-power-up-indexer.ts",
     "notify": "tsx scripts/broadcast.ts",
     "notify:v1": "tsx scripts/broadcastV1.ts",
-    "notify:claim-reset": "tsx scripts/notify-claim-reset-onchain.ts"
+    "notify:claim-reset": "tsx scripts/notify-claim-reset-onchain.ts",
+    "update-profiles": "tsx scripts/update-user-profiles.ts"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.mjs"
