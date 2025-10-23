@@ -17,6 +17,7 @@ interface WeeklyStats {
   weeklyPoints: string;
   rank: number;
   rewardEarned: string;
+  rewardToken: string;
 }
 
 export default function WeeklyLeaderboardPage() {
@@ -137,7 +138,7 @@ export default function WeeklyLeaderboardPage() {
                 <div className={styles.statItem}>
                     <span className={styles.statLabel}>Reward Earned</span>
                     <span className={`${styles.statValue} ${styles.earnedValue}`}>
-                        {formatPoints(parseFloat(stats.rewardEarned))} {TOKEN_NAME}
+                        {formatPoints(parseFloat(stats.rewardEarned))} {stats.rewardToken}
                     </span>
                 </div>
             </div>
@@ -145,7 +146,7 @@ export default function WeeklyLeaderboardPage() {
       )}
        
       <div className={styles.buttonContainer}>
-        {hasShared ? (
+        {hasShared || error ? (
           <button onClick={handleContinue} className={styles.continueButton}>
             Continue to Game
           </button>

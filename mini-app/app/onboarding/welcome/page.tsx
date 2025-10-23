@@ -29,7 +29,6 @@ export default function WelcomePage() {
 
     while (attempts < maxAttempts) {
       try {
-        // No toast needed at the start of an attempt
         if (attempts === 0) {
           await new Promise(resolve => setTimeout(resolve, 1500));
         }
@@ -40,6 +39,7 @@ export default function WelcomePage() {
           const user = await response.json();
           if (user.registrationStatus === 'ACTIVE') {
             console.log('User is registered and active, go to game');
+            //router.push('/weekly-leaderboard');
             router.push('/dashboard/game');
           } else {
             console.log('User is pending, go to register');

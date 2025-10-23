@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-title: "Power ups expires soon!",
-body: "Power ups are active for an hour, Jump back in and set a new high score!",
+title: "Powerups are fully active!",
+body: "Powerups are now enabled in the game. Get ready to blast to the Top!",
 };
 
 

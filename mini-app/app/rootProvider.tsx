@@ -46,7 +46,7 @@ function WeeklyLeaderboardRedirect() {
       if (shouldShowLeaderboard) {
         if (pathname !== '/weekly-leaderboard') {
           console.log('Redirecting to /weekly-leaderboard');
-          router.replace('/weekly-leaderboard');
+         // router.replace('/weekly-leaderboard');
         } else {
           console.log('Already on /weekly-leaderboard, not redirecting.');
         }

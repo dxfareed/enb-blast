@@ -56,7 +56,7 @@ export const POWER_UP_PUMPKIN_URL = "/pumpkin.png";
 export const POWER_UP_PUMPKIN_VALUE = 500; // Note: Corresponds to ITEM_VALUES.powerup_pumpkin
 
 // --- POWER-UP DURATIONS (in seconds) ---
-export const MAGNET_DURATION = 5;
+export const MAGNET_DURATION = 8;
 export const SHIELD_DURATION = 5;
 export const TIME_EXTENSION_SECONDS = 10;
 
