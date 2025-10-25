@@ -5,8 +5,8 @@ import { getWeek } from 'date-fns';
 // Helper to get the week ID for the *previous* week to ensure we reward the correct snapshot.
 const getLastWeekId = (): string => {
   const now = new Date();
-  // Go back 7 days to ensure we are safely in the previous week's snapshot period.
-  const lastWeekDate = new Date(now.setDate(now.getDate() - 7));
+  // Go back 24 hours to ensure we are safely in the previous week's snapshot period.
+  const lastWeekDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const year = lastWeekDate.getUTCFullYear();
   const week = getWeek(lastWeekDate, { weekStartsOn: 1 }); // Assuming week starts on Monday
   return `${year}-${week.toString().padStart(2, '0')}`;

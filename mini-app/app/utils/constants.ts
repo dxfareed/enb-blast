@@ -12,6 +12,18 @@ export const BASE_BLOCKCHAIN_FACTS = [
   "Everybody Needs Base."
 ];
 
+export const INFLYNCE_FACTS = [
+  "Inflynce helps founders get distribution and creators monetize attention on Farcaster.",
+  "Mindshare is your influence score on Farcaster, updated daily.",
+  "Your Farcaster client doesn't affect your mindshare score.",
+  "Mindshare can reset to zero if you become inactive.",
+  "Inflynce Points (IP) are earned from tasks and your mindshare score.",
+  "Inflynce Hub is for launching permissionless, onchain boosting campaigns.",
+  "Creators earn USDC by engaging with boosted posts.",
+  "Anyone can launch a campaign by connecting a wallet and setting a budget.",
+  "Inflynce rewards real users, not bots, based on their Mindshare."
+];
+
 const TOKEN_MEMBERSHIP_CONTRACT_ADDRESS = "0x54F400Ce798049303594DdA9Df724996b9B6dEAF";
 const TOKEN_MEMBERSHIP_LEVELS = ["Based", "SuperBased", "Legendary"];
 const TOKEN_MEMBERSHIP_CONTRACT_ABI = [{ "inputs": [{ "internalType": "address", "name": "", "type": "address" }], "name": "userAccounts", "outputs": [{ "internalType": "uint40", "name": "lastDailyClaimTime", "type": "uint40" }, { "internalType": "uint40", "name": "accountCreatedAt", "type": "uint40" }, { "internalType": "uint32", "name": "totalDailyClaims", "type": "uint32" }, { "internalType": "uint96", "name": "totalYieldClaimed", "type": "uint96" }, { "internalType": "enum EnbMiniApp.MembershipLevel", "name": "membershipLevel", "type": "uint8" }, { "internalType": "bool", "name": "exists", "type": "bool" }], "stateMutability": "view", "type": "function" }];

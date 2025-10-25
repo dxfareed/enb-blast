@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-title: "Powerups are fully active!",
-body: "Powerups are now enabled in the game. Get ready to blast to the Top!",
+  title: "Blast x Inflynce 🚀🧡",
+  body: "Inflynce collab is live now, 900k $ENB raffle!. Up for 72 hours",
 };
 
 

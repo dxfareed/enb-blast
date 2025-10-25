@@ -49,6 +49,7 @@ const allowedCheckKeys = [
   'DISCORD_JOIN_ENB',
   'CREATORX_FOLLOW_FOUNDER',
   'SCORELINE_TOURNAMENT_JOIN',
+  'MINI_APP_OPEN_INFLYNCE',
 ];
 
 export async function POST(request: NextRequest) {

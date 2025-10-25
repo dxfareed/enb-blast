@@ -1,0 +1,40 @@
+/* app/dashboard/1v1/page.module.css */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+  padding: 2rem;
+  font-family: var(--font-space-mono);
+  color: #4b5563;
+}
+
+.icon {
+  margin-bottom: 1.1rem;
+  color: #9ca3af;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e40af;
+  background-color: #e0e7ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  margin-bottom: 1.5rem;
+}
+
+.description {
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 400px;
+}

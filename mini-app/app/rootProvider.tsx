@@ -28,7 +28,7 @@ function WeeklyLeaderboardRedirect() {
       const now = new Date();
       const currentWeekIdentifier = getWeekIdentifier(now);
       const lastSeenIdentifier = localStorage.getItem(
-        'lastSeenWeeklyLeaderboard_v4'
+        'lastSeenWeeklyLeaderboard_v6'
       );
 
       console.log('--- WeeklyLeaderboardRedirect (delayed) ---');

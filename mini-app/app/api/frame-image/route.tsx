@@ -20,6 +20,7 @@ type UserProfile = {
   totalClaimed: string;
   weeklyPoints: string;
   weeklyRank: number;
+  highScore: number;
 };
 
 type LeaderboardUser = {
@@ -37,6 +38,7 @@ async function getUserProfile(fid: string, revalidate = false): Promise<UserProf
     totalClaimed: '0',
     weeklyPoints: '0',
     weeklyRank: 0,
+    highScore: 0,
   };
 
   if (!fid) return fallbackUser;
@@ -57,6 +59,7 @@ async function getUserProfile(fid: string, revalidate = false): Promise<UserProf
       totalClaimed: user.totalClaimed || fallbackUser.totalClaimed,
       weeklyPoints: user.weeklyPoints || fallbackUser.weeklyPoints,
       weeklyRank: user.weeklyRank ?? fallbackUser.weeklyRank,
+      highScore: user.highScore ?? fallbackUser.highScore,
     };
   } catch (error) {
     console.error("Failed to fetch user profile:", error);
@@ -121,6 +124,7 @@ export async function GET(request: NextRequest) {
     const urlClaimed = searchParams.get('claimed');
     const urlWeeklyPoints = searchParams.get('weeklyPoints');
     const urlRank = searchParams.get('rank');
+    const urlHighScore = searchParams.get('highScore');
 
     // Construct the user profile for display, prioritizing URL parameters
     const displayUserProfile: UserProfile = {
@@ -130,6 +134,7 @@ export async function GET(request: NextRequest) {
       totalClaimed: urlClaimed || fetchedUserProfile.totalClaimed,
       weeklyPoints: urlWeeklyPoints || fetchedUserProfile.weeklyPoints,
       weeklyRank: urlRank ? parseInt(urlRank) : fetchedUserProfile.weeklyRank,
+      highScore: urlHighScore ? parseInt(urlHighScore) : fetchedUserProfile.highScore,
     };
 
     const topUsers = topUsersData.slice(0, 5).map((user, index) => ({
@@ -178,7 +183,7 @@ export async function GET(request: NextRequest) {
                     label={`Streak${displayUserProfile.streak <= 1 ? '' : 's'}`}
                     value={String(displayUserProfile.streak)}
                   />
-                  <StatItem label="Claimed" value={formatPoints(parseFloat(displayUserProfile.totalClaimed))} />
+                  <StatItem label="Best" value={formatPoints(displayUserProfile.highScore)} />
                 </div>
               </div>
             </div>

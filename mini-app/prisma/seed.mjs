@@ -7,7 +7,6 @@ const tasks = [
   { title: 'Follow ENB Community on farcaster', description: 'Join the ENB community channel for the latest updates and discussions.', rewardPoints: 100, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/~/channel/enb', checkKey: 'FARCASTER_FOLLOW_ENB_CHANNEL' },
   { title: 'Follow ENB account', description: 'Follow the official ENB account on Farcaster.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/enb', checkKey: 'FARCASTER_FOLLOW_ENB' },
   { title: 'Subscribe to ENB YouTube Channel', description: 'Subscribe to the official ENB Mini Apps YouTube channel.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://youtube.com/@enbminiapps?si=Vzf_-DeReYEVK3lu', checkKey: 'YOUTUBE_SUBSCRIBE_ENBMINIAPPS' },
-  { title: 'Subscribe to ENB on Paragraph', description: 'Subscribe to the ENB Bit-Sized Scoop on Paragraph.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://paragraph.com/@enb-bit-sized-scoop/enb-ecosystem-weekly-scoops-7', checkKey: 'PARAGRAPH_SUBSCRIBE_ENB' },
   { title: 'Follow ENB on Zora', description: 'Follow the official ENB account on Zora.', rewardPoints: 500, type: TaskType.DEFAULT, actionUrl: 'https://zora.co/@enb', checkKey: 'ZORA_FOLLOW_ENB' },
   { title: 'Join ENB on Telegram', description: 'Join the community for real-time discussions.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://t.me/+_cGFbzCqtEthNDNk', checkKey: 'TELEGRAM_JOIN_ENB' },
   { title: 'Join the ENB Discord', description: 'Join our Discord community for announcements and support.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://discord.gg/n7XUtBmuQ', checkKey: 'DISCORD_JOIN_ENB' },
@@ -26,16 +25,7 @@ const tasks = [
   { title: 'Mint ENB Bounty NFT', description: 'Mint your exclusive ENB Bounty NFT to mark your participation in the ecosystem.', rewardPoints: 250, type: TaskType.DEFAULT, actionUrl: 'https://farcaster.xyz/miniapps/0GzdUkFK2f7A/enb-bounty', checkKey: 'MINT_ENB_BOUNTY_NFT' },
   { title: 'Follow ENB on X', description: 'Follow the official ENB account on X.', rewardPoints: 50, type: TaskType.DEFAULT, actionUrl: 'https://x.com/EverybNeedsBase', checkKey: 'X_FOLLOW_ENB' },
   { title: 'Follow ENB Apps on X', description: 'Follow the official ENB Apps account on X.', rewardPoints: 1000, type: TaskType.DEFAULT, actionUrl: 'https://x.com/enbapps', checkKey: 'X_FOLLOW_ENB_APPS' },
-  {
-    title: '1m $ENB tournament on scoreline',
-    description: 'Join tournament, Predict and Win',
-    rewardPoints: 3000,
-    type: TaskType.PARTNER,
-    actionUrl: 'https://base.scoreline.fun/matches?tournamentId=1&poolId=5',
-    checkKey: 'SCORELINE_TOURNAMENT_JOIN',
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
-  },
-  {
+  /* {
     title: 'Hold 10k+ $CAP',
     description: 'Hold at least 10,000 $CAP (Capminal) tokens.',
     rewardPoints: 4000,
@@ -50,6 +40,15 @@ const tasks = [
     type: TaskType.PARTNER,
     actionUrl: 'https://farcaster.xyz/miniapps/lwBYO_1-Hga8/capminal',
     checkKey: 'MINI_APP_OPEN_CAPMINAL',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+  }, */
+  {
+    title: 'Explore Inflynce',
+    description: 'Use the Inflynce mini app.',
+    rewardPoints: 5000,
+    type: TaskType.PARTNER,
+    actionUrl: 'https://farcaster.xyz/miniapps/TrnTSlXGbRDg/inflynce',
+    checkKey: 'MINI_APP_OPEN_INFLYNCE',
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
   },
   /* { 

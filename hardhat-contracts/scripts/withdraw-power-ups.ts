@@ -4,11 +4,11 @@ async function main() {
   const [deployer] = await hre.viem.getWalletClients();
   const toAddress = "0x8A6472bCDF34378C81140f8122032849061a7B12";
 
-  const powerUpContractAddress = "0x333bc453a8fc5aab73badd6a93a12e5133f90c53";
+  const powerUpContractAddress = "0xf40376a732f280b6d4488921fbaed274b3b6238a";
 
   console.log("Withdrawing funds from PowerUpContract to:", toAddress);
 
-  const powerUpContract = await hre.viem.getContractAt("PowerUpContract", powerUpContractAddress);
+  const powerUpContract = await hre.viem.getContractAt("BlastPowerUpNFT", powerUpContractAddress);
 
   const tx = await powerUpContract.write.withdrawFunds([toAddress]);
 
