@@ -3,8 +3,6 @@
 // --- GAME CORE ---
 export const GAME_DURATION_SECONDS = 30;
 
-// --- GAME BALANCE: SPAWN RATE & SPEED ---
-// Initial values at the start of the game
 export const INITIAL_SPAWN_RATE = 290; // Milliseconds between spawns
 export const INITIAL_BOMB_SPEED = 5;
 export const INITIAL_PICTURE_SPEED = 5;
@@ -40,7 +38,7 @@ export const ITEM_VALUES = {
 
 // Client-side URLs and display values
 export const PICTURE_URL = "/Enb_000.png";
-export const CAP_PICTURE_URL = "/cap.jpg";
+export const CAP_PICTURE_URL = "/inf3.png";
 
 export const BASE_PICTURE_VALUE = 5; // Note: Corresponds to ITEM_VALUES.picture
 export const POWER_UP_POINT_2_URL = "/powerup_2.png";

@@ -7,9 +7,11 @@ import gameStyles from '@/app/dashboard/game/game.module.css';
 import Avatar from './Avatar';
 import { useUser } from '@/app/context/UserContext';
 import DidYouKnow from './DidYouKnow';
-import { BASE_BLOCKCHAIN_FACTS } from '@/app/utils/constants';
+import { BASE_BLOCKCHAIN_FACTS, INFLYNCE_FACTS } from '@/app/utils/constants';
 import NewHighScoreAnimation from './NewHighScoreAnimation';
 import * as GameConfig from '@/lib/gameConfig';
+
+const allFacts = [...BASE_BLOCKCHAIN_FACTS, ...INFLYNCE_FACTS];
 
 const GAME_DURATION = GameConfig.GAME_DURATION_SECONDS;
 
@@ -793,13 +795,13 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
                 <>
                   <div className={gameStyles.spinner}></div>
                   <p>Starting game...</p>
-                  <DidYouKnow facts={BASE_BLOCKCHAIN_FACTS} />
+                  <DidYouKnow facts={allFacts} />
                 </>
               ) : (
                 <>
                   <h2>blast ENBS</h2>
                   <p>
-                    Drag your avatar to collect.<br />Avoid the Wormhole ENBs!
+                    Drag your avatar to collect.<br />Avoid the Green Wormhole ENBs!
                   </p>
                   <button onClick={startGame} className={gameStyles.startButton}>
                     Click to Start
@@ -858,7 +860,7 @@ const GameEngine = forwardRef<GameEngineHandle, GameEngineProps>(({
               <>
                 <div className={gameStyles.spinner}></div>
                 <p>Saving score...</p>
-                <DidYouKnow facts={BASE_BLOCKCHAIN_FACTS} />
+                <DidYouKnow facts={allFacts} />
               </>
             ) : (
               <>

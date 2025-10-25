@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@/app/context/UserContext';
-import { Home, Trophy, User, ClipboardList, Plus} from 'lucide-react';
+import { Home, Trophy, User, ClipboardList, Plus, Swords} from 'lucide-react';
 import styles from './layout.module.css';
 import TokenBalanceDisplay from '@/app/components/TokenBalanceDisplay';
 import HighlightTooltip from '@/app/components/HighlightTooltip';
@@ -15,6 +15,7 @@ import Marquee from '@/app/components/Marquee';
 import { getTokenMarqueeData, TokenMarqueeRawData } from '@/lib/dexscreener';
 import { TOKEN_ADDRESS } from '../utils/constants';
 import { sdk } from '@farcaster/miniapp-sdk'
+import Toast from '@/app/components/Toast';
 
 const TOOLTIP_STORAGE_KEY = 'hasSeenDashboardTooltip';
 
@@ -29,6 +30,7 @@ const tourSteps = [
 const navItems = [
   { id: 'home', href: '/dashboard/game', icon: Home, label: 'Home' },
   { id: 'tasks', href: '/dashboard/tasks', icon: ClipboardList, label: 'Tasks' },
+  { id: '1v1', href: '/dashboard/1v1', icon: Swords, label: '1v1' },
   { id: 'leaderboard', href: '/dashboard/leaderboard', icon: Trophy, label: 'Leaderboard' },
   { id: 'profile', href: '/dashboard/profile', icon: User, label: 'Me' },
 ];

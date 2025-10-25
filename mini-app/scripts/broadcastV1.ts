@@ -6,8 +6,8 @@ interface NotificationDetails {
 }
 
 const NOTIFICATION_CONFIG = {
-title: "New Round, More Rewards!",
-body: "New round has started. Blast ENBs to earn more rewards!",
+  title: "Blast x Inflynce 🚀🧡",
+  body: "Inflynce collab is live now, 900k $ENB raffle!. Up for 72 hours",
 };
 
 

@@ -2,8 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseGwei } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -13,23 +11,11 @@ import styles from './register.module.css';
 import modalStyles from './pendingModal.module.css';
 import animationStyles from '../../animations.module.css';
 import { useUser } from '@/app/context/UserContext';
+import { useAccount } from 'wagmi';
 
 const ParticleBackground = dynamic(() => import('./particles'), { ssr: false });
 
-// The correct, full ABI for the register function
-const GAME_ABI = [{
-  "inputs": [
-    { "internalType": "uint256", "name": "_fid", "type": "uint256" },
-    { "internalType": "address[]", "name": "_wallets", "type": "address[]" },
-    { "internalType": "bytes", "name": "_signature", "type": "bytes" }
-  ],
-  "name": "register",
-  "outputs": [],
-  "stateMutability": "nonpayable",
-  "type": "function"
-}] as const;
 
-const GAME_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`;
 
 export default function RegisterPage() {
   const [isPopping, setIsPopping] = useState(false);
@@ -38,69 +24,26 @@ export default function RegisterPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const { address, isConnected } = useAccount();
   const router = useRouter();
-  const { userProfile, fid, refetchUserProfile } = useUser();
+  const { userProfile, refetchUserProfile } = useUser();
 
-  // Redirect user or show pending modal based on status
   useEffect(() => {
     if (userProfile) {
       if (userProfile.registrationStatus === 'ACTIVE') {
         router.replace('/dashboard/game');
-      } else if (userProfile.registrationStatus === 'PENDING') {
-        setShowPendingModal(true);
+        return;
       }
-    }
-  }, [userProfile, router]);
 
-  const { data: hash, writeContract, isPending, error: writeContractError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess, error: confirmationError } = useWaitForTransactionReceipt({ hash });
-
-  // Combined loading state
-  useEffect(() => {
-    setIsLoading(isPending || isConfirming);
-  }, [isPending, isConfirming]);
-
-  // Handle user activation after successful transaction
-  useEffect(() => {
-    async function activateUserOnSuccess() {
-      if (isSuccess && hash) {
-        setIsLoading(true);
-        try {
-          const activateResponse = await sdk.quickAuth.fetch('/api/user/activate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ txHash: hash }),
-          });
-
-          if (!activateResponse.ok) {
-            const errorData = await activateResponse.json();
-            throw new Error(errorData.message || 'Failed to activate user status.');
-          }
-
-          await refetchUserProfile();
-          setToast({ message: 'Activation complete! Redirecting...', type: 'success' });
-          setTimeout(() => router.push('/dashboard/game'), 1500);
-
-        } catch (error) {
-          setToast({ message: `Activation failed: ${(error as Error).message}`, type: 'error' });
-        } finally {
-          setIsLoading(false);
+      if (userProfile.registrationStatus === 'PENDING') {
+        if (isConnected && address) {
+          handleRegister();
+        } else {
+          setShowPendingModal(true);
         }
       }
     }
-    activateUserOnSuccess();
-  }, [isSuccess, hash, router, refetchUserProfile]);
-
-  // Handle contract errors
-  useEffect(() => {
-    const error = writeContractError || confirmationError;
-    if (error) {
-      const message = error.message.includes('User rejected') ? 'Transaction rejected.' : (error as any).shortMessage || error.message;
-      setToast({ message: `Error: ${message}`, type: 'error' });
-    }
-  }, [writeContractError, confirmationError]);
+  }, [userProfile, router, isConnected, address]);
 
   async function handleRegister() {
-    // Hide modal if it was open
     if (showPendingModal) {
       setShowPendingModal(false);
     }
@@ -108,8 +51,8 @@ export default function RegisterPage() {
     setIsPopping(true);
     setTimeout(() => setIsPopping(false), 500);
 
-    if (!isConnected || !address || !fid) {
-      setToast({ message: 'Wallet or Farcaster ID not available.', type: 'error' });
+    if (!isConnected || !address) {
+      setToast({ message: 'Please connect your wallet.', type: 'error' });
       return;
     }
     if (isLoading) return;
@@ -124,29 +67,12 @@ export default function RegisterPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to get registration data.');
+        throw new Error(errorData.message || 'Registration failed.');
       }
 
-      const { signature, wallets } = await response.json();
-
-      if (!signature) {
-        await refetchUserProfile();
-        setToast({ message: "You're already registered! Redirecting...", type: 'success' });
-        setTimeout(() => router.push('/dashboard/game'), 100);
-        return;
-      }
-      const maxPriority = parseGwei('0.05');
-      const maxFee = parseGwei('0.1');
-
-
-      writeContract({
-        address: GAME_CONTRACT_ADDRESS,
-        abi: GAME_ABI,
-        functionName: 'register',
-        args: [BigInt(fid), wallets, signature],
-        maxFeePerGas: maxFee,
-        maxPriorityFeePerGas: maxPriority,
-      });
+      await refetchUserProfile();
+      setToast({ message: "Registration successful! Let's go!", type: 'success' });
+      router.push('/dashboard/game');
 
     } catch (error) {
       const errorMessage = (error as Error).message;
@@ -155,6 +81,7 @@ export default function RegisterPage() {
       } else {
         setToast({ message: `Error: ${errorMessage}`, type: 'error' });
       }
+    } finally {
       setIsLoading(false);
     }
   }

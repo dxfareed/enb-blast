@@ -1,15 +1,5 @@
 // app/api/user/profile/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  createPublicClient, 
-  http, 
-  Hash, 
-  keccak256, 
-  encodePacked, 
-  encodeAbiParameters 
-} from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { base } from 'viem/chains';
 import { Errors, createClient } from "@farcaster/quick-auth";
 import { convertBigIntsToStrings } from '../../../../lib/json';
 import prisma from '../../../../lib/prisma';
@@ -18,20 +8,7 @@ import prisma from '../../../../lib/prisma';
 //                                  CONFIGURATION
 // =================================================================================
 
-// Viem public client for read-only blockchain interactions
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http("https://mainnet-preconf.base.org"),
-});
 
-// The ABI for the functions we need to call, formatted for viem
-const GAME_CONTRACT_ABI = [{
-  "inputs": [{ "internalType": "uint256", "name": "fid", "type": "uint256" }],
-  "name": "userProfiles",
-  "outputs": [{ "internalType": "bool", "name": "isRegistered", "type": "bool" }],
-  "stateMutability": "view",
-  "type": "function"
-}] as const; // Using 'as const' provides strong typing
 
 // Farcaster Auth Client
 const client = createClient();
@@ -69,17 +46,7 @@ async function fetchFarcasterProfile(fid: bigint | string) {
   };
 }
 
-// [REFACTORED WITH VIEM]
-async function isFidAlreadyRegistered(fid: bigint): Promise<boolean> {
-  const data = await publicClient.readContract({
-    address: process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`,
-    abi: GAME_CONTRACT_ABI,
-    functionName: 'userProfiles',
-    args: [fid]
-  });
-  // The result of readContract is the boolean value directly
-  return data;
-}
+
 
 function getUrlHost(request: NextRequest): string {
     const origin = request.headers.get("origin");
@@ -162,10 +129,15 @@ export async function POST(req: NextRequest) {
           walletAddress: walletAddress.toLowerCase(),
           username: farcasterProfile.username,
           pfpUrl: farcasterProfile.pfpUrl,
-          registrationStatus: 'PENDING',
+          registrationStatus: 'ACTIVE',
           verifiedWallets: farcasterProfile.wallets.map((w:any) => w.toLowerCase()),
         },
       });
+    } else if (user.registrationStatus !== 'ACTIVE') {
+        user = await prisma.user.update({
+            where: { fid: userFid },
+            data: { registrationStatus: 'ACTIVE' },
+        });
     }
     
     const serializableUser = convertBigIntsToStrings(user);
@@ -174,46 +146,7 @@ export async function POST(req: NextRequest) {
         fid: parseInt(serializableUser.fid, 10)
     };
 
-    if (await isFidAlreadyRegistered(userFid)) {
-      if (user.registrationStatus !== 'ACTIVE') {
-        await prisma.user.update({ where: { fid: userFid }, data: { registrationStatus: 'ACTIVE' } });
-        finalUserProfile.registrationStatus = 'ACTIVE';
-      }
-      return NextResponse.json({ ...finalUserProfile, signature: null }, { status: 200 });
-    }
-
-    const farcasterProfile = await fetchFarcasterProfile(userFid);
-    const wallets = farcasterProfile.wallets;
-    if (wallets.length === 0) {
-      return NextResponse.json({ message: "No verified Ethereum addresses found on your Farcaster account." }, { status: 404 });
-    }
-
-    // [REFACTORED WITH VIEM]
-    const serverAccount = privateKeyToAccount(process.env.SERVER_SIGNER_PRIVATE_KEY as `0x${string}`);
-    const contractAddress = process.env.NEXT_PUBLIC_GAME_CONTRACT_ADDRESS as `0x${string}`;
-    
-    // Create the inner hash of the wallets array
-    const encodedWallets = encodeAbiParameters([{ type: 'address[]' }], [wallets]);
-    const walletsHash = keccak256(encodedWallets);
-
-    // Create the final registration hash
-    const registrationHash = keccak256(
-      encodePacked(
-        ['address', 'string', 'uint256', 'bytes32'],
-        [contractAddress, "REGISTER", userFid, walletsHash]
-      )
-    );
-
-    // Sign the hash
-    const signature = await serverAccount.signMessage({ 
-      message: { raw: registrationHash } 
-    });
-
-    return NextResponse.json({
-      ...finalUserProfile,
-      signature,
-      wallets
-    }, { status: 200 });
+    return NextResponse.json({ ...finalUserProfile, signature: null }, { status: 200 });
 
   } catch (error) {
     if (error instanceof Errors.InvalidTokenError) {

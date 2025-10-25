@@ -11,6 +11,11 @@
   color: #0052ff; /* Base blue */
 }
 
+.orangeTitle {
+  composes: title;
+  color: orange;
+}
+
 .fact {
   font-size: 0.9em;
   margin: 0;

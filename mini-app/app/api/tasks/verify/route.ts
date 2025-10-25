@@ -364,6 +364,10 @@ const taskCheckers = {
     console.log(`Verifying Mini App open (Capminal) for user ${user.id}...`);
     return true;
   },
+  MINI_APP_OPEN_INFLYNCE: async (user: { id: string; }): Promise<boolean> => {
+    console.log(`Verifying Mini App open (Inflynce) for user ${user.id}...`);
+    return true;
+  },
   PARTNER_SPECIAL_EVENT: async (user: { id: string; }): Promise<boolean> => {
     console.log(`Verifying Partner Special Event for user ${user.id}...`);
     return true;

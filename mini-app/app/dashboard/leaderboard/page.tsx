@@ -8,7 +8,7 @@ import WeeklyCountdown from '@/app/components/WeeklyCountdown';
 import { formatPoints } from '@/app/utils/format';
 import Loader from '@/app/components/Loader';
 import { ChevronDown } from 'lucide-react';
-import { REWARD_TIERS } from '@/lib/rewardTiers';
+import { REWARD_TIERS, TOKEN_NAME, prizePoolAmount} from '@/lib/rewardTiers';
 
 type LeaderboardUser = {
   fid: number;
@@ -24,11 +24,9 @@ const getRankStyling = (rank: number) => {
   if (rank === 2) return styles.rank2;
   if (rank === 3) return styles.rank3;
   if (rank === 4 || rank === 5) return styles.rank4_5_purple;
-  if (rank >= 6 && rank <= 10) return styles.rank6_10_blue;
+  if (rank >= 6 && rank <= 15) return styles.rank6_15_blue;
   return styles.rankDefault;
 };
-
-const prizePoolAmount = 250000;
 
 export default function LeaderboardPage() {
   const { userProfile } = useUser();
@@ -115,7 +113,7 @@ export default function LeaderboardPage() {
         <div className={styles.subHeader}>
           <div className={styles.prizePool}>
             <span className={styles.cardLabel}>PRIZE POOL</span>
-            <span className={styles.cardValue}>{prizePoolAmount.toLocaleString()} $CAP</span>
+            <span className={styles.cardValue}>{prizePoolAmount.toLocaleString()} {TOKEN_NAME}</span>
           </div>
           <div className={styles.countdown}>
             <span className={styles.cardLabel}>TIME LEFT</span>
